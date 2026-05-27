@@ -1,0 +1,9 @@
+fastembed==0.8.0
+pydantic==2.13.4
+numpy==2.4.6
+scikit-learn==1.8.0
+pytest==9.0.3
+fastapi>=0.100.0
+uvicorn>=0.23.0
+jupyter
+nbformat
