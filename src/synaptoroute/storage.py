@@ -1,5 +1,6 @@
 import sqlite3
 import json
+import os
 from abc import ABC, abstractmethod
 from typing import List
 
@@ -21,6 +22,9 @@ class BaseStorage(ABC):
 class SQLiteStorage(BaseStorage):
     def __init__(self, db_path: str):
         self.db_path = db_path
+        dirname = os.path.dirname(self.db_path)
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.conn.execute('PRAGMA journal_mode=WAL;')
         self.conn.execute('PRAGMA foreign_keys = ON')
