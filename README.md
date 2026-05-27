@@ -1,16 +1,42 @@
 # SynaptoRoute
 
-SynaptoRoute is a high-throughput, local semantic routing engine designed to replace slow, costly Large Language Model (LLM) routing chains. By leveraging local INT8 quantized embeddings and asynchronous dynamic batching, SynaptoRoute achieves zero-token intent classification in under 3 milliseconds on standard cloud hardware.
+SynaptoRoute is a high-throughput, local semantic routing engine built for production Python microservices. Designed as a mathematically optimal alternative to Large Language Model (LLM) routing chains and slower local routers, it provides zero-token intent classification in under 3 milliseconds on standard cloud hardware.
 
-## Architecture
+## Table of Contents
+- [Why SynaptoRoute?](#why-synaptoroute)
+- [Architecture & Optimizations](#architecture--optimizations)
+- [Performance Benchmarks](#performance-benchmarks)
+- [Installation & Deployment](#installation--deployment)
+- [Quick Start Guide](#quick-start-guide)
+- [API Reference](#api-reference)
+- [System Limitations](#system-limitations)
 
-Traditional semantic routers suffer from O(N) memory degradation during live updates because they execute a deep memory copy of their entire vector space on every addition. SynaptoRoute solves this via a lazy-compilation strategy, deferring vector reallocation until strictly necessary.
+---
 
-Furthermore, SynaptoRoute implements a dynamic asynchronous batching queue. Rather than evaluating queries sequentially, the background worker intercepts parallel HTTP requests, groups them within a 5-millisecond window, and processes the batch as a single matrix multiplication operation.
+## Why SynaptoRoute?
+
+In modern agentic systems, relying on an external API (like OpenAI or Anthropic) to make simple routing decisions—such as determining if a user wants to reset their password or check their balance—introduces unacceptable latency (300ms+) and high token costs.
+
+SynaptoRoute solves this by executing intent classification entirely locally using INT8 quantized vector embeddings. 
+
+Compared to existing open-source local routers (e.g., `semantic-router`), SynaptoRoute was engineered specifically to solve the $O(N)$ memory degradation problem during live hot-reloading and to maximize hardware utilization via asynchronous dynamic batching. For an in-depth breakdown, read our [Architectural Comparison](COMPARISON.md).
+
+## Architecture & Optimizations
+
+### 1. Lazy Memory Compilation
+Traditional routers suffer from severe performance degradation during live updates. When a new route is added, they execute an immediate `numpy.vstack`, copying the entire vector array in memory ($O(N)$ complexity). SynaptoRoute defers this reallocation, appending new vectors to a lightweight list ($O(1)$) and only executing the heavy compilation precisely when the next query arrives, preventing server freezes.
+
+### 2. Dynamic Asynchronous Batching
+Hardware accelerators (GPUs, AVX512 CPUs) are optimized for large matrix multiplications. Sending single queries sequentially incurs massive transfer overhead. SynaptoRoute utilizes a background `asyncio.Queue` worker that traps parallel HTTP requests, waits 5 milliseconds, groups them into a batch, and processes them in a single hardware cycle.
+
+### 3. INT8 Quantization
+By default, SynaptoRoute leverages the `BAAI/bge-small-en-v1.5` model quantized to 8-bit integers via the ONNX runtime, slashing memory bandwidth requirements by 4x and maximizing CPU cache utilization.
+
+---
 
 ## Performance Benchmarks
 
-The following metrics were captured via automated GitHub Actions CI/CD running on a standard `ubuntu-latest` 2-core cloud CPU.
+The following metrics were captured via automated GitHub Actions CI/CD running on a standard, unaccelerated `ubuntu-latest` 2-core cloud CPU.
 
 | Metric | Cloud CPU Latency | Context |
 | :--- | :--- | :--- |
@@ -18,35 +44,40 @@ The following metrics were captured via automated GitHub Actions CI/CD running o
 | **Amortized P50** | 2.69 ms | Per-query latency when processing 1,000 concurrent requests via dynamic batching. |
 | **Hot-Reload** | 5.04 ms | Time required to dynamically inject a new utterance into memory without dropping active API requests. |
 
-## Deployment & Usage
+---
+
+## Installation & Deployment
 
 ### Method 1: Docker REST API (Recommended)
 
-SynaptoRoute includes a fully asynchronous FastAPI wrapper designed for immediate microservice deployment.
+SynaptoRoute ships with a fully asynchronous FastAPI wrapper, designed for immediate drop-in deployment as a scalable microservice.
 
 ```bash
-# Build the image
+# Build the Docker image
 docker build -t synaptoroute .
 
 # Run the container
 docker run -p 8000:8000 synaptoroute
 ```
 
-Once running, you can interface with the router via standard HTTP requests:
-
+You can interface with the router immediately:
 ```bash
 curl -X POST http://localhost:8000/route \
      -H "Content-Type: application/json" \
      -d '{"query": "I need help resetting my password"}'
 ```
 
-### Method 2: Python Library
+### Method 2: Python Package
 
-To embed SynaptoRoute directly into your existing Python applications:
+To embed SynaptoRoute natively into your existing Python pipelines:
 
 ```bash
 pip install git+https://github.com/sitanshukr08/SynaptoRoute.git
 ```
+
+---
+
+## Quick Start Guide
 
 ```python
 import asyncio
@@ -56,26 +87,35 @@ from synaptoroute.storage import SQLiteStorage
 from synaptoroute.models import Route
 
 async def main():
+    # 1. Initialize Components
     encoder = Encoder()
     storage = SQLiteStorage("data/memory.sqlite")
     router = AdaptiveRouter(encoder, storage)
     
-    # Add an intent
-    router.add_route(Route(name="billing", utterances=["I need a refund"]))
+    # 2. Define Routes
+    billing_route = Route(
+        name="billing", 
+        utterances=["I need a refund", "Where is my receipt?", "Cancel my subscription"]
+    )
+    router.add_route(billing_route)
     
-    # Start the background batching worker
+    # 3. Start the Background Batching Worker
     await router.start()
     
-    # Query the router
+    # 4. Execute Async Queries
     result = await router.aquery("How do I get my money back?")
-    print(result.name) # Output: billing
+    print(f"Matched Intent: {result.name}") # Output: billing
     
+    # 5. Graceful Shutdown
     await router.stop()
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+---
+
 ## System Limitations
 
-SynaptoRoute utilizes local SQLite and in-memory NumPy matrices to achieve microsecond latency. As such, it is structurally bound to a single node. Deploying this system across multiple Kubernetes pods without a distributed event bus (such as Redis Pub/Sub) will result in cache incoherency (split-brain routing) during hot-reloads.
+**Horizontal Scaling (Kubernetes Split-Brain)**  
+SynaptoRoute relies on a highly optimized, local in-memory NumPy matrix to achieve its microsecond latency. As such, it is structurally bound to a single node. If deployed across multiple load-balanced Kubernetes pods, a hot-reload request hitting Pod A will update Pod A's local memory, but Pod B will remain unaware. Scaling horizontally requires implementing an external event bus (e.g., Redis Pub/Sub) to broadcast memory invalidation events across the cluster.
