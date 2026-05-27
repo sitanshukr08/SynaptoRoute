@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy python project configuration
 COPY pyproject.toml .
+COPY README.md .
 COPY src/ src/
 
 # Install the package
