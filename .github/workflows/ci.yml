@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[test]
+          
+      - name: Run Tests
+        run: |
+          pytest
+          
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build Docker Image
+        run: |
+          docker build -t synaptoroute-test .
+
+  benchmark:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          
+      - name: Run Dynamic Batching Benchmark
+        run: |
+          echo "### Dynamic Batching Throughput" >> $GITHUB_STEP_SUMMARY
+          python benchmarks/bench_dynamic_batching.py >> $GITHUB_STEP_SUMMARY
+          
+      - name: Run System Performance Benchmark
+        run: |
+          echo "### System Performance & Hot-Reload Latency" >> $GITHUB_STEP_SUMMARY
+          python benchmarks/bench_performance.py >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,20 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install any required system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy python project configuration
+COPY pyproject.toml .
+COPY src/ src/
+
+# Install the package
+RUN pip install --no-cache-dir .
+
+# Cache fastembed weights during build
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding()" || true
+
+ENTRYPOINT ["python", "-m", "synaptoroute"]

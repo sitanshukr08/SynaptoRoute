@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "synaptoroute"
+version = "0.1.0"
+description = "A dynamic zero-token semantic router"
+dependencies = [
+    "fastembed==0.8.0",
+    "pydantic==2.13.4",
+    "numpy==2.4.6",
+    "scikit-learn==1.8.0"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest==9.0.3"
+]
