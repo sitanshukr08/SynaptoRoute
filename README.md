@@ -19,7 +19,7 @@ In modern agentic systems, relying on an external API (like OpenAI or Anthropic)
 
 SynaptoRoute solves this by executing intent classification entirely locally using INT8 quantized vector embeddings. 
 
-Compared to existing open-source local routers (e.g., `semantic-router`), SynaptoRoute was engineered specifically to solve the $O(N)$ memory degradation problem during live hot-reloading and to maximize hardware utilization via asynchronous dynamic batching. For an in-depth breakdown, read our [Architectural Comparison](COMPARISON.md).
+SynaptoRoute was engineered specifically to solve the $O(N)$ memory degradation problem during live hot-reloading and to maximize hardware utilization via asynchronous dynamic batching.
 
 ## Architecture & Optimizations
 
