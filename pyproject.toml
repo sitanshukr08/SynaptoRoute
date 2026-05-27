@@ -6,18 +6,36 @@ build-backend = "hatchling.build"
 name = "synaptoroute"
 version = "0.1.0"
 description = "A dynamic zero-token semantic router"
-dependencies = [
-    "fastembed==0.8.0",
-    "pydantic==2.13.4",
-    "numpy==2.4.6",
-    "scikit-learn==1.8.0"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Sitanshu", email = "contact@example.com"}
 ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence"
+]
+dependencies = [
+    "fastembed>=0.8.0",
+    "pydantic>=2.10.0",
+    "numpy>=1.24.0",
+    "scikit-learn>=1.3.0"
+]
+
+[project.urls]
+Repository = "https://github.com/sitanshukr08/SynaptoRoute"
+Issues = "https://github.com/sitanshukr08/SynaptoRoute/issues"
 
 [project.optional-dependencies]
 test = [
-    "pytest==9.0.3"
+    "pytest>=7.0.0"
 ]
 api = [
     "fastapi>=0.100.0",
     "uvicorn>=0.22.0"
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/synaptoroute"]

@@ -63,20 +63,27 @@ class AdaptiveRouter:
             self.storage.save_route(route)
             
             if is_overwrite:
-                self._rebuild_memory_locked()
-            else:
-                self._route_map[route.name] = route
-                if route.utterances:
-                    embeddings = self.encoder.encode_batch(route.utterances)
-                    self._uncompiled_vectors.append(embeddings)
-                    self._meta.extend([route] * len(route.utterances))
+                # O(1) Memory Replacement: Filter out the old route's vectors without full DB re-encoding
+                self._compile_vectors_locked()
+                if self._vectors is not None:
+                    mask = [r.name != route.name for r in self._meta]
+                    if len(mask) > 0:
+                        self._vectors = self._vectors[mask]
+                        self._meta = [r for r, keep in zip(self._meta, mask) if keep]
+            
+            self._route_map[route.name] = route
+            if route.utterances:
+                embeddings = self.encoder.encode_batch(route.utterances)
+                self._uncompiled_vectors.append(embeddings)
+                self._meta.extend([route] * len(route.utterances))
 
     def add_utterance(self, route_name: str, utterance: str):
         with self.lock:
             if route_name not in self._route_map:
                 raise RouteNotFoundError(f"Route '{route_name}' not found.")
                 
-        embedding = self.encoder.encode(utterance)
+        # Reshape to 2D to ensure safe vstack compatibility
+        embedding = self.encoder.encode(utterance).reshape(1, -1)
         
         with self.lock:
             self.storage.add_utterance(route_name, utterance)
@@ -115,6 +122,9 @@ class AdaptiveRouter:
             return best_route
 
     async def aquery(self, query: str) -> Optional[Route]:
+        if self._batch_queue is None:
+            raise RuntimeError("Router must be started with `await router.start()` before calling aquery.")
+            
         loop = asyncio.get_running_loop()
         future = loop.create_future()
         try:
@@ -178,6 +188,10 @@ class AdaptiveRouter:
                     for future in futures:
                         if not future.done():
                             future.set_exception(e)
+                finally:
+                    # Prevent async deadlocks by marking tasks done
+                    for _ in batch:
+                        self._batch_queue.task_done()
         finally:
             while not self._batch_queue.empty():
                 try:
@@ -190,6 +204,9 @@ class AdaptiveRouter:
     def fit_thresholds(self, samples: list[str], labels: list[str]):
         if not samples:
             return
+        if len(samples) != len(labels):
+            raise ValueError("samples and labels lists must have the exact same length.")
+            
         query_embeddings = self.encoder.encode_batch(samples)
         
         with self.lock:
@@ -221,7 +238,8 @@ class AdaptiveRouter:
         best_scores = np.array(best_scores)
         labels_arr = np.array(labels)
         
-        thresholds_to_test = np.arange(0.1, 0.95, 0.05)
+        # Test full cosine similarity range
+        thresholds_to_test = np.arange(-1.0, 1.05, 0.05)
         new_thresholds = {}
         
         for route_name, route in route_map_snapshot.items():
@@ -234,7 +252,7 @@ class AdaptiveRouter:
                 y_pred = ((best_routes == route_name) & (best_scores > t)).astype(int)
                 f1 = f1_score(y_true, y_pred, zero_division=0)
                 
-                if f1 > best_f1:
+                if f1 >= best_f1:
                     best_f1 = f1
                     best_t = t
             new_thresholds[route_name] = float(best_t)
@@ -243,6 +261,11 @@ class AdaptiveRouter:
             for route_name, t in new_thresholds.items():
                 if route_name in self._route_map:
                     route = self._route_map[route_name]
-                    route.threshold = t
-                    self.storage.save_route(route)
+                    old_t = route.threshold
+                    try:
+                        route.threshold = t
+                        self.storage.save_route(route)
+                    except Exception as e:
+                        route.threshold = old_t
+                        raise e
 

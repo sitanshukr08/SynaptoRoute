@@ -25,10 +25,25 @@ class SQLiteStorage(BaseStorage):
         dirname = os.path.dirname(self.db_path)
         if dirname:
             os.makedirs(dirname, exist_ok=True)
-        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        # timeout=10.0 handles 'database is locked' errors automatically with backoff
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=10.0)
         self.conn.execute('PRAGMA journal_mode=WAL;')
         self.conn.execute('PRAGMA foreign_keys = ON')
         self._init_db()
+
+    def close(self):
+        if self.conn:
+            self.conn.close()
+            self.conn = None
+
+    def __del__(self):
+        self.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     def _get_connection(self):
         return self.conn
@@ -49,11 +64,12 @@ class SQLiteStorage(BaseStorage):
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         route_name TEXT,
                         utterance TEXT,
-                        FOREIGN KEY(route_name) REFERENCES routes(name)
+                        FOREIGN KEY(route_name) REFERENCES routes(name) ON DELETE CASCADE,
+                        UNIQUE(route_name, utterance)
                     )
                 ''')
                 conn.commit()
-        except sqlite3.OperationalError as e:
+        except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
             raise RuntimeError(f"Failed to initialize database: {e}") from e
 
     def save_route(self, route: Route):
@@ -76,12 +92,12 @@ class SQLiteStorage(BaseStorage):
                 # Insert utterances
                 if route.utterances:
                     cursor.executemany('''
-                        INSERT INTO utterances (route_name, utterance)
+                        INSERT OR IGNORE INTO utterances (route_name, utterance)
                         VALUES (?, ?)
                     ''', [(route.name, u) for u in route.utterances])
                     
                 conn.commit()
-        except sqlite3.OperationalError as e:
+        except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
             raise RuntimeError(f"Failed to save route: {e}") from e
 
     def add_utterance(self, route_name: str, utterance: str):
@@ -89,11 +105,11 @@ class SQLiteStorage(BaseStorage):
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                    INSERT INTO utterances (route_name, utterance)
+                    INSERT OR IGNORE INTO utterances (route_name, utterance)
                     VALUES (?, ?)
                 ''', (route_name, utterance))
                 conn.commit()
-        except sqlite3.OperationalError as e:
+        except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
             raise RuntimeError(f"Failed to add utterance: {e}") from e
 
     def load_all_routes(self) -> List[Route]:
@@ -118,6 +134,6 @@ class SQLiteStorage(BaseStorage):
                         metadata=metadata,
                         utterances=utterances
                     ))
-        except sqlite3.OperationalError as e:
+        except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
             raise RuntimeError(f"Failed to load routes: {e}") from e
         return routes
