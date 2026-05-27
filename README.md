@@ -1,8 +1,11 @@
 # SynaptoRoute
 
+[![PyPI version](https://badge.fury.io/py/synaptoroute.svg)](https://pypi.org/project/synaptoroute/)
+[![CI/CD Pipeline](https://github.com/sitanshukr08/SynaptoRoute/actions/workflows/ci.yml/badge.svg)](https://github.com/sitanshukr08/SynaptoRoute/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/sitanshukr08/SynaptoRoute/blob/main/CONTRIBUTING.md)
 
 SynaptoRoute is a high-throughput, local semantic routing engine built for production Python microservices. Designed as a mathematically optimal alternative to Large Language Model (LLM) routing chains and slower local routers, it provides zero-token intent classification in under 3 milliseconds on standard cloud hardware.
 
@@ -12,8 +15,8 @@ SynaptoRoute is a high-throughput, local semantic routing engine built for produ
 - [Performance Benchmarks](#performance-benchmarks)
 - [Installation & Deployment](#installation--deployment)
 - [Quick Start Guide](#quick-start-guide)
-- [API Reference](#api-reference)
 - [System Limitations](#system-limitations)
+- [Community & Contributing](#community--contributing)
 
 ---
 
@@ -48,6 +51,8 @@ The following metrics were captured via automated GitHub Actions CI/CD running o
 | **Amortized P50** | 2.69 ms | Per-query latency when processing 1,000 concurrent requests via dynamic batching. |
 | **Hot-Reload** | 5.04 ms | Time required to dynamically inject a new utterance into memory without dropping active API requests. |
 
+> **📊 View Full Benchmarks:** For detailed analysis including Memory Leak Endurance, GPU Scaling, Classification F1-Scores, and Input Poisoning Survival Metrics, see our official [BENCHMARKS.md](BENCHMARKS.md).
+
 ---
 
 ## Installation & Deployment
@@ -71,12 +76,12 @@ curl -X POST http://localhost:8000/route \
      -d '{"query": "I need help resetting my password"}'
 ```
 
-### Method 2: Python Package
+### Method 2: Standard Python Package
 
-To embed SynaptoRoute natively into your existing Python pipelines:
+To embed SynaptoRoute natively into your existing Python pipelines, install directly from pip (or via git if testing the latest main branch):
 
 ```bash
-pip install git+https://github.com/sitanshukr08/SynaptoRoute.git
+pip install synaptoroute
 ```
 
 ---
@@ -123,3 +128,13 @@ if __name__ == "__main__":
 
 **Horizontal Scaling (Kubernetes Split-Brain)**  
 SynaptoRoute relies on a highly optimized, local in-memory NumPy matrix to achieve its microsecond latency. As such, it is structurally bound to a single node. If deployed across multiple load-balanced Kubernetes pods, a hot-reload request hitting Pod A will update Pod A's local memory, but Pod B will remain unaware. Scaling horizontally requires implementing an external event bus (e.g., Redis Pub/Sub) to broadcast memory invalidation events across the cluster.
+
+---
+
+## Community & Contributing
+
+We welcome contributions of all sizes from the open-source community! 
+
+- **Contributing:** Please read our [Contributing Guidelines](CONTRIBUTING.md) to learn how to set up your development environment, run the test suite, and submit Pull Requests.
+- **Code of Conduct:** We are committed to fostering a welcoming environment. Please review our [Code of Conduct](CODE_OF_CONDUCT.md).
+- **Issues:** If you discover a bug or have a feature request, please [open an issue](https://github.com/sitanshukr08/SynaptoRoute/issues).
