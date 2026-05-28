@@ -9,7 +9,7 @@ description = "A dynamic zero-token semantic router"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Sitanshu", email = "contact@example.com"}
+    {name = "Sitanshu Kumar", email = "sitanshukumar@65gmail.com"}
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
