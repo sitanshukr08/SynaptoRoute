@@ -11,6 +11,8 @@ class Encoder:
         if providers is None:
             providers = ["CPUExecutionProvider"]
         self.model = TextEmbedding(model_name=model_name, providers=providers)
+        # Probe dimensionality directly from the model using a dummy token
+        self.dim = len(list(self.model.embed(["test"]))[0])
     
     def encode(self, text: str) -> npt.NDArray[np.float32]:
         embeddings = list(self.model.embed([text]))
@@ -18,8 +20,7 @@ class Encoder:
         
     def encode_batch(self, texts: List[str]) -> npt.NDArray[np.float32]:
         if not texts:
-            # Return empty array with correct shape for BGE models (384)
-            # If using another model, shape mismatches will be caught downstream
-            return np.empty((0, 384), dtype=np.float32)
+            # Dynamically use the model's true dimensionality
+            return np.empty((0, self.dim), dtype=np.float32)
         embeddings = list(self.model.embed(texts))
         return np.array(embeddings)

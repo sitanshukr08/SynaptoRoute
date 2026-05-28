@@ -86,6 +86,8 @@ class AdaptiveRouter:
         embedding = self.encoder.encode(utterance).reshape(1, -1)
         
         with self.lock:
+            if route_name not in self._route_map:
+                raise RouteNotFoundError(f"Route '{route_name}' was deleted during encoding.")
             self.storage.add_utterance(route_name, utterance)
             self._uncompiled_vectors.append(embedding)
             route = self._route_map[route_name]
@@ -264,7 +266,7 @@ class AdaptiveRouter:
                     old_t = route.threshold
                     try:
                         route.threshold = t
-                        self.storage.save_route(route)
+                        self.storage.update_threshold(route_name, t)
                     except Exception as e:
                         route.threshold = old_t
                         raise e

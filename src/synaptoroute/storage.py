@@ -16,6 +16,10 @@ class BaseStorage(ABC):
         pass
 
     @abstractmethod
+    def update_threshold(self, route_name: str, threshold: float):
+        pass
+
+    @abstractmethod
     def load_all_routes(self) -> List[Route]:
         pass
 
@@ -99,6 +103,17 @@ class SQLiteStorage(BaseStorage):
                 conn.commit()
         except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
             raise RuntimeError(f"Failed to save route: {e}") from e
+
+    def update_threshold(self, route_name: str, threshold: float):
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE routes SET threshold = ? WHERE name = ?
+                ''', (threshold, route_name))
+                conn.commit()
+        except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
+            raise RuntimeError(f"Failed to update threshold: {e}") from e
 
     def add_utterance(self, route_name: str, utterance: str):
         try:
