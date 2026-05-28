@@ -18,9 +18,10 @@ except ImportError as e:
     exit(1)
 
 class DummyStorage(BaseStorage):
-    def load_all_routes(self): return []
-    def save_route(self, route): pass
-    def add_utterance(self, name, utt): pass
+    def load_all_routes(self): return [], {}
+    def save_route(self, route, embeddings=None): pass
+    def add_utterance(self, name, utt, embedding=None): pass
+    def update_threshold(self, name, threshold): pass
     def get_route(self, name): return None
 
 def bench_hot_reload():

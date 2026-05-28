@@ -3,6 +3,11 @@
 ## System Status: Stable & Production Ready
 The system architecture has fundamentally transitioned from an experimental Python dict/list prototype (v0.1.0) into a highly concurrent, memory-safe embedded router (v0.2.0). 
 
+### Benchmark Environment Setup
+- **CPU:** 13th Gen Intel(R) Core(TM) i5-13450HX
+- **GPU:** NVIDIA GeForce RTX 3050 6GB Laptop GPU
+- **Warmup Methodology:** All ONNX `fastembed` inference numbers presented in this document are recorded *after* an initial warm-up sequence. The ONNX backend incurs a ~150ms JIT compilation/graph optimization penalty on its first inference batch. Cold-start requests will be slower than the published sustained throughput numbers.
+
 By executing the `bench_concurrency_v2.py` stress test, we mathematically proved that:
 - **SQLite Concurrency:** The framework now easily survives 2,000 parallel multithreaded SQL writes with 0% data corruption.
 - **Async Blockers Removed:** Background processing is no longer held hostage during heavy transformer inference tasks.
@@ -23,6 +28,7 @@ Because we decoupled embedding generation from the global memory lock, our basel
 | Latency Percentile | v0.1.0 | v0.2.0 | Notes |
 |--------------------|--------|--------|-------|
 | **P50 (Median)** | ~5.3 ms | **31.8 ms** | This slight increase is because memory locks are acquired iteratively per batch rather than hoarding the lock globally, which allows background Asyncio web-server queues (like FastAPI) to process multiple requests concurrently without halting the server. |
+| **P99 (Worst Case)** | N/A | **46.15 ms** | Strict batch-timeout bounds prevent tail latency spikes even under maximum concurrent load. |
 | **Hot-Reload (add_route)**| ~41.9 ms | **50.6 ms** | This is mathematically amortized $O(1)$ now. In v0.1.0, adding an utterance to a 10,000 vector database triggered a massive $O(N)$ `np.vstack` cascade which crashed RAM. In v0.2.0, it is a sub-millisecond cursor slice operation `[cursor] = embedding`.
 
 ### 3. Memory Scalability (`bench_scalability.py`)
@@ -47,7 +53,10 @@ We also conducted a raw limit test using a dense 5,000 vector database and gener
 - **Dynamic Batching (Async):** **38.19 QPS** (Avg 26.18 ms/query)
 
 > [!WARNING]
-> **Deliberate Tradeoff (Latency Regression):** To achieve this 2.01x throughput increase and true thread-safety via lock acquisition, the P50 latency increased from ~5.3ms in `v0.1.0` to ~31.8ms in `v0.2.0`. We are shifting from a purely low-latency sequential router to a **high-throughput concurrent router**.
+> **Deliberate Tradeoff (Latency Regression):** To achieve this 2.01x throughput increase and true thread-safety via lock acquisition, the CPU P50 latency increased from ~5.3ms in `v0.1.0` to ~31.8ms in `v0.2.0`. 
+
+> [!NOTE]
+> **What is the CPU mode used for?** A 31.8ms latency is slower than a Redis lookup or an indexed Postgres read. `SynaptoRoute` CPU mode is *not* optimized for single-request low-latency routing. Instead, it is designed strictly for **high-throughput asynchronous request parsing, background batch-processing workflows, and massive-scale concurrency** where avoiding API lock freezes is mathematically more important than the speed of a single isolated request.
 
 By firing queries through the async batch queue, the system achieved exactly **2.01x higher throughput**.
 
@@ -83,9 +92,17 @@ We unlocked the `CUDAExecutionProvider` via `onnxruntime-gpu` to test the exact 
 > [!TIP]
 > **v0.2.1 Boot Bottleneck Hotfix:** We discovered a severe cold-boot bottleneck where a 50k vector database took 20 minutes to boot due to CPU re-encoding. In `v0.2.1`, we implemented `float32` BLOB caching in SQLite. Booting 50,000 vectors now drops from **20 minutes to 0.45 seconds** ($O(1)$ memory mapping).
 
+### 7. Head-to-Head vs. Semantic-Router (`bench_vs_semantic_router.py`)
+To properly contextualize these numbers, we executed an apples-to-apples comparison against `semantic-router` (using their default `FastEmbedEncoder`).
+
+| Metric | `semantic-router` | `SynaptoRoute` (`v0.2.0`) | Notes |
+|--------|-------------------|---------------------------|-------|
+| **Hot-Reload Degradation** | +6.46 ms | **+0.74 ms** | `semantic-router` aggressively re-compiles its internal index on every route addition, causing latency to spike exponentially (from 5.34ms to 11.81ms by the 500th route). `SynaptoRoute` completely bypasses this via $O(1)$ memory slicing, keeping degradation under 1ms. |
+| **Concurrent Throughput** | Blocked (Sequential) | **38.19 QPS** | The dynamic async batching queue allows `SynaptoRoute` to safely handle 10,000 parallel requests via `asyncio`. `semantic-router` blocks globally and does not natively support async concurrent inference. |
+
 ---
 
-## 7. Core Problems & Research Gaps (v0.3.0+)
+## 8. Core Problems & Research Gaps (v0.3.0+)
 
 While `v0.2.0` achieves significant performance milestones, the current benchmark suite evaluates `SynaptoRoute` in isolation. To scientifically validate the framework for enterprise adoption, several critical architectural and methodological gaps must be addressed in future releases.
 
