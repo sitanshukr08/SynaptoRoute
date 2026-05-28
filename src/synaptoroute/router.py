@@ -16,8 +16,9 @@ class AdaptiveRouter:
         self.storage = storage
         self.lock = threading.Lock()
         
+        self.max_capacity = 50000
         self._vectors = None
-        self._uncompiled_vectors = []
+        self._cursor = 0
         self._meta = []
         self._route_map = {}
         
@@ -43,39 +44,49 @@ class AdaptiveRouter:
     def _load_routes(self):
         routes = self.storage.load_all_routes()
         
+        if self._vectors is None:
+            self._vectors = np.zeros((self.max_capacity, self.encoder.dim), dtype=np.float32)
+            
         for route in routes:
             self._route_map[route.name] = route
             if route.utterances:
                 embeddings = self.encoder.encode_batch(route.utterances)
-                self._uncompiled_vectors.append(embeddings)
-                self._meta.extend([route] * len(route.utterances))
+                num_embs = len(embeddings)
+                self._vectors[self._cursor : self._cursor + num_embs] = embeddings
+                self._cursor += num_embs
+                self._meta.extend([route] * num_embs)
 
     def _rebuild_memory_locked(self):
-        self._vectors = None
-        self._uncompiled_vectors = []
+        self._cursor = 0
         self._meta = []
         self._route_map = {}
         self._load_routes()
 
     def add_route(self, route: Route):
+        embeddings = None
+        num_embs = 0
+        if route.utterances:
+            embeddings = self.encoder.encode_batch(route.utterances)
+            num_embs = len(embeddings)
+            
         with self.lock:
             is_overwrite = route.name in self._route_map
             self.storage.save_route(route)
             
             if is_overwrite:
-                # O(1) Memory Replacement: Filter out the old route's vectors without full DB re-encoding
-                self._compile_vectors_locked()
-                if self._vectors is not None:
-                    mask = [r.name != route.name for r in self._meta]
-                    if len(mask) > 0:
-                        self._vectors = self._vectors[mask]
-                        self._meta = [r for r, keep in zip(self._meta, mask) if keep]
+                mask = [r.name != route.name for r in self._meta]
+                if not all(mask):
+                    keep_idx = np.where(mask)[0]
+                    num_kept = len(keep_idx)
+                    self._vectors[:num_kept] = self._vectors[keep_idx]
+                    self._cursor = num_kept
+                    self._meta = [self._meta[i] for i in keep_idx]
             
             self._route_map[route.name] = route
-            if route.utterances:
-                embeddings = self.encoder.encode_batch(route.utterances)
-                self._uncompiled_vectors.append(embeddings)
-                self._meta.extend([route] * len(route.utterances))
+            if num_embs > 0:
+                self._vectors[self._cursor : self._cursor + num_embs] = embeddings
+                self._cursor += num_embs
+                self._meta.extend([route] * num_embs)
 
     def add_utterance(self, route_name: str, utterance: str):
         with self.lock:
@@ -89,29 +100,22 @@ class AdaptiveRouter:
             if route_name not in self._route_map:
                 raise RouteNotFoundError(f"Route '{route_name}' was deleted during encoding.")
             self.storage.add_utterance(route_name, utterance)
-            self._uncompiled_vectors.append(embedding)
+            
+            self._vectors[self._cursor] = embedding
+            self._cursor += 1
+            
             route = self._route_map[route_name]
             route.utterances.append(utterance)
             self._meta.append(route)
-
-    def _compile_vectors_locked(self):
-        if self._uncompiled_vectors:
-            if self._vectors is not None:
-                self._vectors = np.vstack([self._vectors] + self._uncompiled_vectors)
-            else:
-                self._vectors = np.vstack(self._uncompiled_vectors)
-            self._uncompiled_vectors = []
 
     def __call__(self, query: str) -> Optional[Route]:
         query_embedding = self.encoder.encode(query)
         
         with self.lock:
-            self._compile_vectors_locked()
-            
-            if self._vectors is None or len(self._vectors) == 0:
+            if self._cursor == 0:
                 return None
                 
-            similarities = cosine_similarity([query_embedding], self._vectors)[0]
+            similarities = cosine_similarity([query_embedding], self._vectors[:self._cursor])[0]
             
             best_route = None
             best_score = -1.0
@@ -164,10 +168,9 @@ class AdaptiveRouter:
                     def process_batch(qs):
                         query_embeddings = self.encoder.encode_batch(qs)
                         with self.lock:
-                            self._compile_vectors_locked()
-                            if self._vectors is None or len(self._vectors) == 0:
+                            if self._cursor == 0:
                                 return [None] * len(qs)
-                            similarities = cosine_similarity(query_embeddings, self._vectors)
+                            similarities = cosine_similarity(query_embeddings, self._vectors[:self._cursor])
                             results = []
                             for i in range(len(qs)):
                                 best_route = None
@@ -212,15 +215,13 @@ class AdaptiveRouter:
         query_embeddings = self.encoder.encode_batch(samples)
         
         with self.lock:
-            self._compile_vectors_locked()
-            
-            if self._vectors is None or len(self._vectors) == 0:
+            if self._cursor == 0:
                 return
                 
             if not self._route_map:
                 return
 
-            vectors_snapshot = self._vectors
+            vectors_snapshot = self._vectors[:self._cursor].copy()
             meta_snapshot = list(self._meta)
             route_map_snapshot = dict(self._route_map)
 

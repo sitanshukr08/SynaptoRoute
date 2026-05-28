@@ -1,6 +1,7 @@
 import sqlite3
 import json
 import os
+import threading
 from abc import ABC, abstractmethod
 from typing import List
 
@@ -29,16 +30,13 @@ class SQLiteStorage(BaseStorage):
         dirname = os.path.dirname(self.db_path)
         if dirname:
             os.makedirs(dirname, exist_ok=True)
-        # timeout=10.0 handles 'database is locked' errors automatically with backoff
-        self.conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=10.0)
-        self.conn.execute('PRAGMA journal_mode=WAL;')
-        self.conn.execute('PRAGMA foreign_keys = ON')
+        self.local = threading.local()
         self._init_db()
 
     def close(self):
-        if self.conn:
-            self.conn.close()
-            self.conn = None
+        if hasattr(self.local, 'conn') and self.local.conn:
+            self.local.conn.close()
+            del self.local.conn
 
     def __del__(self):
         self.close()
@@ -50,7 +48,11 @@ class SQLiteStorage(BaseStorage):
         self.close()
 
     def _get_connection(self):
-        return self.conn
+        if not hasattr(self.local, 'conn'):
+            self.local.conn = sqlite3.connect(self.db_path, timeout=10.0)
+            self.local.conn.execute('PRAGMA journal_mode=WAL;')
+            self.local.conn.execute('PRAGMA foreign_keys = ON')
+        return self.local.conn
 
     def _init_db(self):
         try:
