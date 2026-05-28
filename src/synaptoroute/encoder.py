@@ -10,7 +10,7 @@ class Encoder:
     def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5", providers: List[str] = None):
         if providers is None:
             providers = ["CPUExecutionProvider"]
-        self.model = TextEmbedding(model_name=model_name, providers=providers)
+        self.model = TextEmbedding(model_name=model_name, providers=providers, threads=1)
         # Probe dimensionality directly from the model using a dummy token
         self.dim = len(list(self.model.embed(["test"]))[0])
     

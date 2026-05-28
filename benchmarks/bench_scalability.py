@@ -26,7 +26,7 @@ def measure_memory_for_utterances(num_utterances):
     current, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
     
-    storage.conn.close()
+    storage.close()
     if os.path.exists(db_path):
         os.remove(db_path)
         
