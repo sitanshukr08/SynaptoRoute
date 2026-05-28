@@ -22,6 +22,7 @@ The immediate next phase focuses on addressing critical research gaps identified
 
 * **Distributed State Sync (K8s Horizontal Scaling):** Resolve the Kubernetes split-brain issue by evaluating an external event bus (e.g., Redis Pub/Sub) or shared-memory architecture to broadcast cache invalidation events across multiple pods.
 * **Sub-Linear Scalability (FAISS / HNSW):** Integrate approximate nearest-neighbor (ANN) indexes as an optional backend to unblock routing beyond the current 50k dense vector memory bottleneck.
+* **Safe Optimization Profiles:** Abstract runtime engine tuning dials (batch size, timeouts, core utilization) into strict Profiles (e.g., `LATENCY` vs `THROUGHPUT`). This prevents developers from inducing CPU-thrashing under heavy load while allowing sub-5ms latency for sequential use cases.
 * **Comparative Baselines & Statistical Rigor:** Build comprehensive testing suites against `LangChain` and `LlamaIndex` routers. Implement repeated trial averages, standard deviation analysis, and formal queue scheduling tradeoff matrices.
 * **Semantic Robustness Evaluation:** Introduce multilingual benchmarking and adversarial semantic drift tests against real conversational traffic.
 * **Energy & Cost Efficiency Analytics:** Define watt-per-inference and requests-per-dollar metrics to prove viability over cloud LLMs.
