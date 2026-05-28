@@ -4,7 +4,7 @@ This document outlines the strategic vision and upcoming features for `SynaptoRo
 
 ---
 
-## ✅ v0.2.0 - Production Readiness & Concurrency
+## v0.2.0 - Production Readiness & Concurrency
 **Status:** Completed
 
 The v0.2.0 release transitioned the engine from a sequential low-latency prototype into an ACID-compliant, async batching router capable of safely absorbing asynchronous FastAPI server loads.
@@ -15,7 +15,7 @@ The v0.2.0 release transitioned the engine from a sequential low-latency prototy
 
 ---
 
-## 🔬 v0.3.0 - Scalability, Distributed Systems & Scientific Benchmarks
+## v0.3.0 - Scalability, Distributed Systems & Scientific Benchmarks
 **Status:** Planned
 
 The immediate next phase focuses on addressing critical research gaps identified during the v0.2.0 rollout. To validate SynaptoRoute for enterprise adoption, we must break the single-node dense matrix barrier and introduce rigorous statistical controls.
@@ -28,7 +28,7 @@ The immediate next phase focuses on addressing critical research gaps identified
 
 ---
 
-## ⚙️ v0.4.0 - Zero-Shot Tool Routing
+## v0.4.0 - Zero-Shot Tool Routing
 **Status:** Conceptual
 
 Eliminate the need for manual "utterances" by generating semantic boundaries directly from function signatures.
@@ -37,7 +37,7 @@ Eliminate the need for manual "utterances" by generating semantic boundaries dir
 
 ---
 
-## ⚖️ v0.5.0 - Cross-Encoder Tie-Breakers
+## v0.5.0 - Cross-Encoder Tie-Breakers
 **Status:** Conceptual
 
 Maximize classification accuracy in highly ambiguous routing scenarios using a classic two-stage retrieval pattern.
@@ -46,7 +46,7 @@ Maximize classification accuracy in highly ambiguous routing scenarios using a c
 
 ---
 
-## 👁️ v0.6.0 - Multi-Modal Routing
+## v0.6.0 - Multi-Modal Routing
 **Status:** Conceptual
 
 Expand semantic routing beyond text to handle images and visual data, enabling complex routing in Vision-Agent workflows.
