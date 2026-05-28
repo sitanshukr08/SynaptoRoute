@@ -7,13 +7,17 @@ from synaptoroute.models import Route
 
 class DummyStorage(BaseStorage):
     def load_all_routes(self):
-        return []
-    def save_route(self, route):
+        return [], {}
+    def save_route(self, route, embeddings=None):
         pass
-    def add_utterance(self, route_name, utterance):
+    def add_utterance(self, route_name, utterance, embedding=None):
         pass
     def get_route(self, route_name):
         return None
+    def update_threshold(self, route_name, threshold):
+        pass
+    def close(self):
+        pass
 
 async def main():
     try:
