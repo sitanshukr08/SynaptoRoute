@@ -25,11 +25,11 @@ def test_save_and_load_route(memory_db):
     memory_db.save_route(route1)
     memory_db.save_route(route2)
 
-    loaded_routes = memory_db.load_all_routes()
-    assert len(loaded_routes) == 2
+    routes, _ = memory_db.load_all_routes()
+    assert len(routes) == 2
 
     # Map by name for easy checking
-    routes_by_name = {r.name: r for r in loaded_routes}
+    routes_by_name = {r.name: r for r in routes}
 
     assert "test_route_1" in routes_by_name
     r1 = routes_by_name["test_route_1"]
@@ -56,9 +56,9 @@ def test_add_utterance(memory_db):
     memory_db.add_utterance("dynamic_route", "new utterance 1")
     memory_db.add_utterance("dynamic_route", "new utterance 2")
 
-    loaded_routes = memory_db.load_all_routes()
-    assert len(loaded_routes) == 1
-    loaded_route = loaded_routes[0]
+    routes, _ = memory_db.load_all_routes()
+    assert len(routes) == 1
+    loaded_route = routes[0]
 
     assert loaded_route.name == "dynamic_route"
     assert set(loaded_route.utterances) == {"start", "new utterance 1", "new utterance 2"}
@@ -80,9 +80,9 @@ def test_save_route_replace(memory_db):
     )
     memory_db.save_route(route_v2)
 
-    loaded_routes = memory_db.load_all_routes()
-    assert len(loaded_routes) == 1
-    loaded_route = loaded_routes[0]
+    routes, _ = memory_db.load_all_routes()
+    assert len(routes) == 1
+    loaded_route = routes[0]
 
     assert loaded_route.threshold == 0.9
     assert loaded_route.metadata == {"version": 2}

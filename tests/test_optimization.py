@@ -6,6 +6,9 @@ from synaptoroute.models import Route
 import numpy as np
 
 class MockEncoder(Encoder):
+    def __init__(self):
+        self.dim = 2
+
     def encode(self, text: str) -> np.ndarray:
         if "finance" in text:
             return np.array([1.0, 0.0])
