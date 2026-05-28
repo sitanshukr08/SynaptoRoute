@@ -4,13 +4,20 @@ from synaptoroute.router import AdaptiveRouter
 from synaptoroute.encoder import Encoder
 from synaptoroute.storage import SQLiteStorage
 
+import onnxruntime
+
 db_path = "data/extreme_bench.sqlite"
+
+# Detect available providers and prefer CUDA when present.
+_available = onnxruntime.get_available_providers()
+_providers = ["CUDAExecutionProvider"] if "CUDAExecutionProvider" in _available else ["CPUExecutionProvider"]
+print(f"Using providers: {_providers}")
 
 print("Test 1: Cold Booting existing extreme scale database (10k vectors)...")
 # Note: The extreme_bench database might be 50k vectors if we left it there.
 start_time = time.time()
 storage = SQLiteStorage(db_path)
-encoder = Encoder(providers=["CUDAExecutionProvider"])
+encoder = Encoder(providers=_providers)
 router = AdaptiveRouter(encoder, storage)
 duration_pass1 = time.time() - start_time
 print(f"Pass 1 Boot Time (Backfilling/Computing): {duration_pass1:.2f}s")
