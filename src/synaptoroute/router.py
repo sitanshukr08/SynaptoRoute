@@ -11,12 +11,12 @@ from synaptoroute.storage import BaseStorage
 from synaptoroute.exceptions import RouteNotFoundError, RouterOverloadedError
 
 class AdaptiveRouter:
-    def __init__(self, encoder: Encoder, storage: BaseStorage):
+    def __init__(self, encoder: Encoder, storage: BaseStorage, max_capacity: int = 50000):
         self.encoder = encoder
         self.storage = storage
         self.lock = threading.Lock()
         
-        self.max_capacity = 50000
+        self.max_capacity = max_capacity
         self._vectors = None
         self._cursor = 0
         self._meta = []
@@ -42,19 +42,39 @@ class AdaptiveRouter:
                 pass
 
     def _load_routes(self):
-        routes = self.storage.load_all_routes()
+        routes, embeddings_map = self.storage.load_all_routes()
         
         if self._vectors is None:
             self._vectors = np.zeros((self.max_capacity, self.encoder.dim), dtype=np.float32)
             
         for route in routes:
             self._route_map[route.name] = route
-            if route.utterances:
-                embeddings = self.encoder.encode_batch(route.utterances)
-                num_embs = len(embeddings)
-                self._vectors[self._cursor : self._cursor + num_embs] = embeddings
-                self._cursor += num_embs
-                self._meta.extend([route] * num_embs)
+            if not route.utterances:
+                continue
+                
+            embs_data = embeddings_map.get(route.name, [])
+            missing_idx = []
+            missing_texts = []
+            final_embeddings = np.zeros((len(route.utterances), self.encoder.dim), dtype=np.float32)
+            
+            for i, (u, e_bytes) in enumerate(zip(route.utterances, embs_data)):
+                if e_bytes is not None:
+                    final_embeddings[i] = np.frombuffer(e_bytes, dtype=np.float32)
+                else:
+                    missing_idx.append(i)
+                    missing_texts.append(u)
+                    
+            if missing_texts:
+                new_embs = self.encoder.encode_batch(missing_texts)
+                for i, new_emb in zip(missing_idx, new_embs):
+                    final_embeddings[i] = new_emb
+                # Backfill DB so future boots are fast
+                self.storage.save_route(route, final_embeddings)
+                
+            num_embs = len(final_embeddings)
+            self._vectors[self._cursor : self._cursor + num_embs] = final_embeddings
+            self._cursor += num_embs
+            self._meta.extend([route] * num_embs)
 
     def _rebuild_memory_locked(self):
         self._cursor = 0
@@ -71,7 +91,7 @@ class AdaptiveRouter:
             
         with self.lock:
             is_overwrite = route.name in self._route_map
-            self.storage.save_route(route)
+            self.storage.save_route(route, embeddings)
             
             if is_overwrite:
                 mask = [r.name != route.name for r in self._meta]
@@ -99,7 +119,7 @@ class AdaptiveRouter:
         with self.lock:
             if route_name not in self._route_map:
                 raise RouteNotFoundError(f"Route '{route_name}' was deleted during encoding.")
-            self.storage.add_utterance(route_name, utterance)
+            self.storage.add_utterance(route_name, utterance, embedding[0])
             
             self._vectors[self._cursor] = embedding
             self._cursor += 1

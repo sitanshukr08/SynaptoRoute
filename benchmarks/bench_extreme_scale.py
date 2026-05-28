@@ -29,9 +29,8 @@ def setup_db(db_path, num_vectors):
         os.remove(db_path + "-shm")
         
     storage = SQLiteStorage(db_path)
-    # Use CPU for fast generation to avoid OOM if GPU isn't available, but we can try CUDA if installed. 
-    # Let's use CPU for safe generation, the router's batch size protects it anyway.
-    encoder = Encoder(providers=["CPUExecutionProvider"])
+    # Use GPU for fast generation since we are explicitly testing GPU now.
+    encoder = Encoder(providers=["CUDAExecutionProvider"])
     router = AdaptiveRouter(encoder, storage)
     
     # Pre-seed routes. We'll use 50 routes, and math out the utterances per route
@@ -84,8 +83,8 @@ async def main():
         
         setup_db(db_path, scale)
         
-        print("\n--- PASS 1: CPU EXECUTION ---")
-        await run_workload(db_path, "CPUExecutionProvider", queries)
+        # print("\n--- PASS 1: CPU EXECUTION ---")
+        # await run_workload(db_path, "CPUExecutionProvider", queries)
         
         print("\n--- PASS 2: GPU EXECUTION ---")
         try:

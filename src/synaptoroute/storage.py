@@ -9,11 +9,11 @@ from synaptoroute.models import Route
 
 class BaseStorage(ABC):
     @abstractmethod
-    def save_route(self, route: Route):
+    def save_route(self, route: Route, embeddings=None):
         pass
 
     @abstractmethod
-    def add_utterance(self, route_name: str, utterance: str):
+    def add_utterance(self, route_name: str, utterance: str, embedding=None):
         pass
 
     @abstractmethod
@@ -21,7 +21,7 @@ class BaseStorage(ABC):
         pass
 
     @abstractmethod
-    def load_all_routes(self) -> List[Route]:
+    def load_all_routes(self) -> tuple[List[Route], dict]:
         pass
 
 class SQLiteStorage(BaseStorage):
@@ -77,8 +77,15 @@ class SQLiteStorage(BaseStorage):
                 conn.commit()
         except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
             raise RuntimeError(f"Failed to initialize database: {e}") from e
+            
+        try:
+            with self._get_connection() as conn:
+                conn.execute('ALTER TABLE utterances ADD COLUMN embedding BLOB')
+                conn.commit()
+        except sqlite3.OperationalError:
+            pass # Column already exists
 
-    def save_route(self, route: Route):
+    def save_route(self, route: Route, embeddings=None):
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
@@ -97,10 +104,16 @@ class SQLiteStorage(BaseStorage):
                 
                 # Insert utterances
                 if route.utterances:
-                    cursor.executemany('''
-                        INSERT OR IGNORE INTO utterances (route_name, utterance)
-                        VALUES (?, ?)
-                    ''', [(route.name, u) for u in route.utterances])
+                    if embeddings is not None:
+                        cursor.executemany('''
+                            INSERT OR IGNORE INTO utterances (route_name, utterance, embedding)
+                            VALUES (?, ?, ?)
+                        ''', [(route.name, u, e.tobytes()) for u, e in zip(route.utterances, embeddings)])
+                    else:
+                        cursor.executemany('''
+                            INSERT OR IGNORE INTO utterances (route_name, utterance)
+                            VALUES (?, ?)
+                        ''', [(route.name, u) for u in route.utterances])
                     
                 conn.commit()
         except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
@@ -117,20 +130,21 @@ class SQLiteStorage(BaseStorage):
         except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
             raise RuntimeError(f"Failed to update threshold: {e}") from e
 
-    def add_utterance(self, route_name: str, utterance: str):
+    def add_utterance(self, route_name: str, utterance: str, embedding=None):
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                    INSERT OR IGNORE INTO utterances (route_name, utterance)
-                    VALUES (?, ?)
-                ''', (route_name, utterance))
+                    INSERT OR IGNORE INTO utterances (route_name, utterance, embedding)
+                    VALUES (?, ?, ?)
+                ''', (route_name, utterance, embedding.tobytes() if embedding is not None else None))
                 conn.commit()
         except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
             raise RuntimeError(f"Failed to add utterance: {e}") from e
 
-    def load_all_routes(self) -> List[Route]:
+    def load_all_routes(self) -> tuple[List[Route], dict]:
         routes = []
+        embeddings_map = {}
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
@@ -141,9 +155,13 @@ class SQLiteStorage(BaseStorage):
                     name, threshold, metadata_str = row
                     metadata = json.loads(metadata_str) if metadata_str else None
                     
-                    cursor.execute('SELECT utterance FROM utterances WHERE route_name = ?', (name,))
+                    cursor.execute('SELECT utterance, embedding FROM utterances WHERE route_name = ?', (name,))
                     utterance_rows = cursor.fetchall()
-                    utterances = [u[0] for u in utterance_rows]
+                    utterances = []
+                    embs = []
+                    for u, e in utterance_rows:
+                        utterances.append(u)
+                        embs.append(e)
                     
                     routes.append(Route(
                         name=name,
@@ -151,6 +169,7 @@ class SQLiteStorage(BaseStorage):
                         metadata=metadata,
                         utterances=utterances
                     ))
+                    embeddings_map[name] = embs
         except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
             raise RuntimeError(f"Failed to load routes: {e}") from e
-        return routes
+        return routes, embeddings_map
