@@ -75,6 +75,9 @@ To mathematically prove our $O(1)$ memory buffer and asynchronous batch queue, w
 | **25,000** | 424.33s | 23.57 | 42.43 ms | 690.25 MB |
 | **50,000** | 241.40s | 41.42 | 24.14 ms | 793.62 MB |
 
+> [!WARNING]
+> **Methodological Anomaly:** The CPU duration table above exhibits inverse physical scaling (50k vectors completing faster than 10k vectors). This was caused by uncontrolled benchmark environments where the 10k/25k runs were executed during cold-cache states prior to the v0.2.1 SQLite BLOB cache hotfix, while the 50k run was executed warm. We have preserved this table for historical transparency. A formalized, statistically rigorous benchmark suite using standard `pytest-benchmark` methodology is scheduled for `v0.3.0` to generate comparable $O(N)$ scaling curves.
+
 ### 6. GPU Acceleration (NVIDIA CUDA)
 We unlocked the `CUDAExecutionProvider` via `onnxruntime-gpu` to test the exact same extreme workloads on the user's local RTX GPU. 
 
@@ -98,7 +101,7 @@ We unlocked the `CUDAExecutionProvider` via `onnxruntime-gpu` to test the exact 
 > **GPU Scaling Physics:** You may notice that as scale increases from 10k to 50k, GPU QPS drops (307 -> 72) while CPU QPS increased (19 -> 41). This inversion is expected: at 10k vectors, batching fills the GPU pipeline perfectly. At 50k vectors, the mathematical weight of the cosine similarity matrix multiply ($O(N)$ dot products) alongside PCIe VRAM transfer overhead dominates the GPU execution. GPU is the optimal choice for up to ~25,000 routes.
 
 > [!TIP]
-> **v0.2.1 Boot Bottleneck Hotfix:** We discovered a severe cold-boot bottleneck where a 50k vector database took 20 minutes to boot due to CPU re-encoding. In `v0.2.1`, we implemented `float32` BLOB caching in SQLite. Booting 50,000 vectors now drops from **20 minutes to 0.45 seconds** ($O(1)$ memory mapping).
+> **v0.2.1 Boot Bottleneck Hotfix:** We discovered a severe cold-boot bottleneck where a 50k vector database took 20 minutes to boot due to CPU re-encoding (10k routes took ~4 minutes, 25k took ~10 minutes). In `v0.2.1`, we implemented `float32` BLOB caching in SQLite. Booting 50,000 vectors now drops from **20 minutes to 0.45 seconds** ($O(1)$ memory mapping).
 
 ### 7. Head-to-Head vs. Semantic-Router (`bench_vs_semantic_router.py`)
 To properly contextualize these numbers, we executed an apples-to-apples comparison against `semantic-router` (using their default `FastEmbedEncoder`).
@@ -106,7 +109,7 @@ To properly contextualize these numbers, we executed an apples-to-apples compari
 | Metric | `semantic-router` | `SynaptoRoute` (`v0.2.0`) | Notes |
 |--------|-------------------|---------------------------|-------|
 | **Hot-Reload Degradation** | +6.46 ms | **+0.74 ms** | `semantic-router` aggressively re-compiles its internal index on every route addition, causing latency to degrade linearly in $O(N)$ fashion (from 5.34ms to 11.81ms by the 500th route). `SynaptoRoute` bypasses this via $O(1)$ lazy memory slicing, keeping degradation under 1ms. |
-| **Concurrent Throughput** | Blocked (Sequential) | **38.19 QPS** | The dynamic async batching queue allows `SynaptoRoute` to safely handle 10,000 parallel requests via `asyncio`. `semantic-router` blocks globally and does not natively support async concurrent inference. |
+| **Concurrent Throughput** | Blocked (Sequential) | **38.19 QPS** | The dynamic async batching queue allows `SynaptoRoute` to safely handle 10,000 parallel requests via `asyncio`. `semantic-router` blocks globally and does not natively support async concurrent inference. Note: this explicitly compares an asynchronous system to a synchronous one, reflecting architectural capabilities rather than apples-to-apples routing speed. |
 
 ---
 

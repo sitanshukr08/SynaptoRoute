@@ -32,7 +32,10 @@ SynaptoRoute solves this by executing intent classification locally. It is engin
 ### 1. Amortized $O(1)$ Lazy Memory Slicing
 Traditional routers suffer from severe performance degradation during live updates. When a new route is added, they execute an immediate `numpy.vstack`, copying the entire vector array in memory ($O(N)$ complexity). 
 
-SynaptoRoute `v0.2.0` pre-allocates a static tensor buffer at initialization. When routes are added dynamically, the router slots the embedding directly into a reserved `float32` memory slice via list assignment. This bounds memory growth strictly to $O(1)$ and prevents server RAM exhaustion, even when handling 50,000 dense vectors.
+SynaptoRoute `v0.2.0` pre-allocates a static tensor buffer at initialization. When routes are added dynamically, the router slots the embedding directly into a reserved `float32` memory slice via list assignment. This bounds memory growth strictly to $O(1)$ and prevents server RAM exhaustion, even when handling 50,000 dense vectors. 
+
+> [!NOTE]
+> **Memory Floor Tradeoff:** Because the maximum capacity is pre-allocated upfront as `np.zeros(max_capacity, dim)`, the system has a fixed baseline memory footprint. With the default `bge-small-en-v1.5` model (384 dimensions) and 50,000 capacity, the empty router consumes **~73 MB of RAM at startup**, regardless of whether you load 3 routes or 49,000 routes. This is the calculated cost of preventing $O(N)$ allocation crashes.
 
 ### 2. Dynamic Asynchronous Batching
 Hardware accelerators (GPUs, AVX CPUs) are optimized for large matrix multiplications. Processing single web requests sequentially wastes hardware potential and blocks Python's `asyncio` event loop. 
@@ -55,7 +58,7 @@ SynaptoRoute is architecturally optimized for async concurrent deployments. We e
 | **Hot-Reload Degradation** (500 Routes) | +6.46 ms | **+0.74 ms** |
 | **Concurrent Async Load** | `Index is not ready` (Thread Blocked) | **Successfully Batched** (38+ QPS) |
 
-> **The Architectural Difference:** The +0.74ms vs +6.46ms hot-reload degradation is a direct consequence of $O(1)$ lazy memory slicing vs $O(N)$ index recompilation. Under `asyncio` concurrent load, `semantic-router`'s sync-first design produced `Index is not ready` failures; SynaptoRoute's `_batch_worker` queue absorbed all requests without dropping a query.
+> **The Architectural Difference:** The +0.74ms vs +6.46ms hot-reload degradation is a direct consequence of $O(1)$ lazy memory slicing vs $O(N)$ index recompilation. Under `asyncio` concurrent load, `semantic-router`'s sync-first design produced `Index is not ready` failures; SynaptoRoute's `_batch_worker` queue absorbed all requests without dropping a query. Note that the throughput comparison is heavily biased by architectural choices: it compares an async batching queue against a strictly sequential, unbatched caller.
 
 > **View Full Benchmarks:** For detailed statistical analysis, including GPU physics scaling, P50 vs P99 tradeoffs, and our roadmap for fixing distributed system limitations, see our official [BENCHMARKS.md](BENCHMARKS.md).
 
