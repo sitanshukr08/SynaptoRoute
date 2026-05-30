@@ -34,9 +34,11 @@ async def main():
 
     await router.start()
 
-    queries = ["This is a test query number {}".format(i) for i in range(1000)]
+    import os
+    num_queries = 100 if os.environ.get("CI") else 1000
+    queries = ["This is a test query number {}".format(i) for i in range(num_queries)]
 
-    print("Starting benchmark with 1000 concurrent requests...")
+    print(f"Starting benchmark with {num_queries} concurrent requests...")
     start_time = time.perf_counter()
 
     tasks = [router.aquery(q) for q in queries]
@@ -45,8 +47,8 @@ async def main():
     end_time = time.perf_counter()
     total_time = end_time - start_time
 
-    print(f"Total time for 1000 queries: {total_time:.4f} seconds")
-    print(f"Amortized latency per query (P50 equivalent): {(total_time / 1000) * 1000:.4f} ms")
+    print(f"Total time for {num_queries} queries: {total_time:.4f} seconds")
+    print(f"Amortized latency per query (P50 equivalent): {(total_time / num_queries) * 1000:.4f} ms")
 
     await router.stop()
 

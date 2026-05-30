@@ -14,7 +14,9 @@ def main():
     
     queries = ["hello", "cancel my order", "I need a refund", "where is my package", "speak to a human"] * 200
     random.shuffle(queries)
-    queries = queries[:1000]
+    import os
+    num_queries = 100 if os.environ.get("CI") else 1000
+    queries = queries[:num_queries]
     
     latencies = []
     print("Benchmarking Inference Latency...")
