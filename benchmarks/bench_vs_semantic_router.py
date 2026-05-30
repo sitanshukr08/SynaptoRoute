@@ -23,6 +23,8 @@ class DummyStorage(BaseStorage):
     def add_utterance(self, name, utt, embedding=None): pass
     def update_threshold(self, name, threshold): pass
     def get_route(self, name): return None
+    def delete_route(self, name): pass
+    def close(self): pass
 
 def bench_hot_reload():
     print("--- Test 1: Hot-Reload O(N) Degradation ---")

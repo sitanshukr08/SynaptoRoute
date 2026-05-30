@@ -16,6 +16,8 @@ class DummyStorage(BaseStorage):
         return None
     def update_threshold(self, route_name, threshold):
         pass
+    def delete_route(self, route_name):
+        pass
     def close(self):
         pass
 
