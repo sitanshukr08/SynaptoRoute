@@ -57,7 +57,7 @@ SynaptoRoute is architecturally optimized for async concurrent deployments. We e
 
 > **The Architectural Difference:** The +0.74ms vs +6.46ms hot-reload degradation is a direct consequence of $O(1)$ lazy memory slicing vs $O(N)$ index recompilation. Under `asyncio` concurrent load, `semantic-router`'s sync-first design produced `Index is not ready` failures; SynaptoRoute's `_batch_worker` queue absorbed all requests without dropping a query.
 
-> **📊 View Full Benchmarks:** For detailed statistical analysis, including GPU physics scaling, P50 vs P99 tradeoffs, and our roadmap for fixing distributed system limitations, see our official [BENCHMARKS.md](BENCHMARKS.md).
+> **View Full Benchmarks:** For detailed statistical analysis, including GPU physics scaling, P50 vs P99 tradeoffs, and our roadmap for fixing distributed system limitations, see our official [BENCHMARKS.md](BENCHMARKS.md).
 
 ---
 
