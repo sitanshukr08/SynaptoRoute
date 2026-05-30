@@ -7,7 +7,12 @@ import numpy as np
 
 class MockEncoder(Encoder):
     def __init__(self):
-        self.dim = 2
+        self._dim = 2
+
+    @property
+    def dim(self) -> int:
+        return self._dim
+
 
     def encode(self, text: str) -> np.ndarray:
         if "finance" in text:

@@ -37,6 +37,7 @@ api = [
     "fastapi>=0.100.0",
     "uvicorn>=0.22.0"
 ]
+openai = ["openai>=1.0.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/synaptoroute"]
