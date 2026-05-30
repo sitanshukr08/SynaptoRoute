@@ -112,7 +112,10 @@ class AdaptiveRouter:
         embeddings = None
         num_embs = 0
         if route.utterances:
-            with self._encoder_lock:
+            if getattr(self.encoder, 'requires_lock', True):
+                with self._encoder_lock:
+                    embeddings = self.encoder.encode_batch(route.utterances)
+            else:
                 embeddings = self.encoder.encode_batch(route.utterances)
             num_embs = len(embeddings)
             
@@ -154,7 +157,10 @@ class AdaptiveRouter:
             if self._cursor + 1 > self.max_capacity:
                 raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
                 
-        with self._encoder_lock:
+        if getattr(self.encoder, 'requires_lock', True):
+            with self._encoder_lock:
+                embedding = self.encoder.encode(utterance)
+        else:
             embedding = self.encoder.encode(utterance)
         
         with self.lock:
@@ -237,7 +243,10 @@ class AdaptiveRouter:
 
                 try:
                     def process_batch(qs):
-                        with self._encoder_lock:
+                        if getattr(self.encoder, 'requires_lock', True):
+                            with self._encoder_lock:
+                                query_embeddings = self.encoder.encode_batch(qs)
+                        else:
                             query_embeddings = self.encoder.encode_batch(qs)
                         with self.lock:
                             if self._cursor == 0:

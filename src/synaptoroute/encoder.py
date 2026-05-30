@@ -9,6 +9,11 @@ class BaseEncoder(abc.ABC):
     """
     @property
     @abc.abstractmethod
+    def requires_lock(self) -> bool:
+        pass
+
+    @property
+    @abc.abstractmethod
     def dim(self) -> int:
         pass
 
@@ -33,6 +38,10 @@ class FastEmbedEncoder(BaseEncoder):
         self._dim = len(list(self.model.embed(["test"]))[0])
     
     @property
+    def requires_lock(self) -> bool:
+        return True
+
+    @property
     def dim(self) -> int:
         return self._dim
 
@@ -52,7 +61,10 @@ class OpenAIEncoder(BaseEncoder):
     Handles remote intent embeddings using OpenAI models.
     """
     def __init__(self, model_name: str = "text-embedding-3-small", dim: Optional[int] = None, client=None):
-        import openai
+        try:
+            import openai
+        except ImportError as e:
+            raise RuntimeError("Please install synaptoroute[openai] to use the OpenAIEncoder. Run `pip install synaptoroute[openai]`.") from e
         self.model_name = model_name
         self.client = client or openai.OpenAI()
         
@@ -70,20 +82,34 @@ class OpenAIEncoder(BaseEncoder):
                 raise ValueError("dim must be provided explicitly for unknown models.")
                 
     @property
+    def requires_lock(self) -> bool:
+        return False
+
+    @property
     def dim(self) -> int:
         return self._dim
 
     def encode(self, text: str) -> npt.NDArray[np.float32]:
-        response = self.client.embeddings.create(input=[text], model=self.model_name)
-        return np.array(response.data[0].embedding, dtype=np.float32)
+        import openai
+        from synaptoroute.exceptions import SynaptoRouteError
+        try:
+            response = self.client.embeddings.create(input=[text], model=self.model_name)
+            return np.array(response.data[0].embedding, dtype=np.float32)
+        except openai.OpenAIError as e:
+            raise SynaptoRouteError(f"OpenAI API Error: {e}") from e
         
     def encode_batch(self, texts: List[str]) -> npt.NDArray[np.float32]:
         if not texts:
             return np.empty((0, self.dim), dtype=np.float32)
         
-        response = self.client.embeddings.create(input=texts, model=self.model_name)
-        embeddings = [data.embedding for data in response.data]
-        return np.array(embeddings, dtype=np.float32)
+        import openai
+        from synaptoroute.exceptions import SynaptoRouteError
+        try:
+            response = self.client.embeddings.create(input=texts, model=self.model_name)
+            embeddings = [data.embedding for data in response.data]
+            return np.array(embeddings, dtype=np.float32)
+        except openai.OpenAIError as e:
+            raise SynaptoRouteError(f"OpenAI API Error: {e}") from e
 
 # Preserve backwards compatibility
 Encoder = FastEmbedEncoder
