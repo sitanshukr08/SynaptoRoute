@@ -1,7 +1,11 @@
 import pytest
+import sqlite3
+import os
 from synaptoroute.models import Route
 from synaptoroute.storage import SQLiteStorage
-
+from synaptoroute.router import AdaptiveRouter
+from synaptoroute.encoder import Encoder
+from synaptoroute.exceptions import SynaptoRouteError
 @pytest.fixture
 def memory_db():
     storage = SQLiteStorage(":memory:")
@@ -87,3 +91,63 @@ def test_save_route_replace(memory_db):
     assert loaded_route.threshold == 0.9
     assert loaded_route.metadata == {"version": 2}
     assert set(loaded_route.utterances) == {"v2", "v3"}
+
+def test_delete_route_storage(memory_db):
+    route = Route(name="r1", utterances=["u1", "u2"], threshold=0.5)
+    memory_db.save_route(route)
+    memory_db.delete_route("r1")
+    
+    routes, _ = memory_db.load_all_routes()
+    assert len(routes) == 0
+    
+    # Verify utterances were cascade deleted
+    with memory_db._get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM utterances WHERE route_name = 'r1'")
+        assert cursor.fetchone()[0] == 0
+
+def test_corrupt_json_metadata(memory_db):
+    route = Route(name="r1", utterances=["u1"], threshold=0.5)
+    memory_db.save_route(route)
+    
+    with memory_db._get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE routes SET metadata = '{corrupt_json}' WHERE name = 'r1'")
+        conn.commit()
+        
+    routes, _ = memory_db.load_all_routes()
+    assert len(routes) == 1
+    assert routes[0].metadata is None
+
+def test_sqlite_storage_creates_directory(tmp_path):
+    nested_path = tmp_path / "nested" / "dir" / "routes.db"
+    assert not nested_path.parent.exists()
+    
+    storage = SQLiteStorage(str(nested_path))
+    assert nested_path.parent.exists()
+    
+    # Cleanup connection to avoid file locking on Windows
+    del storage
+
+def test_fit_thresholds_db_error(memory_db, monkeypatch):
+    encoder = Encoder(model_name="BAAI/bge-small-en-v1.5")
+    router = AdaptiveRouter(encoder, memory_db)
+    
+    route = Route(name="r1", utterances=["hello"], threshold=0.5)
+    router.add_route(route)
+    
+    def raise_operational_error(*args, **kwargs):
+        raise sqlite3.OperationalError("Mocked DB error")
+        
+    # Storage methods catch OperationalError and raise RuntimeError, which Router catches and raises SynaptoRouteError
+    original_update = memory_db.update_threshold
+    def mock_update_threshold(route_name, threshold):
+        try:
+            raise_operational_error()
+        except sqlite3.OperationalError as e:
+            raise RuntimeError(f"Failed to update threshold: {e}") from e
+            
+    monkeypatch.setattr(memory_db, "update_threshold", mock_update_threshold)
+    
+    with pytest.raises(SynaptoRouteError, match="Mocked DB error"):
+        router.fit_thresholds(["hello"], ["r1"])

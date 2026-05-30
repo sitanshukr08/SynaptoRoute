@@ -8,13 +8,14 @@ import asyncio
 from synaptoroute.models import Route
 from synaptoroute.encoder import Encoder
 from synaptoroute.storage import BaseStorage
-from synaptoroute.exceptions import RouteNotFoundError, RouterOverloadedError, RouterCapacityError
+from synaptoroute.exceptions import RouteNotFoundError, RouterOverloadedError, RouterCapacityError, SynaptoRouteError
 
 class AdaptiveRouter:
     def __init__(self, encoder: Encoder, storage: BaseStorage, max_capacity: int = 50000):
         self.encoder = encoder
         self.storage = storage
         self.lock = threading.Lock()
+        self._encoder_lock = threading.Lock()
         
         self.max_capacity = max_capacity
         self._vectors = None
@@ -72,6 +73,8 @@ class AdaptiveRouter:
                 self.storage.save_route(route, final_embeddings)
                 
             num_embs = len(final_embeddings)
+            if self._cursor + num_embs > self.max_capacity:
+                raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
             self._vectors[self._cursor : self._cursor + num_embs] = final_embeddings
             self._cursor += num_embs
             self._meta.extend([route] * num_embs)
@@ -105,14 +108,19 @@ class AdaptiveRouter:
         embeddings = None
         num_embs = 0
         if route.utterances:
-            embeddings = self.encoder.encode_batch(route.utterances)
+            with self._encoder_lock:
+                embeddings = self.encoder.encode_batch(route.utterances)
             num_embs = len(embeddings)
             
         with self.lock:
-            if self._cursor + num_embs > self.max_capacity:
+            is_overwrite = route.name in self._route_map
+            net_increase = num_embs
+            if is_overwrite:
+                net_increase -= len(self._route_map[route.name].utterances)
+            
+            if self._cursor + net_increase > self.max_capacity:
                 raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
 
-            is_overwrite = route.name in self._route_map
             self.storage.save_route(route, embeddings)
             
             if is_overwrite:
@@ -137,8 +145,13 @@ class AdaptiveRouter:
         with self.lock:
             if route_name not in self._route_map:
                 raise RouteNotFoundError(f"Route '{route_name}' not found.")
+            if utterance in self._route_map[route_name].utterances:
+                return
+            if self._cursor + 1 > self.max_capacity:
+                raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
                 
-        embedding = self.encoder.encode(utterance)
+        with self._encoder_lock:
+            embedding = self.encoder.encode(utterance)
         
         with self.lock:
             if route_name not in self._route_map:
@@ -203,6 +216,11 @@ class AdaptiveRouter:
                         except asyncio.TimeoutError:
                             break
                 except asyncio.CancelledError:
+                    for _, future in batch:
+                        if not future.done():
+                            future.set_exception(asyncio.CancelledError())
+                    for _ in batch:
+                        self._batch_queue.task_done()
                     break
                 except Exception:
                     continue
@@ -215,7 +233,8 @@ class AdaptiveRouter:
 
                 try:
                     def process_batch(qs):
-                        query_embeddings = self.encoder.encode_batch(qs)
+                        with self._encoder_lock:
+                            query_embeddings = self.encoder.encode_batch(qs)
                         with self.lock:
                             if self._cursor == 0:
                                 return [None] * len(qs)
@@ -243,6 +262,9 @@ class AdaptiveRouter:
                         if not future.done():
                             future.set_exception(e)
                 finally:
+                    for _, future in batch:
+                        if not future.done():
+                            future.set_exception(asyncio.CancelledError())
                     # Prevent async deadlocks by marking tasks done
                     for _ in batch:
                         self._batch_queue.task_done()
@@ -319,5 +341,5 @@ class AdaptiveRouter:
                         self.storage.update_threshold(route_name, t)
                     except Exception as e:
                         route.threshold = old_t
-                        raise e
+                        raise SynaptoRouteError(f"Failed: {e}") from e
 

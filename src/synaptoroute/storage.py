@@ -159,7 +159,10 @@ class SQLiteStorage(BaseStorage):
                 
                 for row in route_rows:
                     name, threshold, metadata_str = row
-                    metadata = json.loads(metadata_str) if metadata_str else None
+                    try:
+                        metadata = json.loads(metadata_str) if metadata_str else None
+                    except json.JSONDecodeError:
+                        metadata = None
                     
                     cursor.execute('SELECT utterance, embedding FROM utterances WHERE route_name = ?', (name,))
                     utterance_rows = cursor.fetchall()
