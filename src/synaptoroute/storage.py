@@ -2,6 +2,7 @@ import sqlite3
 import json
 import os
 import threading
+import contextlib
 from abc import ABC, abstractmethod
 from typing import List
 
@@ -24,35 +25,39 @@ class BaseStorage(ABC):
     def load_all_routes(self) -> tuple[List[Route], dict]:
         pass
 
+    @abstractmethod
+    def delete_route(self, route_name: str):
+        pass
+
 class SQLiteStorage(BaseStorage):
     def __init__(self, db_path: str):
         self.db_path = db_path
-        dirname = os.path.dirname(self.db_path)
-        if dirname:
-            os.makedirs(dirname, exist_ok=True)
-        self.local = threading.local()
+        self._memory_conn = None
+        if self.db_path == ':memory:':
+            self._memory_conn = sqlite3.connect(self.db_path, timeout=10.0, check_same_thread=False)
+            self._memory_conn.execute('PRAGMA foreign_keys = ON')
+        else:
+            dirname = os.path.dirname(self.db_path)
+            if dirname:
+                os.makedirs(dirname, exist_ok=True)
         self._init_db()
 
-    def close(self):
-        if hasattr(self.local, 'conn') and self.local.conn:
-            self.local.conn.close()
-            del self.local.conn
-
     def __del__(self):
-        self.close()
+        if hasattr(self, '_memory_conn') and self._memory_conn is not None:
+            self._memory_conn.close()
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-
+    @contextlib.contextmanager
     def _get_connection(self):
-        if not hasattr(self.local, 'conn'):
-            self.local.conn = sqlite3.connect(self.db_path, timeout=10.0)
-            self.local.conn.execute('PRAGMA journal_mode=WAL;')
-            self.local.conn.execute('PRAGMA foreign_keys = ON')
-        return self.local.conn
+        if self._memory_conn is not None:
+            yield self._memory_conn
+        else:
+            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            conn.execute('PRAGMA journal_mode=WAL;')
+            conn.execute('PRAGMA foreign_keys = ON')
+            try:
+                yield conn
+            finally:
+                conn.close()
 
     def _init_db(self):
         try:
@@ -78,12 +83,13 @@ class SQLiteStorage(BaseStorage):
         except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
             raise RuntimeError(f"Failed to initialize database: {e}") from e
             
-        try:
-            with self._get_connection() as conn:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('PRAGMA table_info(utterances)')
+            columns = [info[1] for info in cursor.fetchall()]
+            if 'embedding' not in columns:
                 conn.execute('ALTER TABLE utterances ADD COLUMN embedding BLOB')
-                conn.commit()
-        except sqlite3.OperationalError:
-            pass # Column already exists
+            conn.commit()
 
     def save_route(self, route: Route, embeddings=None):
         try:
@@ -173,3 +179,12 @@ class SQLiteStorage(BaseStorage):
         except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
             raise RuntimeError(f"Failed to load routes: {e}") from e
         return routes, embeddings_map
+
+    def delete_route(self, route_name: str):
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM routes WHERE name = ?', (route_name,))
+                conn.commit()
+        except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
+            raise RuntimeError(f"Failed to delete route: {e}") from e

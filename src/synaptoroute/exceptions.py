@@ -13,3 +13,7 @@ class ModelLoadError(SynaptoRouteError):
 class RouterOverloadedError(SynaptoRouteError):
     """Raised when the dynamic batching queue is full (DDoS protection)."""
     pass
+
+class RouterCapacityError(SynaptoRouteError):
+    """Raised when the router's maximum capacity is exceeded."""
+    pass

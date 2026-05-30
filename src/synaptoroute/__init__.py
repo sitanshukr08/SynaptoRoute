@@ -3,7 +3,12 @@ SynaptoRoute
 A high-throughput, local semantic routing engine.
 """
 
-__version__ = "0.1.0"
+import importlib.metadata
+
+try:
+    __version__ = importlib.metadata.version("synaptoroute")
+except importlib.metadata.PackageNotFoundError:
+    __version__ = "unknown"
 
 from synaptoroute.router import AdaptiveRouter
 from synaptoroute.encoder import Encoder

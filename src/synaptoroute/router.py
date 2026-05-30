@@ -8,7 +8,7 @@ import asyncio
 from synaptoroute.models import Route
 from synaptoroute.encoder import Encoder
 from synaptoroute.storage import BaseStorage
-from synaptoroute.exceptions import RouteNotFoundError, RouterOverloadedError
+from synaptoroute.exceptions import RouteNotFoundError, RouterOverloadedError, RouterCapacityError
 
 class AdaptiveRouter:
     def __init__(self, encoder: Encoder, storage: BaseStorage, max_capacity: int = 50000):
@@ -82,6 +82,25 @@ class AdaptiveRouter:
         self._route_map = {}
         self._load_routes()
 
+    def delete_route(self, route_name: str):
+        with self.lock:
+            if route_name not in self._route_map:
+                return
+            
+            self.storage.delete_route(route_name)
+            self._route_map.pop(route_name)
+            
+            i = 0
+            while i < self._cursor:
+                if self._meta[i].name == route_name:
+                    last_idx = self._cursor - 1
+                    self._vectors[i] = self._vectors[last_idx]
+                    self._meta[i] = self._meta[last_idx]
+                    self._cursor -= 1
+                    self._meta.pop()
+                else:
+                    i += 1
+
     def add_route(self, route: Route):
         embeddings = None
         num_embs = 0
@@ -90,17 +109,23 @@ class AdaptiveRouter:
             num_embs = len(embeddings)
             
         with self.lock:
+            if self._cursor + num_embs > self.max_capacity:
+                raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
+
             is_overwrite = route.name in self._route_map
             self.storage.save_route(route, embeddings)
             
             if is_overwrite:
-                mask = [r.name != route.name for r in self._meta]
-                if not all(mask):
-                    keep_idx = np.where(mask)[0]
-                    num_kept = len(keep_idx)
-                    self._vectors[:num_kept] = self._vectors[keep_idx]
-                    self._cursor = num_kept
-                    self._meta = [self._meta[i] for i in keep_idx]
+                i = 0
+                while i < self._cursor:
+                    if self._meta[i].name == route.name:
+                        last_idx = self._cursor - 1
+                        self._vectors[i] = self._vectors[last_idx]
+                        self._meta[i] = self._meta[last_idx]
+                        self._cursor -= 1
+                        self._meta.pop()
+                    else:
+                        i += 1
             
             self._route_map[route.name] = route
             if num_embs > 0:
@@ -113,13 +138,15 @@ class AdaptiveRouter:
             if route_name not in self._route_map:
                 raise RouteNotFoundError(f"Route '{route_name}' not found.")
                 
-        # Reshape to 2D to ensure safe vstack compatibility
-        embedding = self.encoder.encode(utterance).reshape(1, -1)
+        embedding = self.encoder.encode(utterance)
         
         with self.lock:
             if route_name not in self._route_map:
                 raise RouteNotFoundError(f"Route '{route_name}' was deleted during encoding.")
-            self.storage.add_utterance(route_name, utterance, embedding[0])
+            if self._cursor + 1 > self.max_capacity:
+                raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
+
+            self.storage.add_utterance(route_name, utterance, embedding)
             
             self._vectors[self._cursor] = embedding
             self._cursor += 1
@@ -150,6 +177,8 @@ class AdaptiveRouter:
     async def aquery(self, query: str) -> Optional[Route]:
         if self._batch_queue is None:
             raise RuntimeError("Router must be started with `await router.start()` before calling aquery.")
+        if self._worker_task is None or self._worker_task.done():
+            raise RuntimeError("Router worker has crashed or stopped.")
             
         loop = asyncio.get_running_loop()
         future = loop.create_future()
