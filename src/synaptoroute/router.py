@@ -9,9 +9,13 @@ from synaptoroute.models import Route
 from synaptoroute.encoder import Encoder
 from synaptoroute.storage import BaseStorage
 from synaptoroute.exceptions import RouteNotFoundError, RouterOverloadedError, RouterCapacityError, SynaptoRouteError
+from synaptoroute.profile import OptimizationProfile, get_profile, ProfileType
 
 class AdaptiveRouter:
-    def __init__(self, encoder: Encoder, storage: BaseStorage, max_capacity: int = 50000):
+    def __init__(self, encoder: Encoder, storage: BaseStorage, profile: OptimizationProfile = None, max_capacity: int = 50000):
+        if profile is None:
+            profile = get_profile(ProfileType.THROUGHPUT)
+            
         self.encoder = encoder
         self.storage = storage
         self.lock = threading.Lock()
@@ -25,8 +29,8 @@ class AdaptiveRouter:
         
         self._batch_queue = None
         self._worker_task = None
-        self.batch_size = 32
-        self.batch_timeout = 0.005
+        self.batch_size = profile.batch_size
+        self.batch_timeout = profile.batch_timeout
         
         self._load_routes()
         
