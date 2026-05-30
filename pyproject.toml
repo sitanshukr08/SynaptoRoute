@@ -30,7 +30,8 @@ Issues = "https://github.com/sitanshukr08/SynaptoRoute/issues"
 
 [project.optional-dependencies]
 test = [
-    "pytest>=7.0.0"
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0"
 ]
 api = [
     "fastapi>=0.100.0",
