@@ -12,6 +12,10 @@ By executing the `bench_concurrency_v2.py` stress test, we mathematically proved
 - **SQLite Concurrency:** The framework now easily survives 2,000 parallel multithreaded SQL writes with 0% data corruption.
 - **Async Blockers Removed:** Background processing is no longer held hostage during heavy transformer inference tasks.
 
+### Accuracy Benchmark Dataset Disclaimer
+> [!NOTE]
+> The classification accuracy metric (>98%, F1 = 0.985) was achieved using a distinct, well-separated 5-intent dataset. In production environments with heavily overlapping semantic intents, absolute F1 scores will naturally be lower. Future releases will formalize this benchmark against standardized public datasets.
+
 ---
 
 ## Benchmark Comparisons (v0.1.0 vs v0.2.0)
@@ -62,8 +66,8 @@ By firing queries through the async batch queue, the system achieved exactly **2
 
 We are officially ready to tag the `v0.2.0` release.
 
-### 5. Extreme Capacity Stress Test (`bench_extreme_scale.py`)
-To mathematically prove our $O(1)$ memory buffer and asynchronous batch queue, we simulated extreme 10,000-request web server concurrency against the maximum hard-coded capacity (50,000 vectors).
+### 5. Extreme Capacity Stress Test & Queue Overload
+To mathematically prove our $O(1)$ memory buffer and asynchronous batch queue, we simulated extreme 10,000-request web server concurrency against the maximum hard-coded capacity (50,000 vectors). During massive bursts (e.g., a 20k concurrency test), the system processes 10,000 requests and explicitly rejects the remainder via `RouterOverloadedError`. This validates that the `maxsize=10000` queue correctly enforces load shedding to protect the host server from crashing under DDoS-level traffic.
 
 | Scale (Vectors) | CPU Duration | CPU QPS | CPU Avg Latency | Peak RAM |
 |-----------------|--------------|---------|-----------------|----------|
@@ -73,6 +77,10 @@ To mathematically prove our $O(1)$ memory buffer and asynchronous batch queue, w
 
 ### 6. GPU Acceleration (NVIDIA CUDA)
 We unlocked the `CUDAExecutionProvider` via `onnxruntime-gpu` to test the exact same extreme workloads on the user's local RTX GPU. 
+
+> [!NOTE]
+> **Reproducibility:** GPU numbers cannot be produced by standard GitHub Actions cloud runners (which rely on 2-core CPUs). These numbers were executed locally on an RTX 3050 Laptop GPU and transcribed. To reproduce these numbers locally, install `onnxruntime-gpu` and run `scripts/bench_extreme_scale.py`.
+
 
 | Scale (Vectors) | GPU Duration | GPU QPS | GPU Avg Latency | Peak RAM |
 |-----------------|--------------|---------|-----------------|----------|
