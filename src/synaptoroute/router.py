@@ -3,8 +3,10 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.metrics import f1_score
 from typing import Optional
+import time
 import asyncio
 
+from synaptoroute.metrics import MetricsRegistry
 from synaptoroute.models import Route
 from synaptoroute.encoder import Encoder
 from synaptoroute.storage import BaseStorage
@@ -12,7 +14,7 @@ from synaptoroute.exceptions import RouteNotFoundError, RouterOverloadedError, R
 from synaptoroute.profile import OptimizationProfile, get_profile, ProfileType
 
 class AdaptiveRouter:
-    def __init__(self, encoder: Encoder, storage: BaseStorage, profile: OptimizationProfile = None, max_capacity: int = 50000):
+    def __init__(self, encoder: Encoder, storage: BaseStorage, profile: OptimizationProfile = None, max_capacity: int = 50000, metrics: MetricsRegistry = None):
         if profile is None:
             profile = get_profile(ProfileType.THROUGHPUT)
             
@@ -20,6 +22,7 @@ class AdaptiveRouter:
         self.storage = storage
         self.lock = threading.Lock()
         self._encoder_lock = threading.Lock()
+        self.metrics = metrics or MetricsRegistry()
         
         self.max_capacity = max_capacity
         self._vectors = None
@@ -82,6 +85,8 @@ class AdaptiveRouter:
             self._vectors[self._cursor : self._cursor + num_embs] = final_embeddings
             self._cursor += num_embs
             self._meta.extend([route] * num_embs)
+            
+        self.metrics.capacity_usage.set(self._cursor)
 
     def _rebuild_memory_locked(self):
         self._cursor = 0
@@ -107,6 +112,8 @@ class AdaptiveRouter:
                     self._meta.pop()
                 else:
                     i += 1
+            
+            self.metrics.capacity_usage.set(self._cursor)
 
     def add_route(self, route: Route):
         embeddings = None
@@ -147,6 +154,8 @@ class AdaptiveRouter:
                 self._vectors[self._cursor : self._cursor + num_embs] = embeddings
                 self._cursor += num_embs
                 self._meta.extend([route] * num_embs)
+            
+            self.metrics.capacity_usage.set(self._cursor)
 
     def add_utterance(self, route_name: str, utterance: str):
         with self.lock:
@@ -177,8 +186,11 @@ class AdaptiveRouter:
             route = self._route_map[route_name]
             route.utterances.append(utterance)
             self._meta.append(route)
+            
+            self.metrics.capacity_usage.set(self._cursor)
 
     def __call__(self, query: str) -> Optional[Route]:
+        start_time = time.perf_counter()
         query_embedding = self.encoder.encode(query)
         
         with self.lock:
@@ -195,6 +207,7 @@ class AdaptiveRouter:
                     best_score = score
                     best_route = route
                     
+            self.metrics.inference_latency_seconds.observe(time.perf_counter() - start_time)
             return best_route
 
     async def aquery(self, query: str) -> Optional[Route]:
@@ -207,9 +220,15 @@ class AdaptiveRouter:
         future = loop.create_future()
         try:
             self._batch_queue.put_nowait((query, future))
+            self.metrics.queue_depth.inc()
         except asyncio.QueueFull:
             raise RouterOverloadedError("Router queue is full (max 10000). Shedding load.")
-        return await future
+            
+        start_time = time.perf_counter()
+        try:
+            return await future
+        finally:
+            self.metrics.inference_latency_seconds.observe(time.perf_counter() - start_time)
 
     async def _batch_worker(self):
         try:
@@ -217,11 +236,13 @@ class AdaptiveRouter:
                 batch = []
                 try:
                     item = await self._batch_queue.get()
+                    self.metrics.queue_depth.dec()
                     batch.append(item)
                     
                     while len(batch) < self.batch_size:
                         try:
                             item = await asyncio.wait_for(self._batch_queue.get(), timeout=self.batch_timeout)
+                            self.metrics.queue_depth.dec()
                             batch.append(item)
                         except asyncio.TimeoutError:
                             break
@@ -237,6 +258,8 @@ class AdaptiveRouter:
 
                 if not batch:
                     continue
+
+                self.metrics.batch_size.observe(len(batch))
 
                 queries = [q for q, _ in batch]
                 futures = [f for _, f in batch]
@@ -285,6 +308,7 @@ class AdaptiveRouter:
             while not self._batch_queue.empty():
                 try:
                     _, future = self._batch_queue.get_nowait()
+                    self.metrics.queue_depth.dec()
                     if not future.done():
                         future.set_exception(asyncio.CancelledError("Router worker shutting down."))
                 except asyncio.QueueEmpty:
