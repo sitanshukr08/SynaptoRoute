@@ -32,6 +32,6 @@ To maintain academic and professional engineering standards, contributors must a
 
 ## Pull Request Process
 1. Ensure your code strictly adheres to the existing architectural philosophy (e.g., preserving $O(1)$ updates and non-blocking asynchronous execution).
-2. Update `README.md` and `BENCHMARKS.md` if your code impacts structural throughput.
+2. Update `README.md` and `docs/BENCHMARKS.md` if your code impacts structural throughput.
 3. Open a Pull Request using the provided GitHub PR template.
 4. Wait for CI/CD checks to pass.

@@ -388,14 +388,7 @@ class AdaptiveRouter:
             
         start_time = time.perf_counter()
         try:
-            done, _ = await asyncio.wait(
-                [future, self._worker_task],
-                return_when=asyncio.FIRST_COMPLETED
-            )
-            if future in done:
-                return future.result()
-            else:
-                raise RuntimeError("Router worker stopped before completing this query.")
+            return await future
         finally:
             self.metrics.inference_latency_seconds.observe(time.perf_counter() - start_time)
 

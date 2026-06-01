@@ -24,7 +24,8 @@ jobs:
           
       - name: Run Tests
         run: |
-          pytest tests/
+          pip install pytest-timeout
+          pytest tests/ -v -s --timeout=30
           
   docker-build:
     runs-on: ubuntu-latest
@@ -51,12 +52,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .[all]
           
-      - name: Run Synthetic Scale Benchmark
-        run: |
-          echo "### Faiss Scale Performance" >> $GITHUB_STEP_SUMMARY
-          python benchmarks/bench_faiss.py >> $GITHUB_STEP_SUMMARY
-          
       - name: Run Real-World Dataset Benchmark
         run: |
+          pip install datasets
           echo "### System Performance & Real Datasets" >> $GITHUB_STEP_SUMMARY
           python benchmarks/bench_realworld.py >> $GITHUB_STEP_SUMMARY

@@ -30,6 +30,8 @@ class FastEmbedEncoder(BaseEncoder):
     Handles local intent embeddings using fastembed ONNX models.
     """
     def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5", providers: List[str] = None, threads: Optional[int] = None):
+        import threading
+        self._lock = threading.Lock()
         from fastembed import TextEmbedding
         if providers is None:
             providers = ["CPUExecutionProvider"]
@@ -39,15 +41,16 @@ class FastEmbedEncoder(BaseEncoder):
     
     @property
     def requires_lock(self) -> bool:
-        return True
+        return False
 
     @property
     def dim(self) -> int:
         return self._dim
 
     def encode(self, text: str) -> npt.NDArray[np.float32]:
-        embeddings = list(self.model.embed([text]))
-        return embeddings[0]
+        with self._lock:
+            embeddings = list(self.model.embed([text]))
+            return embeddings[0]
         
     def encode_batch(self, texts: List[str]) -> npt.NDArray[np.float32]:
         if not texts:
@@ -56,10 +59,11 @@ class FastEmbedEncoder(BaseEncoder):
             
         chunk_size = 500
         all_embeddings = []
-        for i in range(0, len(texts), chunk_size):
-            chunk = texts[i:i + chunk_size]
-            embeddings = list(self.model.embed(chunk))
-            all_embeddings.extend(embeddings)
+        with self._lock:
+            for i in range(0, len(texts), chunk_size):
+                chunk = texts[i:i + chunk_size]
+                embeddings = list(self.model.embed(chunk))
+                all_embeddings.extend(embeddings)
             
         return np.array(all_embeddings, dtype=np.float32)
 

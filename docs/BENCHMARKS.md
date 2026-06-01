@@ -106,9 +106,10 @@ Stress testing the absolute upper boundaries of the system architecture in an in
 
 ## Independent Hardware Validation
 
-SynaptoRoute v0.3.0 was independently executed on four separate Windows laptops ranging from:
+SynaptoRoute v0.3.0 was independently executed on five separate Windows laptops ranging from:
 
 - 4C/8T Intel CPU, 8GB RAM
+- 6C/12T AMD CPU + GTX 1650, 16GB RAM
 - 8C/16T AMD CPU + RTX 3050
 - 12C/16T Intel CPU
 - 16C/24T Intel CPU + RTX 4050
