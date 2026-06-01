@@ -22,8 +22,10 @@ class BaseSyncManager:
         pass
 
 class RedisSyncManager(BaseSyncManager):
-    def __init__(self, redis_url: str):
+    def __init__(self, redis_url: str, sync_worker_count: int = 4, sync_queue_size: int = 1000):
         super().__init__()
+        self.sync_worker_count = sync_worker_count
+        self.sync_queue_size = sync_queue_size
         if not HAS_REDIS:
             raise ImportError("redis is not installed. Please install it using 'pip install synaptoroute[redis]'.")
         self.redis_url = redis_url
@@ -34,6 +36,8 @@ class RedisSyncManager(BaseSyncManager):
         self._listener_task: Optional[asyncio.Task] = None
         self._publisher_task: Optional[asyncio.Task] = None
         self._outbound_queue: Optional[asyncio.Queue] = None
+        self._inbound_queue: Optional[asyncio.Queue] = None
+        self._dispatch_workers: list[asyncio.Task] = []
         self._channel = "synaptoroute:sync"
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
@@ -43,12 +47,17 @@ class RedisSyncManager(BaseSyncManager):
     async def start(self):
         self._loop = asyncio.get_running_loop()
         self._outbound_queue = asyncio.Queue()
+        self._inbound_queue = asyncio.Queue(maxsize=self.sync_queue_size)
         self._redis_client = redis.from_url(self.redis_url)
         self._pubsub = self._redis_client.pubsub()
         await self._pubsub.subscribe(self._channel)
 
         self._listener_task = self._loop.create_task(self._listener_loop())
         self._publisher_task = self._loop.create_task(self._publisher_loop())
+        self._dispatch_workers = [
+            self._loop.create_task(self._dispatch_worker_loop()) 
+            for _ in range(self.sync_worker_count)
+        ]
 
     async def stop(self):
         if self._outbound_queue:
@@ -69,6 +78,13 @@ class RedisSyncManager(BaseSyncManager):
                 await self._publisher_task
             except asyncio.CancelledError:
                 pass
+                
+        for worker in self._dispatch_workers:
+            worker.cancel()
+            try:
+                await worker
+            except asyncio.CancelledError:
+                pass
             
         if self._pubsub:
             await self._pubsub.unsubscribe(self._channel)
@@ -86,7 +102,7 @@ class RedisSyncManager(BaseSyncManager):
                             data = json.loads(message["data"])
                             sender_id = data.get("sender_id")
                             if sender_id != self.sender_id:
-                                await asyncio.to_thread(self._dispatch, data)
+                                await self._inbound_queue.put(data)
                         except Exception:
                             pass
             except asyncio.CancelledError:
@@ -107,9 +123,22 @@ class RedisSyncManager(BaseSyncManager):
         except asyncio.CancelledError:
             pass
 
+    async def _dispatch_worker_loop(self):
+        try:
+            while True:
+                data = await self._inbound_queue.get()
+                await asyncio.to_thread(self._dispatch, data)
+                self._inbound_queue.task_done()
+        except asyncio.CancelledError:
+            pass
+
     def broadcast(self, action: str, payload: dict, embeddings: bytes = None):
         if self._outbound_queue is None or self._loop is None:
             return
+            
+        import base64
+        if embeddings is not None:
+            payload["_embeddings_b64"] = base64.b64encode(embeddings).decode('ascii')
             
         msg = {
             "sender_id": self.sender_id,
@@ -142,15 +171,25 @@ class RedisSyncManager(BaseSyncManager):
             )
             return
 
+        import base64
+        import numpy as np
+
         action = data.get("action")
         payload = data.get("payload", {})
+        
+        emb_b64 = payload.pop("_embeddings_b64", None)
+        emb_bytes = base64.b64decode(emb_b64) if emb_b64 else None
+        precomputed_embeddings = np.frombuffer(emb_bytes, dtype=np.float32) if emb_bytes else None
                 
         if action == "add_route":
             from synaptoroute.models import Route
             route = Route(**payload)
-            self.router.add_route(route, _broadcast=False)
+            # Reshape 1D array back to 2D based on number of utterances if we have embeddings
+            if precomputed_embeddings is not None:
+                precomputed_embeddings = precomputed_embeddings.reshape(len(route.utterances), -1)
+            self.router.add_route(route, _broadcast=False, _precomputed_embeddings=precomputed_embeddings)
         elif action == "add_utterance":
-            self.router.add_utterance(payload["route_name"], payload["utterance"], _broadcast=False)
+            self.router.add_utterance(payload["route_name"], payload["utterance"], _broadcast=False, _precomputed_embedding=precomputed_embeddings)
         elif action == "delete_route":
             self.router.delete_route(payload["route_name"], _broadcast=False)
         elif action == "update_threshold":

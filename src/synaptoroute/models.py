@@ -37,3 +37,11 @@ class Route(BaseModel):
         if not deduped:
             raise ValueError("Route must have at least one valid utterance.")
         return deduped
+
+from dataclasses import dataclass
+import numpy as np
+
+@dataclass
+class RollbackSnapshot:
+    route: Optional['Route'] = None
+    embeddings: Optional[np.ndarray] = None

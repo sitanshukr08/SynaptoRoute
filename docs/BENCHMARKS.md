@@ -104,6 +104,29 @@ Stress testing the absolute upper boundaries of the system architecture in an in
 
 ---
 
+## Independent Hardware Validation
+
+SynaptoRoute v0.3.0 was independently executed on four separate Windows laptops ranging from:
+
+- 4C/8T Intel CPU, 8GB RAM
+- 8C/16T AMD CPU + RTX 3050
+- 12C/16T Intel CPU
+- 16C/24T Intel CPU + RTX 4050
+
+Results were consistent across all systems:
+
+CLINC150:
+- Top-1 Accuracy: 75.04%
+- F1 Score: 82.33%
+
+Banking77:
+- Top-1 Accuracy: 92.85%
+- F1 Score: 92.85%
+
+This demonstrates benchmark reproducibility across heterogeneous consumer hardware.
+
+---
+
 ## Methodology
 
 1. **Isolation:** Testing strictly uses separated `train` and `test` splits to prevent benchmark inflation through vector memorization.

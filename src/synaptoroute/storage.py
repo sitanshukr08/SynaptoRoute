@@ -153,12 +153,19 @@ class SQLiteStorage(BaseStorage):
         embeddings_map = {}
         try:
             with self._get_connection() as conn:
+                original_isolation = conn.isolation_level
+                conn.isolation_level = None
                 cursor = conn.cursor()
+                cursor.execute('BEGIN IMMEDIATE')
+                
                 cursor.execute('SELECT name, threshold, metadata FROM routes')
                 route_rows = cursor.fetchall()
                 
                 cursor.execute('SELECT route_name, utterance, embedding FROM utterances')
                 utterance_rows = cursor.fetchall()
+                
+                conn.commit()
+                conn.isolation_level = original_isolation
                 
                 utt_dict = {}
                 emb_dict = {}

@@ -7,7 +7,7 @@ import asyncio
 import logging
 
 from synaptoroute.metrics import MetricsRegistry
-from synaptoroute.models import Route
+from synaptoroute.models import Route, RollbackSnapshot
 from synaptoroute.encoder import Encoder
 from synaptoroute.storage import BaseStorage
 from synaptoroute.sync import BaseSyncManager
@@ -157,12 +157,12 @@ class AdaptiveRouter:
             
         with self.lock:
             is_overwrite = route.name in self._route_map
-            old_route = self._route_map.get(route.name) if is_overwrite else None
+            rollback = RollbackSnapshot(route=self._route_map.get(route.name)) if is_overwrite else None
             net_increase = num_embs
             if is_overwrite:
                 net_increase -= len(self._route_map[route.name].utterances)
 
-            if self.index.total_vectors + net_increase > self.max_capacity:
+            if getattr(self.index, '_next_id', self.index.total_vectors) + net_increase > self.max_capacity:
                 raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
 
             self.storage.save_route(route, embeddings)
@@ -177,9 +177,9 @@ class AdaptiveRouter:
                     self.index.add(embeddings, route.name)
             except Exception as e:
                 # Rollback: restore old route if index insertion failed
-                if is_overwrite and old_route is not None:
-                    self._route_map[route.name] = old_route
-                    self.storage.save_route(old_route, None)
+                if is_overwrite and rollback.route is not None:
+                    self._route_map[route.name] = rollback.route
+                    self.storage.save_route(rollback.route, None)
                     logging.getLogger(__name__).error(
                         f"Index add failed during overwrite of "
                         f"'{route.name}'. Rolled back to previous route. "
@@ -214,7 +214,7 @@ class AdaptiveRouter:
                 raise RouteNotFoundError(f"Route '{route_name}' not found.")
             if utterance in self._route_map[route_name].utterances:
                 return
-            if self.index.total_vectors + 1 > self.max_capacity:
+            if getattr(self.index, '_next_id', self.index.total_vectors) + 1 > self.max_capacity:
                 raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
                 
         if _precomputed_embedding is not None:
@@ -229,8 +229,10 @@ class AdaptiveRouter:
         with self.lock:
             if route_name not in self._route_map:
                 raise RouteNotFoundError(f"Route '{route_name}' was deleted during encoding.")
-            if self.index.total_vectors + 1 > self.max_capacity:
+            if getattr(self.index, '_next_id', self.index.total_vectors) + 1 > self.max_capacity:
                 raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
+
+            rollback_route = RollbackSnapshot(route=self._route_map.get(route_name))
 
             self.storage.add_utterance(route_name, utterance, embedding)
             
@@ -248,6 +250,13 @@ class AdaptiveRouter:
                         except Exception:
                             self._rebuild_pending = False
                     raise SynaptoRouteError("Index exhausted, triggered rebuild. Next query will incorporate DB utterance.") from e
+                
+                # Rollback
+                self._route_map[route_name] = rollback_route.route
+                raise
+            except Exception as e:
+                # Rollback
+                self._route_map[route_name] = rollback_route.route
                 raise
             
             route = self._route_map[route_name]
@@ -255,6 +264,19 @@ class AdaptiveRouter:
             route.utterances = route.utterances + [utterance]
             
             self.metrics.capacity_usage.set(self.index.total_vectors)
+
+            live_vectors = max(1, self.index.total_vectors)
+            tombstone_ratio = len(self.index.tombstones) / live_vectors
+            if tombstone_ratio > 0.1 or len(self.index.tombstones) > 1500:
+                if not self._rebuild_pending:
+                    self._rebuild_pending = True
+                    try:
+                        if hasattr(self, '_loop') and self._loop and not self._loop.is_closed():
+                            self._loop.call_soon_threadsafe(lambda: asyncio.create_task(self._rebuild_index()))
+                        else:
+                            self._rebuild_pending = False
+                    except Exception:
+                        self._rebuild_pending = False
 
         if _broadcast and self.sync_manager:
             emb_bytes = embedding.tobytes() if embedding is not None else None
@@ -264,7 +286,10 @@ class AdaptiveRouter:
         try:
             routes, embeddings_map = await asyncio.to_thread(self.storage.load_all_routes)
             route_dict = {r.name: r for r in routes}
-            await asyncio.to_thread(self.index.rebuild, route_dict, embeddings_map)
+            new_index = get_index(dim=self.encoder.dim, max_capacity=self.max_capacity)
+            await asyncio.to_thread(new_index.rebuild, route_dict, embeddings_map)
+            with self.lock:
+                self.index = new_index
         except Exception as e:
             logging.getLogger(__name__).error(f"Rebuild failed: {e}")
             self.metrics.gc_errors.inc()
@@ -313,11 +338,11 @@ class AdaptiveRouter:
                 route = self._route_map[route_name]
                 if score >= route.threshold:
                     if score > best_score:
-                        # Demote current best to second best
-                        second_best_score = best_score
+                        if best_route is not None and route.name != best_route.name:
+                            second_best_score = best_score
                         best_score = score
                         best_route = route
-                    elif score > second_best_score:
+                    elif score > second_best_score and (best_route is None or route.name != best_route.name):
                         second_best_score = score
                         
             if best_route is not None:
@@ -332,6 +357,13 @@ class AdaptiveRouter:
         if self._batch_queue is None:
             raise RuntimeError("Router must be started with `await router.start()` before calling aquery.")
         if self._worker_task is None or self._worker_task.done():
+            if self._worker_task and self._worker_task.done():
+                try:
+                    exc = self._worker_task.exception()
+                    if exc:
+                        raise exc
+                except asyncio.CancelledError:
+                    pass
             raise RuntimeError("Router worker has crashed or stopped.")
             
         loop = asyncio.get_running_loop()
@@ -438,10 +470,11 @@ class AdaptiveRouter:
                                     route = self._route_map[route_name]
                                     if score >= route.threshold:
                                         if score > best_score:
-                                            second_best_score = best_score
+                                            if best_route is not None and route.name != best_route.name:
+                                                second_best_score = best_score
                                             best_score = score
                                             best_route = route
-                                        elif score > second_best_score:
+                                        elif score > second_best_score and (best_route is None or route.name != best_route.name):
                                             second_best_score = score
                                             
                                 if best_route is not None:
@@ -526,11 +559,20 @@ class AdaptiveRouter:
                 for i in range(len(samples)):
                     b_route = ""
                     b_score = -1.0
+                    sb_score = -1.0
                     for score, r_name in search_results[i]:
                         test_threshold = t if r_name == route_name else route_map_snapshot[r_name].threshold
-                        if score >= test_threshold and score > b_score:
-                            b_score = score
-                            b_route = r_name
+                        if score >= test_threshold:
+                            if score > b_score:
+                                if b_route and r_name != b_route:
+                                    sb_score = b_score
+                                b_score = score
+                                b_route = r_name
+                            elif score > sb_score and (not b_route or r_name != b_route):
+                                sb_score = score
+                    if b_route != "":
+                        if sb_score != -1.0 and (b_score - sb_score) < self.margin:
+                            b_route = ""
                     y_pred.append(1 if b_route == route_name else 0)
                     
                 f1 = f1_score(y_true, y_pred, zero_division=0)
