@@ -7,8 +7,7 @@ from synaptoroute.router import AdaptiveRouter
 from synaptoroute.storage import BaseStorage
 from synaptoroute.models import Route
 
-def test_fastembed_encoder():
-    encoder = FastEmbedEncoder()
+def test_fastembed_encoder(encoder):
     embedding = encoder.encode("Hello world")
     assert isinstance(embedding, np.ndarray)
     assert embedding.shape[0] == encoder.dim

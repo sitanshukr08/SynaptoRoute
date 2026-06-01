@@ -21,9 +21,8 @@ def test_latency_profile_defaults():
     assert profile.batch_size == 1
     assert profile.batch_timeout == 0.0
 
-def test_router_inherits_profile(tmp_path):
+def test_router_inherits_profile(tmp_path, encoder):
     storage = SQLiteStorage(str(tmp_path / "test.db"))
-    encoder = Encoder()
     
     # Test Latency Profile
     latency_profile = get_profile(ProfileType.LATENCY)

@@ -129,8 +129,7 @@ def test_sqlite_storage_creates_directory(tmp_path):
     # Cleanup connection to avoid file locking on Windows
     del storage
 
-def test_fit_thresholds_db_error(memory_db, monkeypatch):
-    encoder = Encoder(model_name="BAAI/bge-small-en-v1.5")
+def test_fit_thresholds_db_error(memory_db, monkeypatch, encoder):
     router = AdaptiveRouter(encoder, memory_db)
     
     route = Route(name="r1", utterances=["hello"], threshold=0.5)

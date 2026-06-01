@@ -61,10 +61,12 @@ async def test_aquery_overload(storage, encoder):
                 await t
             except asyncio.CancelledError:
                 pass
-        elif t.exception() is not None:
-            # retrieve the exception to avoid unhandled exception warnings
-            t.exception()
-            
+        else:
+            try:
+                t.exception()
+            except asyncio.CancelledError:
+                pass
+                
     assert overloaded, "RouterOverloadedError was not raised"
 
 @pytest.mark.asyncio
