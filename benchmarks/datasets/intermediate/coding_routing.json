@@ -1,0 +1,544 @@
+{
+  "routes": [
+    {
+      "name": "generate_code",
+      "utterances": [
+        "write a python script to parse json",
+        "create a react component for a navigation bar",
+        "implement binary search in rust",
+        "how do I write a bash script to loop through files",
+        "generate a SQL query to join these tables"
+      ]
+    },
+    {
+      "name": "explain_code",
+      "utterances": [
+        "what does this python function do",
+        "explain how this pointer arithmetic works in C",
+        "break down this regular expression",
+        "walk me through this kubernetes yaml file",
+        "why is this async function blocking"
+      ]
+    },
+    {
+      "name": "debug_code",
+      "utterances": [
+        "why am I getting a NullPointerException here",
+        "fix the memory leak in this C++ code",
+        "my react app is rendering infinitely",
+        "find the syntax error in my json",
+        "resolve this merge conflict"
+      ]
+    }
+  ],
+  "test_queries": [
+    {
+      "query": "build me a fastAPI server",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "code a login page using HTML and CSS",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "what does async/await mean in JS",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "help me understand this traceback",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "there's a bug in my python script",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "IndexError: list index out of range",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "fix my generated fastAPI server code",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "build me a react component",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "write a python script",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "write a rust backend quickly",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "build me a react component",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "generate a fastAPI server from scratch",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "build me a react component",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "write a fastAPI server with async",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "write a rust backend using best practices",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "build me a rust backend quickly",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "implement a python script with async",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "write a python script",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "write a python script with async",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "write a react component",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "generate a rust backend from scratch",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "write a rust backend with async",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "generate a python script with async",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "create a python script with async",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "implement a python script",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "create a SQL query",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "write a python script using best practices",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "implement a SQL query with async",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "create a react component with async",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "implement a python script using best practices",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "implement a rust backend",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "create a fastAPI server",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "generate a fastAPI server",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "implement a python script quickly",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "implement a fastAPI server using best practices",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "build me a react component",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "build me a SQL query using best practices",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "what does this do the architecture for a beginner",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "what does this do this loop for a beginner",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "how does this work the codebase step by step",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "explain the architecture step by step",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "break down the architecture step by step",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "explain this regex for a beginner",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "explain this python script step by step",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "walk me through the architecture",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "how does this work this python script for a beginner",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "break down the codebase in detail",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "how does this work the codebase for a beginner",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "walk me through this regex",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "walk me through the codebase in detail",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "break down the codebase for a beginner",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "break down this loop",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "how does this work this loop in detail",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "what does this do the codebase for a beginner",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "explain this loop step by step",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "walk me through this python script",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "explain this python script step by step",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "explain this regex",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "explain the codebase in detail",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "how does this work this python script in detail",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "break down this loop in detail",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "what does this do the architecture step by step",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "how does this work this regex",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "walk me through the codebase",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "explain this loop in detail",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "what does this do the architecture step by step",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "walk me through this loop",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "fix this function please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "there's a bug in this function",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "why is this failing the traceback please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "fix my python script I am stuck",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "resolve the error in my deployment it throws a TypeError",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "why is this failing my deployment I am stuck",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "debug the traceback I am stuck",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "debug this function please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "fix my deployment I am stuck",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "debug my python script please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "fix this function",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "fix my python script",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "debug my deployment please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "there's a bug in my python script",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "debug this function please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "there's a bug in this function please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "there's a bug in my python script it throws a TypeError",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "debug the fastAPI server I am stuck",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "why is this failing this function it throws a TypeError",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "fix the traceback",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "why is this failing my deployment please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "why is this failing my python script I am stuck",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "resolve the error in my deployment please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "resolve the error in the traceback",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "there's a bug in my python script",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "why is this failing the traceback please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "debug my deployment",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "there's a bug in my deployment please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "resolve the error in the traceback please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "why is this failing the traceback it throws a TypeError",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "how do I cook a steak right now",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me some music",
+      "expected_route": null
+    },
+    {
+      "query": "how do I the meaning of life in space",
+      "expected_route": null
+    },
+    {
+      "query": "tell me how to tie a tie",
+      "expected_route": null
+    },
+    {
+      "query": "play a timer in space",
+      "expected_route": null
+    },
+    {
+      "query": "play how to tie a tie right now",
+      "expected_route": null
+    },
+    {
+      "query": "play a joke in space",
+      "expected_route": null
+    },
+    {
+      "query": "tell me the meaning of life right now",
+      "expected_route": null
+    },
+    {
+      "query": "play a timer for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "tell me how to tie a tie please",
+      "expected_route": null
+    },
+    {
+      "query": "set cook a steak",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me cook a steak right now",
+      "expected_route": null
+    },
+    {
+      "query": "tell me how to tie a tie for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "play a timer for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "set a joke quickly",
+      "expected_route": null
+    },
+    {
+      "query": "tell me how to tie a tie right now",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me the meaning of life quickly",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me some music in space",
+      "expected_route": null
+    },
+    {
+      "query": "how do I the meaning of life quickly",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me a joke right now",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me the meaning of life in space",
+      "expected_route": null
+    },
+    {
+      "query": "how do I a joke",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me a timer",
+      "expected_route": null
+    },
+    {
+      "query": "how do I some music",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me cook a steak right now",
+      "expected_route": null
+    },
+    {
+      "query": "how do I how to tie a tie for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me a joke in space",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me some music please",
+      "expected_route": null
+    },
+    {
+      "query": "play a joke",
+      "expected_route": null
+    },
+    {
+      "query": "set the meaning of life please",
+      "expected_route": null
+    }
+  ]
+}

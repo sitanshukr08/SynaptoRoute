@@ -100,3 +100,24 @@ async def test_aquery_worker_crashed(storage, encoder):
         
     with pytest.raises(RuntimeError, match="Router worker has crashed or stopped"):
         await router.aquery("hello")
+
+@pytest.mark.asyncio
+async def test_aquery_raises_if_worker_crashes_while_pending(storage, encoder):
+    router = AdaptiveRouter(encoder, storage)
+    await router.start()
+
+    async def mock_worker():
+        # Keep worker alive for a moment, then crash it
+        await asyncio.sleep(0.05)
+        raise ValueError("Worker crashed!")
+
+    router._worker_task.cancel()
+    try:
+        await router._worker_task
+    except asyncio.CancelledError:
+        pass
+        
+    router._worker_task = asyncio.create_task(mock_worker())
+
+    with pytest.raises(RuntimeError, match="Router worker stopped before completing this query"):
+        await asyncio.wait_for(router.aquery("test query"), timeout=2.0)

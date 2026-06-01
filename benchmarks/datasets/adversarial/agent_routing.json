@@ -1,0 +1,208 @@
+{
+  "routes": [
+    {
+      "name": "orchestrator_agent",
+      "utterances": [
+        "delegate this task to the coding agent",
+        "break down this large project into subtasks",
+        "coordinate the workflow between the researchers and the writers",
+        "plan the execution strategy for this objective",
+        "manage the subagents"
+      ]
+    },
+    {
+      "name": "research_agent",
+      "utterances": [
+        "search the web for the latest papers on quantum computing",
+        "summarize this pdf document",
+        "gather data on historical stock prices",
+        "scrape this website for contact information",
+        "find statistics about renewable energy"
+      ]
+    },
+    {
+      "name": "writer_agent",
+      "utterances": [
+        "draft a blog post about artificial intelligence",
+        "rewrite this paragraph to sound more professional",
+        "generate a cover letter for a software engineer position",
+        "write a creative story about a space explorer",
+        "summarize these bullet points into a cohesive essay"
+      ]
+    }
+  ],
+  "test_queries": [
+    {
+      "query": "figure out how to do this and assign the tasks",
+      "expected_route": "orchestrator_agent"
+    },
+    {
+      "query": "read through this article and extract the main points",
+      "expected_route": "research_agent"
+    },
+    {
+      "query": "write a summary of the research you just did",
+      "expected_route": "writer_agent"
+    },
+    {
+      "query": "figure out this project into subtasks",
+      "expected_route": "orchestrator_agent"
+    },
+    {
+      "query": "coordinate the team",
+      "expected_route": "orchestrator_agent"
+    },
+    {
+      "query": "coordinate the team across the team",
+      "expected_route": "orchestrator_agent"
+    },
+    {
+      "query": "manage the task for tomorrow",
+      "expected_route": "orchestrator_agent"
+    },
+    {
+      "query": "figure out the workflow",
+      "expected_route": "orchestrator_agent"
+    },
+    {
+      "query": "break down the subagents carefully",
+      "expected_route": "orchestrator_agent"
+    },
+    {
+      "query": "plan the team into subtasks",
+      "expected_route": "orchestrator_agent"
+    },
+    {
+      "query": "delegate the work",
+      "expected_route": "orchestrator_agent"
+    },
+    {
+      "query": "break down the task into subtasks",
+      "expected_route": "orchestrator_agent"
+    },
+    {
+      "query": "coordinate the task for tomorrow",
+      "expected_route": "orchestrator_agent"
+    },
+    {
+      "query": "find the website",
+      "expected_route": "research_agent"
+    },
+    {
+      "query": "gather the population in detail",
+      "expected_route": "research_agent"
+    },
+    {
+      "query": "scrape the website for the latest info",
+      "expected_route": "research_agent"
+    },
+    {
+      "query": "analyze the website",
+      "expected_route": "research_agent"
+    },
+    {
+      "query": "gather the web",
+      "expected_route": "research_agent"
+    },
+    {
+      "query": "gather this pdf in detail",
+      "expected_route": "research_agent"
+    },
+    {
+      "query": "gather the population for the latest info",
+      "expected_route": "research_agent"
+    },
+    {
+      "query": "scrape statistics and give me a brief",
+      "expected_route": "research_agent"
+    },
+    {
+      "query": "analyze the website for the latest info",
+      "expected_route": "research_agent"
+    },
+    {
+      "query": "look up the website",
+      "expected_route": "research_agent"
+    },
+    {
+      "query": "rewrite these bullet points creatively",
+      "expected_route": "writer_agent"
+    },
+    {
+      "query": "edit a story cohesively",
+      "expected_route": "writer_agent"
+    },
+    {
+      "query": "proofread these bullet points cohesively",
+      "expected_route": "writer_agent"
+    },
+    {
+      "query": "compose this text",
+      "expected_route": "writer_agent"
+    },
+    {
+      "query": "rewrite an email",
+      "expected_route": "writer_agent"
+    },
+    {
+      "query": "proofread this paragraph",
+      "expected_route": "writer_agent"
+    },
+    {
+      "query": "generate a cover letter",
+      "expected_route": "writer_agent"
+    },
+    {
+      "query": "summarize this paragraph",
+      "expected_route": "writer_agent"
+    },
+    {
+      "query": "compose a blog post",
+      "expected_route": "writer_agent"
+    },
+    {
+      "query": "edit an email",
+      "expected_route": "writer_agent"
+    },
+    {
+      "query": "explain to me the meaning of life right now",
+      "expected_route": null
+    },
+    {
+      "query": "set a joke",
+      "expected_route": null
+    },
+    {
+      "query": "how do I a timer",
+      "expected_route": null
+    },
+    {
+      "query": "how do I some music",
+      "expected_route": null
+    },
+    {
+      "query": "play a joke for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "play a joke",
+      "expected_route": null
+    },
+    {
+      "query": "how do I cook a steak right now",
+      "expected_route": null
+    },
+    {
+      "query": "play a timer quickly",
+      "expected_route": null
+    },
+    {
+      "query": "how do I how to tie a tie",
+      "expected_route": null
+    },
+    {
+      "query": "tell me some music please",
+      "expected_route": null
+    }
+  ]
+}

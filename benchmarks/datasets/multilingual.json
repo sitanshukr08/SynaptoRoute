@@ -1,0 +1,32 @@
+{
+  "routes": [
+    {
+      "name": "greeting",
+      "utterances": [
+        "hello how are you",
+        "good morning",
+        "hi there",
+        "greetings",
+        "howdy"
+      ]
+    },
+    {
+      "name": "goodbye",
+      "utterances": [
+        "goodbye",
+        "see you later",
+        "bye for now",
+        "have a good day",
+        "farewell"
+      ]
+    }
+  ],
+  "test_queries": [
+    {"query": "hola", "expected_route": "greeting"},
+    {"query": "bonjour", "expected_route": "greeting"},
+    {"query": "guten morgen", "expected_route": "greeting"},
+    {"query": "adiós", "expected_route": "goodbye"},
+    {"query": "au revoir", "expected_route": "goodbye"},
+    {"query": "sayonara", "expected_route": "goodbye"}
+  ]
+}

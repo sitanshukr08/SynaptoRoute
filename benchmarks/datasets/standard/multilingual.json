@@ -1,0 +1,150 @@
+{
+  "routes": [
+    {
+      "name": "greeting",
+      "utterances": [
+        "hello how are you",
+        "good morning",
+        "hi there",
+        "greetings",
+        "howdy"
+      ]
+    },
+    {
+      "name": "goodbye",
+      "utterances": [
+        "goodbye",
+        "see you later",
+        "bye for now",
+        "have a good day",
+        "farewell"
+      ]
+    }
+  ],
+  "test_queries": [
+    {
+      "query": "guten morgen",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "sayonara",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "hi friend how are you",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "good morning bot how are you",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hey bot what's up",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hello there what's up",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "good morning assistant",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hi assistant how are you",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hi bot what's up",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "greetings bot",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hello friend",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "greetings assistant what's up",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "see you later talk later stop",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "goodbye talk later stop",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "exit for now close",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "see you later for now stop",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "see you later talk later",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "exit thanks have a good day",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "bye talk later stop",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "exit talk later",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "goodbye thanks close",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "explain to me cook a steak",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me how to tie a tie",
+      "expected_route": null
+    },
+    {
+      "query": "play cook a steak quickly",
+      "expected_route": null
+    },
+    {
+      "query": "play cook a steak right now",
+      "expected_route": null
+    },
+    {
+      "query": "how do I cook a steak",
+      "expected_route": null
+    },
+    {
+      "query": "set the meaning of life quickly",
+      "expected_route": null
+    },
+    {
+      "query": "tell me the meaning of life right now",
+      "expected_route": null
+    },
+    {
+      "query": "how do I cook a steak",
+      "expected_route": null
+    },
+    {
+      "query": "set the meaning of life please",
+      "expected_route": null
+    },
+    {
+      "query": "set how to tie a tie for 10 minutes",
+      "expected_route": null
+    }
+  ]
+}

@@ -1,0 +1,204 @@
+{
+  "routes": [
+    {
+      "name": "generate_code",
+      "utterances": [
+        "write a python script to parse json",
+        "create a react component for a navigation bar",
+        "implement binary search in rust",
+        "how do I write a bash script to loop through files",
+        "generate a SQL query to join these tables"
+      ]
+    },
+    {
+      "name": "explain_code",
+      "utterances": [
+        "what does this python function do",
+        "explain how this pointer arithmetic works in C",
+        "break down this regular expression",
+        "walk me through this kubernetes yaml file",
+        "why is this async function blocking"
+      ]
+    },
+    {
+      "name": "debug_code",
+      "utterances": [
+        "why am I getting a NullPointerException here",
+        "fix the memory leak in this C++ code",
+        "my react app is rendering infinitely",
+        "find the syntax error in my json",
+        "resolve this merge conflict"
+      ]
+    }
+  ],
+  "test_queries": [
+    {
+      "query": "what does async/await mean in JS",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "IndexError: list index out of range",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "write a python script",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "generate a fastAPI server from scratch",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "write a rust backend using best practices",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "write a python script",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "generate a rust backend from scratch",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "create a python script with async",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "write a python script using best practices",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "implement a python script using best practices",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "generate a fastAPI server",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "build me a react component",
+      "expected_route": "generate_code"
+    },
+    {
+      "query": "what does this do this loop for a beginner",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "break down the architecture step by step",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "walk me through the architecture",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "how does this work the codebase for a beginner",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "break down the codebase for a beginner",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "what does this do the codebase for a beginner",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "explain this python script step by step",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "how does this work this python script in detail",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "how does this work this regex",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "what does this do the architecture step by step",
+      "expected_route": "explain_code"
+    },
+    {
+      "query": "there's a bug in this function",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "resolve the error in my deployment it throws a TypeError",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "debug this function please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "fix this function",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "there's a bug in my python script",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "there's a bug in my python script it throws a TypeError",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "fix the traceback",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "resolve the error in my deployment please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "why is this failing the traceback please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "resolve the error in the traceback please",
+      "expected_route": "debug_code"
+    },
+    {
+      "query": "explain to me some music",
+      "expected_route": null
+    },
+    {
+      "query": "play a timer in space",
+      "expected_route": null
+    },
+    {
+      "query": "tell me the meaning of life right now",
+      "expected_route": null
+    },
+    {
+      "query": "set cook a steak",
+      "expected_route": null
+    },
+    {
+      "query": "play a timer for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me the meaning of life quickly",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me a joke right now",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me a timer",
+      "expected_route": null
+    },
+    {
+      "query": "how do I how to tie a tie for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "play a joke",
+      "expected_route": null
+    }
+  ]
+}

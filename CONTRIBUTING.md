@@ -1,6 +1,6 @@
 # Contributing to SynaptoRoute
 
-First off, thank you for considering contributing to SynaptoRoute! It's people like you that make open source such a great community.
+Thank you for considering contributing to SynaptoRoute. This repository enforces strict architectural and linguistic guidelines to maintain professional, objective engineering standards.
 
 ## Development Setup
 
@@ -19,13 +19,19 @@ First off, thank you for considering contributing to SynaptoRoute! It's people l
    ```
 
 ## Running Tests
-We enforce strict testing for all architectural components (encoding, latency, routing accuracy). Before submitting a PR, ensure all tests pass:
+We enforce strict testing for all architectural components (encoding, latency, and threshold boundary accuracy). Before submitting a PR, ensure all tests pass:
 ```bash
-pytest tests/
+python -m pytest tests/ -v
 ```
 
+## Language and Documentation Guidelines
+To maintain academic and professional engineering standards, contributors must adhere to the following linguistic rules in PRs, commit messages, and documentation:
+1. **Objective Terminology:** Avoid hyperbolic marketing terms (e.g., "blazingly," "enterprise-grade"). Do not use the word "proven" unless accompanied by a formal proof. Describe exactly what the code does.
+2. **Sanitized Ecosystem Vocabulary:** SynaptoRoute is a semantic microservice router. Do not refer to "AI," "agents," "subagents," or "bots." Refer to external endpoints specifically by their structural function (e.g., "text completion endpoints", "remote embedding models").
+3. **Commit Messages:** Use strictly professional git conventions (e.g., `feat: ...`, `fix: ...`).
+
 ## Pull Request Process
-1. Ensure your code strictly adheres to the existing architectural philosophy (e.g., preserving $O(1)$ Lazy Compilation).
-2. Update the `README.md` or Jupyter Notebooks in `notebooks/` if you add new features.
+1. Ensure your code strictly adheres to the existing architectural philosophy (e.g., preserving $O(1)$ updates and non-blocking asynchronous execution).
+2. Update `README.md` and `BENCHMARKS.md` if your code impacts structural throughput.
 3. Open a Pull Request using the provided GitHub PR template.
 4. Wait for CI/CD checks to pass.

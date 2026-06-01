@@ -1,0 +1,55 @@
+{
+  "routes": [
+    {
+      "name": "get_weather",
+      "utterances": [
+        "what is the weather like today",
+        "is it raining right now",
+        "do I need an umbrella in London",
+        "show me the temperature for tomorrow",
+        "forecast for the week"
+      ]
+    },
+    {
+      "name": "get_stock_price",
+      "utterances": [
+        "what is the current price of AAPL",
+        "how is the stock market doing today",
+        "show me TSLA ticker",
+        "did Microsoft go up or down",
+        "fetch the closing price for Google"
+      ]
+    },
+    {
+      "name": "search_web",
+      "utterances": [
+        "google the nearest coffee shop",
+        "look up the capital of France",
+        "search the internet for recent news on AI",
+        "find information about black holes",
+        "who won the super bowl in 2023"
+      ]
+    },
+    {
+      "name": "calculate_math",
+      "utterances": [
+        "what is 25 divided by 5",
+        "calculate the square root of 144",
+        "how much is 15 percent of 200",
+        "solve this equation for x",
+        "multiply 8 by 12"
+      ]
+    }
+  ],
+  "test_queries": [
+    {"query": "tell me if it's sunny outside", "expected_route": "get_weather"},
+    {"query": "wht is the wather in tokyo", "expected_route": "get_weather"},
+    {"query": "fetch APPL price", "expected_route": "get_stock_price"},
+    {"query": "how much is tesla trading for", "expected_route": "get_stock_price"},
+    {"query": "search online for a good pizza recipe", "expected_route": "search_web"},
+    {"query": "look it up on google", "expected_route": "search_web"},
+    {"query": "what's 50 * 50", "expected_route": "calculate_math"},
+    {"query": "can you do some math for me", "expected_route": "calculate_math"},
+    {"query": "what is the weather impact on the stock market", "expected_route": "get_stock_price"}
+  ]
+}

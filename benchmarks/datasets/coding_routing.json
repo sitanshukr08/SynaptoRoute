@@ -1,0 +1,43 @@
+{
+  "routes": [
+    {
+      "name": "generate_code",
+      "utterances": [
+        "write a python script to parse json",
+        "create a react component for a navigation bar",
+        "implement binary search in rust",
+        "how do I write a bash script to loop through files",
+        "generate a SQL query to join these tables"
+      ]
+    },
+    {
+      "name": "explain_code",
+      "utterances": [
+        "what does this python function do",
+        "explain how this pointer arithmetic works in C",
+        "break down this regular expression",
+        "walk me through this kubernetes yaml file",
+        "why is this async function blocking"
+      ]
+    },
+    {
+      "name": "debug_code",
+      "utterances": [
+        "why am I getting a NullPointerException here",
+        "fix the memory leak in this C++ code",
+        "my react app is rendering infinitely",
+        "find the syntax error in my json",
+        "resolve this merge conflict"
+      ]
+    }
+  ],
+  "test_queries": [
+    {"query": "build me a fastAPI server", "expected_route": "generate_code"},
+    {"query": "code a login page using HTML and CSS", "expected_route": "generate_code"},
+    {"query": "what does async/await mean in JS", "expected_route": "explain_code"},
+    {"query": "help me understand this traceback", "expected_route": "explain_code"},
+    {"query": "there's a bug in my python script", "expected_route": "debug_code"},
+    {"query": "IndexError: list index out of range", "expected_route": "debug_code"},
+    {"query": "fix my generated fastAPI server code", "expected_route": "debug_code"}
+  ]
+}

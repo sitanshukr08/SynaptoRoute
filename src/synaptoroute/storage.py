@@ -34,7 +34,7 @@ class SQLiteStorage(BaseStorage):
         self.db_path = db_path
         self._memory_conn = None
         if self.db_path == ':memory:':
-            self._memory_conn = sqlite3.connect(self.db_path, timeout=10.0, check_same_thread=False)
+            self._memory_conn = sqlite3.connect(self.db_path, timeout=15.0, check_same_thread=False)
             self._memory_conn.execute('PRAGMA foreign_keys = ON')
         else:
             dirname = os.path.dirname(self.db_path)
@@ -51,7 +51,7 @@ class SQLiteStorage(BaseStorage):
         if self._memory_conn is not None:
             yield self._memory_conn
         else:
-            conn = sqlite3.connect(self.db_path, timeout=10.0)
+            conn = sqlite3.connect(self.db_path, timeout=15.0)
             conn.execute('PRAGMA journal_mode=WAL;')
             conn.execute('PRAGMA foreign_keys = ON')
             try:
@@ -97,16 +97,16 @@ class SQLiteStorage(BaseStorage):
                 cursor = conn.cursor()
                 metadata_str = json.dumps(route.metadata) if route.metadata is not None else None
                 
+                # Delete existing utterances for this route to avoid duplicates on replace
+                cursor.execute('''
+                    DELETE FROM utterances WHERE route_name = ?
+                ''', (route.name,))
+                
                 # Insert or replace route
                 cursor.execute('''
                     INSERT OR REPLACE INTO routes (name, threshold, metadata)
                     VALUES (?, ?, ?)
                 ''', (route.name, route.threshold, metadata_str))
-                
-                # Delete existing utterances for this route to avoid duplicates on replace
-                cursor.execute('''
-                    DELETE FROM utterances WHERE route_name = ?
-                ''', (route.name,))
                 
                 # Insert utterances
                 if route.utterances:
@@ -157,6 +157,18 @@ class SQLiteStorage(BaseStorage):
                 cursor.execute('SELECT name, threshold, metadata FROM routes')
                 route_rows = cursor.fetchall()
                 
+                cursor.execute('SELECT route_name, utterance, embedding FROM utterances')
+                utterance_rows = cursor.fetchall()
+                
+                utt_dict = {}
+                emb_dict = {}
+                for route_name, utt, emb in utterance_rows:
+                    if route_name not in utt_dict:
+                        utt_dict[route_name] = []
+                        emb_dict[route_name] = []
+                    utt_dict[route_name].append(utt)
+                    emb_dict[route_name].append(emb)
+                
                 for row in route_rows:
                     name, threshold, metadata_str = row
                     try:
@@ -164,13 +176,8 @@ class SQLiteStorage(BaseStorage):
                     except json.JSONDecodeError:
                         metadata = None
                     
-                    cursor.execute('SELECT utterance, embedding FROM utterances WHERE route_name = ?', (name,))
-                    utterance_rows = cursor.fetchall()
-                    utterances = []
-                    embs = []
-                    for u, e in utterance_rows:
-                        utterances.append(u)
-                        embs.append(e)
+                    utterances = utt_dict.get(name, [])
+                    embs = emb_dict.get(name, [])
                     
                     routes.append(Route(
                         name=name,

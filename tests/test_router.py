@@ -97,12 +97,10 @@ def test_delete_route_memory(storage, encoder):
     route2 = Route(name="r2", utterances=["u3"], threshold=0.5)
     router.add_route(route1)
     router.add_route(route2)
-    assert router._cursor == 3
+    assert router.index.total_vectors == 3
     
     router.delete_route("r1")
-    assert router._cursor == 1
-    # u3 should now be at index 0
-    assert router._meta[0].name == "r2"
+    assert router.index.total_vectors == 1
     
     # Inference should ignore deleted route
     match = router("u1")
@@ -113,11 +111,11 @@ def test_duplicate_utterance_ignored(storage, encoder):
     router = AdaptiveRouter(encoder, storage)
     route = Route(name="r1", utterances=["u1"], threshold=0.5)
     router.add_route(route)
-    assert router._cursor == 1
+    assert router.index.total_vectors == 1
     
     # add same utterance again
     router.add_utterance("r1", "u1")
-    assert router._cursor == 1
+    assert router.index.total_vectors == 1
     assert len(router._route_map["r1"].utterances) == 1
 
 def test_max_capacity_load_routes(temp_db, encoder):
@@ -152,8 +150,54 @@ def test_fit_thresholds_mismatched_lengths(storage, encoder):
 
 def test_zero_state_inference(storage, encoder):
     router = AdaptiveRouter(encoder, storage)
-    assert router._cursor == 0
+    assert router.index.total_vectors == 0
     assert router("hello") is None
     
     # Should return early
     router.fit_thresholds(["q1"], ["l1"])
+
+def test_add_route_overwrite_rollback_on_index_failure(storage, encoder):
+    router = AdaptiveRouter(encoder, storage)
+    route = Route(name="billing", utterances=["bill 1"], threshold=0.5)
+    router.add_route(route)
+    
+    # Mock index.add to raise on the overwrite call
+    original_add = router.index.add
+    def mock_add(embeddings, route_name):
+        raise ValueError("ID_OVERFLOW")
+    
+    router.index.add = mock_add
+    
+    route_new = Route(name="billing", utterances=["bill 2", "bill 3"], threshold=0.5)
+    with pytest.raises(ValueError, match="ID_OVERFLOW"):
+        router.add_route(route_new)
+        
+    # Check old route is still there
+    assert "billing" in router._route_map
+    assert router._route_map["billing"].utterances == ["bill 1"]
+    
+    # Check in DB
+    routes, _ = storage.load_all_routes()
+    r = next((r for r in routes if r.name == "billing"), None)
+    assert r is not None
+    assert r.utterances == ["bill 1"]
+
+def test_load_routes_discards_wrong_dimension_blob(temp_db, encoder):
+    import numpy as np
+    storage = SQLiteStorage(temp_db)
+    route = Route(name="bad_blob", utterances=["test 1"], threshold=0.5)
+    bad_blob = np.zeros(128, dtype=np.float32).tobytes()
+    
+    # Need to manually insert bad blob since save_route might not allow mismatch if it checks
+    # But storage.save_route doesn't check dimensions, it just blindly saves.
+    # Actually wait, save_route takes a list of embeddings.
+    # The current save_route takes np arrays or anything with tobytes(), but wait, save_route expects e.tobytes().
+    # So we pass an array of length 128
+    storage.save_route(route, [np.zeros(128, dtype=np.float32)])
+    
+    # Boot new router
+    router = AdaptiveRouter(encoder, storage)
+    assert "bad_blob" in router._route_map
+    # Query should work, meaning it was re-encoded
+    assert router("test 1") is not None
+    assert router("test 1").name == "bad_blob"

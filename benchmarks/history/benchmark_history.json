@@ -1,0 +1,20 @@
+[
+  {
+    "manifest": {
+      "git_commit": "7edea2f6fa31ab465ca22fda21bd599fc030ea22",
+      "dataset_version": "2.0.0",
+      "embedding_model": "BAAI/bge-small-en-v1.5",
+      "env": "cpu",
+      "profile": "quick",
+      "cpu": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+      "ram": "16 GB",
+      "os": "Windows 11",
+      "python_version": "3.12.10",
+      "seed": 42,
+      "timestamp": "2026-05-31T20:08:04.965774"
+    },
+    "metrics": {
+      "synaptoroute_f1": 0.95
+    }
+  }
+]

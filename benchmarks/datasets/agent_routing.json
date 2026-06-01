@@ -1,0 +1,43 @@
+{
+  "routes": [
+    {
+      "name": "orchestrator_agent",
+      "utterances": [
+        "delegate this task to the coding agent",
+        "break down this large project into subtasks",
+        "coordinate the workflow between the researchers and the writers",
+        "plan the execution strategy for this objective",
+        "manage the subagents"
+      ]
+    },
+    {
+      "name": "research_agent",
+      "utterances": [
+        "search the web for the latest papers on quantum computing",
+        "summarize this pdf document",
+        "gather data on historical stock prices",
+        "scrape this website for contact information",
+        "find statistics about renewable energy"
+      ]
+    },
+    {
+      "name": "writer_agent",
+      "utterances": [
+        "draft a blog post about artificial intelligence",
+        "rewrite this paragraph to sound more professional",
+        "generate a cover letter for a software engineer position",
+        "write a creative story about a space explorer",
+        "summarize these bullet points into a cohesive essay"
+      ]
+    }
+  ],
+  "test_queries": [
+    {"query": "figure out how to do this and assign the tasks", "expected_route": "orchestrator_agent"},
+    {"query": "distribute work to the team", "expected_route": "orchestrator_agent"},
+    {"query": "look up the current population of Japan", "expected_route": "research_agent"},
+    {"query": "read through this article and extract the main points", "expected_route": "research_agent"},
+    {"query": "compose an email to my boss", "expected_route": "writer_agent"},
+    {"query": "edit this text for grammar and style", "expected_route": "writer_agent"},
+    {"query": "write a summary of the research you just did", "expected_route": "writer_agent"}
+  ]
+}

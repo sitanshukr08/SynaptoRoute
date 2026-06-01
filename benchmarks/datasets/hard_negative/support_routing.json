@@ -1,0 +1,204 @@
+{
+  "routes": [
+    {
+      "name": "billing_issue",
+      "utterances": [
+        "I need a refund for my last purchase",
+        "why was I charged twice on my credit card",
+        "update my payment method",
+        "where is my invoice",
+        "cancel my subscription"
+      ]
+    },
+    {
+      "name": "technical_support",
+      "utterances": [
+        "my app keeps crashing on startup",
+        "I can't log into my account",
+        "the software is frozen and won't respond",
+        "how do I reset my password",
+        "the website is throwing a 500 error"
+      ]
+    },
+    {
+      "name": "sales_inquiry",
+      "utterances": [
+        "how much does the enterprise tier cost",
+        "do you offer student discounts",
+        "I want to upgrade my plan",
+        "can I speak to a sales representative",
+        "what features are included in the pro version"
+      ]
+    }
+  ],
+  "test_queries": [
+    {
+      "query": "how to cencel account",
+      "expected_route": "billing_issue"
+    },
+    {
+      "query": "pricing for 50 users",
+      "expected_route": "sales_inquiry"
+    },
+    {
+      "query": "I was charged this invoice",
+      "expected_route": "billing_issue"
+    },
+    {
+      "query": "why did you bill this invoice",
+      "expected_route": "billing_issue"
+    },
+    {
+      "query": "how to cancel this invoice by mistake",
+      "expected_route": "billing_issue"
+    },
+    {
+      "query": "dispute my account by mistake",
+      "expected_route": "billing_issue"
+    },
+    {
+      "query": "update the premium package but I am locked",
+      "expected_route": "billing_issue"
+    },
+    {
+      "query": "dispute this invoice by mistake",
+      "expected_route": "billing_issue"
+    },
+    {
+      "query": "why did you bill my subscription for next month",
+      "expected_route": "billing_issue"
+    },
+    {
+      "query": "update the premium package twice",
+      "expected_route": "billing_issue"
+    },
+    {
+      "query": "why did you bill my account",
+      "expected_route": "billing_issue"
+    },
+    {
+      "query": "refund the premium package but I am locked",
+      "expected_route": "billing_issue"
+    },
+    {
+      "query": "help with my password",
+      "expected_route": "technical_support"
+    },
+    {
+      "query": "troubleshoot my login error 404",
+      "expected_route": "technical_support"
+    },
+    {
+      "query": "help with the dashboard",
+      "expected_route": "technical_support"
+    },
+    {
+      "query": "I can't access the API it's broken",
+      "expected_route": "technical_support"
+    },
+    {
+      "query": "I can't access the API error 404",
+      "expected_route": "technical_support"
+    },
+    {
+      "query": "it crashed my login again",
+      "expected_route": "technical_support"
+    },
+    {
+      "query": "fix the software error 404",
+      "expected_route": "technical_support"
+    },
+    {
+      "query": "reset my password error 404",
+      "expected_route": "technical_support"
+    },
+    {
+      "query": "reset my login again",
+      "expected_route": "technical_support"
+    },
+    {
+      "query": "fix my login please help",
+      "expected_route": "technical_support"
+    },
+    {
+      "query": "what is the cost of enterprise plan with a discount",
+      "expected_route": "sales_inquiry"
+    },
+    {
+      "query": "what is the cost of 50 users with a discount",
+      "expected_route": "sales_inquiry"
+    },
+    {
+      "query": "quote for 50 users",
+      "expected_route": "sales_inquiry"
+    },
+    {
+      "query": "quote for enterprise plan with a discount",
+      "expected_route": "sales_inquiry"
+    },
+    {
+      "query": "quote for enterprise plan with a discount",
+      "expected_route": "sales_inquiry"
+    },
+    {
+      "query": "quote for enterprise plan",
+      "expected_route": "sales_inquiry"
+    },
+    {
+      "query": "what is the cost of the premium package",
+      "expected_route": "sales_inquiry"
+    },
+    {
+      "query": "what is the cost of the premium package yearly",
+      "expected_route": "sales_inquiry"
+    },
+    {
+      "query": "quote for 50 users with a discount",
+      "expected_route": "sales_inquiry"
+    },
+    {
+      "query": "quote for bulk licenses yearly",
+      "expected_route": "sales_inquiry"
+    },
+    {
+      "query": "play cook a steak quickly",
+      "expected_route": null
+    },
+    {
+      "query": "how do I how to tie a tie for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "play the meaning of life for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "how do I a timer",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me some music",
+      "expected_route": null
+    },
+    {
+      "query": "set a timer for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "tell me cook a steak for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me a joke quickly",
+      "expected_route": null
+    },
+    {
+      "query": "tell me cook a steak please",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me cook a steak please",
+      "expected_route": null
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "routes": [
+    {
+        "name": "route_0",
+        "utterances": [
+            "set the user via api 282",
+            "delete the data locally 755",
+            "set the settings in the cloud 605",
+            "create the user in the cloud 96",
+            "delete the data asynchronously 617"
+        ]
+    },
+    {
+        "name": "route_1",
+        "utterances": [
+            "get the settings locally 734",
+            "analyze the image locally 460",
+            "process the report from database 891",
+            "get the profile via api 433",
+            "list the report locally 221"
+        ]
+    },
+    {
+        "name": "route_2",
+        "utterances": [
+            "list the account in the cloud 390",
+            "set the file from database 353",
+            "process the report from database 45",
+            "remove the settings in the cloud 997",
+            "create the account asynchronously 301"
+        ]
+    },
+    {
+        "name": "route_3",
+        "utterances": [
+            "process the file asynchronously 197",
+            "set the user via api 234",
+            "fetch the account from database 239",
+            "set the image for the admin 465",
+            "list the profile for the admin 364"
+        ]
+    },
+    {
+        "name": "route_4",
+        "utterances": [
+            "delete the report via api 960",
+            "set the metrics via api 176",
+            "analyze the data locally 474",
+            "create the report via api 705",
+            "analyze the data via api 333"
+        ]
+    },
+    {
+        "name": "route_5",
+        "utterances": [
+            "get the data from database 33",
+            "list the image for the admin 68",
+            "delete the metrics via api 323",
+            "delete the document securely 906",
+            "remove the profile for the admin 143"
+        ]
+    },
+    {
+        "name": "route_6",
+        "utterances": [
+            "delete the settings asynchronously 270",
+            "process the image asynchronously 409",
+            "list the data locally 522",
+            "remove the account from database 49",
+            "set the profile via api 164"
+        ]
+    },
+    {
+        "name": "route_7",
+        "utterances": [
+            "create the metrics in the cloud 395",
+            "create the metrics securely 542",
+            "fetch the settings from database 966",
+            "get the account via api 907",
+            "analyze the report from database 657"
+        ]
+    },
+    {
+        "name": "route_8",
+        "utterances": [
+            "list the account for the admin 446",
+            "update the document in the cloud 977",
+            "fetch the settings from database 183",
+            "analyze the account from database 641",
+            "fetch the settings asynchronously 204"
+        ]
+    },
+    {
+        "name": "route_9",
+        "utterances": [
+            "update the file from database 166",
+            "analyze the settings in the cloud 614",
+            "list the document in the cloud 115",
+            "list the report locally 60",
+            "delete the metrics in the cloud 88"
+        ]
+    }
+  ]
+}

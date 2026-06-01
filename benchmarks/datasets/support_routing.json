@@ -1,0 +1,43 @@
+{
+  "routes": [
+    {
+      "name": "billing_issue",
+      "utterances": [
+        "I need a refund for my last purchase",
+        "why was I charged twice on my credit card",
+        "update my payment method",
+        "where is my invoice",
+        "cancel my subscription"
+      ]
+    },
+    {
+      "name": "technical_support",
+      "utterances": [
+        "my app keeps crashing on startup",
+        "I can't log into my account",
+        "the software is frozen and won't respond",
+        "how do I reset my password",
+        "the website is throwing a 500 error"
+      ]
+    },
+    {
+      "name": "sales_inquiry",
+      "utterances": [
+        "how much does the enterprise tier cost",
+        "do you offer student discounts",
+        "I want to upgrade my plan",
+        "can I speak to a sales representative",
+        "what features are included in the pro version"
+      ]
+    }
+  ],
+  "test_queries": [
+    {"query": "give me my money back", "expected_route": "billing_issue"},
+    {"query": "how to cencel account", "expected_route": "billing_issue"},
+    {"query": "forgot password link is broken", "expected_route": "technical_support"},
+    {"query": "app crashing on iOS 17", "expected_route": "technical_support"},
+    {"query": "pricing for 50 users", "expected_route": "sales_inquiry"},
+    {"query": "i want to buy the premium package", "expected_route": "sales_inquiry"},
+    {"query": "i was charged but my account is locked", "expected_route": "billing_issue"}
+  ]
+}

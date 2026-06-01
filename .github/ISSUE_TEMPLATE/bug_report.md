@@ -21,5 +21,5 @@ A clear and concise description of what you expected to happen.
 
 **Environment (please complete the following information):**
  - OS: [e.g. Ubuntu 22.04, Windows 11]
- - Python Version: [e.g. 3.11]
- - SynaptoRoute Version: [e.g. 0.1.0]
+ - Python Version: [e.g. 3.9, 3.12]
+ - SynaptoRoute Version: [e.g. 0.3.0]

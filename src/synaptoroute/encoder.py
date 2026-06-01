@@ -53,14 +53,21 @@ class FastEmbedEncoder(BaseEncoder):
         if not texts:
             # Dynamically use the model's true dimensionality
             return np.empty((0, self.dim), dtype=np.float32)
-        embeddings = list(self.model.embed(texts))
-        return np.array(embeddings)
+            
+        chunk_size = 500
+        all_embeddings = []
+        for i in range(0, len(texts), chunk_size):
+            chunk = texts[i:i + chunk_size]
+            embeddings = list(self.model.embed(chunk))
+            all_embeddings.extend(embeddings)
+            
+        return np.array(all_embeddings, dtype=np.float32)
 
 class OpenAIEncoder(BaseEncoder):
     """
     Handles remote intent embeddings using OpenAI models.
     """
-    def __init__(self, model_name: str = "text-embedding-3-small", dim: Optional[int] = None, client=None):
+    def __init__(self, model_name: str = "text-embedding-3-small", dim: Optional[int] = None, dimensions: Optional[int] = None, client=None):
         try:
             import openai
         except ImportError as e:
@@ -68,7 +75,10 @@ class OpenAIEncoder(BaseEncoder):
         self.model_name = model_name
         self.client = client or openai.OpenAI()
         
-        if dim is not None:
+        self.dimensions = dimensions
+        if dimensions is not None:
+            self._dim = dimensions
+        elif dim is not None:
             self._dim = dim
         else:
             # Hardcode based on known models to save an API call
@@ -93,7 +103,10 @@ class OpenAIEncoder(BaseEncoder):
         import openai
         from synaptoroute.exceptions import SynaptoRouteError
         try:
-            response = self.client.embeddings.create(input=[text], model=self.model_name)
+            kwargs = {"input": [text], "model": self.model_name}
+            if self.dimensions is not None:
+                kwargs["dimensions"] = self.dimensions
+            response = self.client.embeddings.create(**kwargs)
             return np.array(response.data[0].embedding, dtype=np.float32)
         except openai.OpenAIError as e:
             raise SynaptoRouteError(f"OpenAI API Error: {e}") from e
@@ -105,9 +118,17 @@ class OpenAIEncoder(BaseEncoder):
         import openai
         from synaptoroute.exceptions import SynaptoRouteError
         try:
-            response = self.client.embeddings.create(input=texts, model=self.model_name)
-            embeddings = [data.embedding for data in response.data]
-            return np.array(embeddings, dtype=np.float32)
+            chunk_size = 2048
+            all_embeddings = []
+            for i in range(0, len(texts), chunk_size):
+                chunk = texts[i:i + chunk_size]
+                kwargs = {"input": chunk, "model": self.model_name}
+                if self.dimensions is not None:
+                    kwargs["dimensions"] = self.dimensions
+                response = self.client.embeddings.create(**kwargs)
+                embeddings = [data.embedding for data in response.data]
+                all_embeddings.extend(embeddings)
+            return np.array(all_embeddings, dtype=np.float32)
         except openai.OpenAIError as e:
             raise SynaptoRouteError(f"OpenAI API Error: {e}") from e
 

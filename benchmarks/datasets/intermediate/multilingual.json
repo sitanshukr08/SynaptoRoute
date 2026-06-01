@@ -1,0 +1,410 @@
+{
+  "routes": [
+    {
+      "name": "greeting",
+      "utterances": [
+        "hello how are you",
+        "good morning",
+        "hi there",
+        "greetings",
+        "howdy"
+      ]
+    },
+    {
+      "name": "goodbye",
+      "utterances": [
+        "goodbye",
+        "see you later",
+        "bye for now",
+        "have a good day",
+        "farewell"
+      ]
+    }
+  ],
+  "test_queries": [
+    {
+      "query": "hola",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "bonjour",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "guten morgen",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "adi\u00c3\u00b3s",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "au revoir",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "sayonara",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "greetings there how are you",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "greetings friend how are you",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hi friend how are you",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hi assistant how are you",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hey there how are you",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "good morning bot how are you",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hello there what's up",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "greetings friend what's up",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hey bot what's up",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "good morning there",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hi bot",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hello there what's up",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "good morning there can you help me",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hello assistant",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "good morning assistant",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hi friend can you help me",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "greetings friend can you help me",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hi assistant how are you",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hello bot what's up",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hi friend can you help me",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hi bot what's up",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hello assistant can you help me",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hi there what's up",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "greetings bot",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hey there",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "greetings bot how are you",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hello friend",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hey assistant",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "hey friend how are you",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "greetings assistant what's up",
+      "expected_route": "greeting"
+    },
+    {
+      "query": "bye thanks stop",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "goodbye for now stop",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "see you later talk later stop",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "goodbye thanks close",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "see you later thanks close",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "goodbye talk later stop",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "quit thanks",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "exit thanks",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "exit for now close",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "see you later thanks stop",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "see you later talk later have a good day",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "see you later for now stop",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "quit thanks close",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "goodbye thanks",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "see you later talk later",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "bye for now",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "bye talk later",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "quit talk later",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "exit thanks have a good day",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "goodbye thanks close",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "quit for now close",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "bye talk later stop",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "bye for now",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "see you later thanks",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "goodbye thanks",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "exit talk later",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "bye thanks",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "exit for now have a good day",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "goodbye thanks close",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "see you later for now have a good day",
+      "expected_route": "goodbye"
+    },
+    {
+      "query": "explain to me a joke please",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me cook a steak",
+      "expected_route": null
+    },
+    {
+      "query": "set cook a steak quickly",
+      "expected_route": null
+    },
+    {
+      "query": "set a joke in space",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me how to tie a tie",
+      "expected_route": null
+    },
+    {
+      "query": "tell me cook a steak quickly",
+      "expected_route": null
+    },
+    {
+      "query": "tell me the meaning of life",
+      "expected_route": null
+    },
+    {
+      "query": "play cook a steak quickly",
+      "expected_route": null
+    },
+    {
+      "query": "tell me a timer for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "tell me a joke quickly",
+      "expected_route": null
+    },
+    {
+      "query": "play cook a steak right now",
+      "expected_route": null
+    },
+    {
+      "query": "how do I the meaning of life",
+      "expected_route": null
+    },
+    {
+      "query": "how do I the meaning of life",
+      "expected_route": null
+    },
+    {
+      "query": "how do I cook a steak",
+      "expected_route": null
+    },
+    {
+      "query": "tell me a joke",
+      "expected_route": null
+    },
+    {
+      "query": "play the meaning of life",
+      "expected_route": null
+    },
+    {
+      "query": "set the meaning of life quickly",
+      "expected_route": null
+    },
+    {
+      "query": "tell me some music for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "play a joke right now",
+      "expected_route": null
+    },
+    {
+      "query": "tell me the meaning of life right now",
+      "expected_route": null
+    },
+    {
+      "query": "how do I a joke for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "set the meaning of life please",
+      "expected_route": null
+    },
+    {
+      "query": "how do I cook a steak",
+      "expected_route": null
+    },
+    {
+      "query": "set how to tie a tie quickly",
+      "expected_route": null
+    },
+    {
+      "query": "play a timer",
+      "expected_route": null
+    },
+    {
+      "query": "set the meaning of life please",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me the meaning of life for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "set how to tie a tie in space",
+      "expected_route": null
+    },
+    {
+      "query": "set how to tie a tie for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me a timer for 10 minutes",
+      "expected_route": null
+    }
+  ]
+}

@@ -1,0 +1,418 @@
+{
+  "routes": [
+    {
+      "name": "book_flight",
+      "utterances": [
+        "I want to book a flight to Paris",
+        "find me a cheap ticket to London",
+        "schedule a trip to Tokyo for next week",
+        "what airlines fly to New York",
+        "reserve a seat on the next plane to Chicago"
+      ]
+    },
+    {
+      "name": "book_hotel",
+      "utterances": [
+        "find a hotel in downtown Seattle",
+        "book a room with two beds in Miami",
+        "I need accommodation near the airport",
+        "what is the nightly rate for the Hilton",
+        "reserve a suite for 3 nights"
+      ]
+    }
+  ],
+  "test_queries": [
+    {
+      "query": "I want to fly to France",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "get me a room in vegas",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "what is the meaning of life",
+      "expected_route": null
+    },
+    {
+      "query": "tell me a joke",
+      "expected_route": null
+    },
+    {
+      "query": "sfjdksfjskdfjskdf",
+      "expected_route": null
+    },
+    {
+      "query": "how do I cook a steak",
+      "expected_route": null
+    },
+    {
+      "query": "set a timer for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "book me a flight to a hotel in space",
+      "expected_route": null
+    },
+    {
+      "query": "look up airfare",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "schedule airfare from new york",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "reserve airfare",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "find airfare for next week",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "reserve airfare",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "schedule a flight for next week",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "book airfare cheaply",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "find tickets",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "schedule tickets",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "reserve a plane ticket",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "schedule airfare to tokyo",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "look up tickets",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "look up airfare",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "reserve a flight cheaply",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "schedule airfare cheaply",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "look up tickets",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "reserve tickets for next week",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "look up a plane ticket from new york",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "book airfare",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "reserve tickets round trip",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "schedule airfare round trip",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "find a flight round trip",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "book tickets for next week",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "book airfare",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "find a plane ticket from new york",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "look up a plane ticket round trip",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "book a flight round trip",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "reserve a flight round trip",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "book airfare round trip",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "reserve a flight to tokyo",
+      "expected_route": "book_flight"
+    },
+    {
+      "query": "schedule a room for two nights",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "reserve a room",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "book accommodation near the airport",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "find a hotel in paris",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "find an airbnb",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "find an airbnb with a pool",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "look for a room with a pool",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "look for a room in paris",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "schedule a hotel for two nights",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "reserve accommodation in paris",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "book a room with a pool",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "reserve a room in paris",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "schedule a room in paris",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "reserve accommodation",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "schedule an airbnb for two nights",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "look for accommodation near the airport",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "look for a hotel",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "book a hotel near the airport",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "schedule accommodation for two nights",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "schedule a room with a pool",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "book a room",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "find an airbnb",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "look for an airbnb with a pool",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "reserve accommodation",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "book a room",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "reserve a room",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "reserve a hotel with a pool",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "find accommodation with a pool",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "reserve a hotel for two nights",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "book a hotel",
+      "expected_route": "book_hotel"
+    },
+    {
+      "query": "how do I cook a steak quickly",
+      "expected_route": null
+    },
+    {
+      "query": "how do I a joke",
+      "expected_route": null
+    },
+    {
+      "query": "tell me some music right now",
+      "expected_route": null
+    },
+    {
+      "query": "play a joke quickly",
+      "expected_route": null
+    },
+    {
+      "query": "set how to tie a tie",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me a timer right now",
+      "expected_route": null
+    },
+    {
+      "query": "tell me some music for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "tell me how to tie a tie please",
+      "expected_route": null
+    },
+    {
+      "query": "play how to tie a tie right now",
+      "expected_route": null
+    },
+    {
+      "query": "set the meaning of life for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "how do I cook a steak for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me a joke",
+      "expected_route": null
+    },
+    {
+      "query": "set a joke",
+      "expected_route": null
+    },
+    {
+      "query": "how do I the meaning of life please",
+      "expected_route": null
+    },
+    {
+      "query": "how do I cook a steak for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "tell me cook a steak quickly",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me a timer",
+      "expected_route": null
+    },
+    {
+      "query": "set some music please",
+      "expected_route": null
+    },
+    {
+      "query": "play a timer quickly",
+      "expected_route": null
+    },
+    {
+      "query": "play some music",
+      "expected_route": null
+    },
+    {
+      "query": "tell me a joke please",
+      "expected_route": null
+    },
+    {
+      "query": "how do I the meaning of life",
+      "expected_route": null
+    },
+    {
+      "query": "play a timer right now",
+      "expected_route": null
+    },
+    {
+      "query": "tell me some music",
+      "expected_route": null
+    },
+    {
+      "query": "tell me the meaning of life in space",
+      "expected_route": null
+    },
+    {
+      "query": "tell me how to tie a tie in space",
+      "expected_route": null
+    },
+    {
+      "query": "play a timer",
+      "expected_route": null
+    },
+    {
+      "query": "play some music please",
+      "expected_route": null
+    },
+    {
+      "query": "set the meaning of life",
+      "expected_route": null
+    },
+    {
+      "query": "tell me how to tie a tie right now",
+      "expected_route": null
+    }
+  ]
+}

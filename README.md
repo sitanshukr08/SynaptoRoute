@@ -2,111 +2,105 @@
 
 [![PyPI version](https://badge.fury.io/py/synaptoroute.svg)](https://pypi.org/project/synaptoroute/)
 [![CI/CD Pipeline](https://github.com/sitanshukr08/SynaptoRoute/actions/workflows/ci.yml/badge.svg)](https://github.com/sitanshukr08/SynaptoRoute/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Python >=3.9](https://img.shields.io/badge/python-%3E%3D3.9-blue.svg)](https://www.python.org/)
 
-SynaptoRoute is a high-throughput, local semantic routing engine built for production Python microservices. Designed as an efficient alternative to LLM routing chains, it executes intent classification entirely locally using ONNX-accelerated vector embeddings.
+SynaptoRoute is a high-performance semantic routing engine designed for production Python microservices. It executes intent classification locally using hardware-accelerated vector embeddings to route natural language to deterministic software logic.
 
-The `v0.2.0` architecture transitions the engine from a sequential low-latency prototype into a **highly concurrent, ACID-compliant async batching router** capable of safely absorbing asynchronous FastAPI server loads.
+It is specifically designed for:
+- **Tool Routing** (Mapping prompts to function signatures)
+- **Agent Routing** (Handing off state to specialized subagents)
+- **Workflow Orchestration** (Triggering RAG chains or DB queries)
+- **Large-Scale Intent Classification** (Supporting massive, dense domain definitions)
 
-## Table of Contents
-- [Why SynaptoRoute?](#why-synaptoroute)
-- [v0.2.0 Architecture & Optimizations](#v020-architecture--optimizations)
-- [Head-to-Head Benchmark](#head-to-head-benchmark)
-- [Installation & Deployment](#installation--deployment)
-- [Quick Start Guide](#quick-start-guide)
-- [System Limitations](#system-limitations)
-- [Community & Contributing](#community--contributing)
+## Key Features
 
----
-
-## Why SynaptoRoute?
-
-In modern agentic systems, relying on an external API (like OpenAI or Anthropic) to make simple routing decisions introduces unacceptable latency and token costs. 
-
-SynaptoRoute solves this by executing intent classification locally. It is engineered to solve two specific problems that plague naive semantic routers: **$O(N)$ memory degradation during live updates** and **thread-blocking under asynchronous web server concurrency**.
-
-## v0.2.0 Architecture & Optimizations
-
-### 1. Amortized $O(1)$ Lazy Memory Slicing
-Traditional routers suffer from severe performance degradation during live updates. When a new route is added, they execute an immediate `numpy.vstack`, copying the entire vector array in memory ($O(N)$ complexity). 
-
-SynaptoRoute `v0.2.0` pre-allocates a static tensor buffer at initialization. When routes are added dynamically, the router slots the embedding directly into a reserved `float32` memory slice via list assignment. This bounds memory growth strictly to $O(1)$ and prevents server RAM exhaustion, even when handling 50,000 dense vectors. 
-
-> [!NOTE]
-> **Memory Floor Tradeoff:** Because the maximum capacity is pre-allocated upfront as `np.zeros(max_capacity, dim)`, the system has a fixed baseline memory footprint. With the default `bge-small-en-v1.5` model (384 dimensions) and 50,000 capacity, the empty router consumes **~73 MB of RAM at startup**, regardless of whether you load 3 routes or 49,000 routes. This is the calculated cost of preventing $O(N)$ allocation crashes.
-
-### 2. Dynamic Asynchronous Batching
-Hardware accelerators (GPUs, AVX CPUs) are optimized for large matrix multiplications. Processing single web requests sequentially wastes hardware potential and blocks Python's `asyncio` event loop. 
-
-SynaptoRoute introduces a background `_batch_worker` queue. It traps parallel HTTP requests, waits for a configurable window (e.g., 5 milliseconds), groups them into a dense batch, and processes them in a single mathematical hardware cycle. This architecture safely doubles throughput under heavy concurrent load.
-
-### 3. SQLite Thread-Local Pooling & BLOB Caching
-Routing logic is only useful if it's durable. SynaptoRoute serializes vectors into a local SQLite database. 
-- **Concurrency:** Thread-local connection pooling ensures 100% data integrity even when 2,000 overlapping web requests attempt to modify routes simultaneously. 
-- **Cold Booting:** The `v0.2.1` hotfix introduced binary `float32` BLOB caching to the schema. Bypassing CPU re-encoding allows a 50,000-vector routing table to boot in **0.45 seconds**, completely eliminating cold-start bottlenecks.
+✓ **Async Batching Queue:** Prevents event loop blocking and absorbs massive concurrent loads without hardware lockup.
+✓ **Fast Route Mutations:** Hot-swap intents in near-constant-time memory without rebuilding the search index.
+✓ **50,000+ Route Support:** Backed by an optional `Faiss` index to maintain interactivity at massive scale.
+✓ **Pluggable Architecture:** Seamlessly swap embedding providers (Local ONNX, OpenAI, etc.).
+✓ **Distributed Sync:** Redis-backed pub/sub to keep Kubernetes replicas aligned.
 
 ---
 
-## Head-to-Head Benchmark
+## Benchmark Highlights
 
-SynaptoRoute is architecturally optimized for async concurrent deployments. We evaluated it against `semantic-router` (using their default `FastEmbedEncoder`) to measure architectural scaling.
+SynaptoRoute has been rigorously benchmarked against both procedural stressors and non-synthetic canonical datasets.
 
-| Metric | `semantic-router` | `SynaptoRoute` (`v0.2.0`) |
-|--------|-------------------|---------------------------|
-| **Hot-Reload Degradation** (500 Routes) | +6.46 ms | **+0.74 ms** |
-| **Concurrent Async Load** | `Index is not ready` (Thread Blocked) | **Successfully Batched** (38+ QPS) |
+- **50,000 routes tested** interactively.
+- **~49ms retrieval latency** at 250,000 embeddings.
+- **CLINC150:** 74.20% Top-1 Accuracy
+- **Banking77:** 91.81% Top-1 Accuracy (Zero-shot mapping on 77 highly overlapping intents)
+- **~302 QPS** on concurrent batched benchmark workloads.
 
-> **The Architectural Difference:** The +0.74ms vs +6.46ms hot-reload degradation is a direct consequence of $O(1)$ lazy memory slicing vs $O(N)$ index recompilation. Under `asyncio` concurrent load, `semantic-router`'s sync-first design produced `Index is not ready` failures; SynaptoRoute's `_batch_worker` queue absorbed all requests without dropping a query. Note that the throughput comparison is heavily biased by architectural choices: it compares an async batching queue against a strictly sequential, unbatched caller.
-
-> **View Full Benchmarks:** For detailed statistical analysis, including GPU physics scaling, P50 vs P99 tradeoffs, and our roadmap for fixing distributed system limitations, see our official [BENCHMARKS.md](BENCHMARKS.md).
+*For full statistical breakdowns, methodology, and comparisons, see [docs/BENCHMARKS.md](docs/BENCHMARKS.md) and [docs/COMPARISON.md](docs/COMPARISON.md).*
 
 ---
 
-## Installation & Deployment
+## When to Use SynaptoRoute
 
-### Method 1: Docker REST API (Recommended)
+**Use SynaptoRoute if:**
+- You need local, edge-deployed routing without API dependencies.
+- You need high concurrency capable of surviving asynchronous spikes.
+- You expect massive routing tables (1,000 to 50,000+ routes).
+- You want highly predictable query latency regardless of scale.
 
-SynaptoRoute ships with a fully asynchronous FastAPI wrapper, designed for immediate drop-in deployment as a scalable microservice.
+**Consider alternatives if:**
+- You need logical reasoning or downstream multi-step planning.
+- You need complex multi-intent decomposition.
+- You require strict Out-Of-Distribution detection without manual calibration.
 
-```bash
-# Build the Docker image
-docker build -t synaptoroute .
+---
 
-# Run the container
-docker run -p 8000:8000 synaptoroute
-```
+## Architecture & Design
 
-### Method 2: Standard Python Package
+In modern microservice architectures, relying on external APIs for classification routing introduces high latency, cost, and rate limits. SynaptoRoute executes intent classification locally, avoiding two structural bottlenecks common in semantic routing:
 
-To embed SynaptoRoute natively into your existing Python pipelines:
+1. **Sequential Compute Starvation:** Processing single semantic requests sequentially creates a bottleneck for parallel API calls, eventually forcing thermal throttling or thread exhaustion on local hardware. SynaptoRoute captures concurrent requests in a background `_batch_worker` queue, groups them (e.g., batch size 32), and executes them in a single optimized pass through the inference engine.
+2. **Index Rebuilding Penalty:** Standard routers execute an $O(N)$ reallocation of the entire memory space when routes change. SynaptoRoute utilizes lazy slicing and memory-mapped tombstoning to allow instant insertions and deletions.
+
+---
+
+### 1. Installation
 
 ```bash
 pip install synaptoroute
+
+# Optional Extras
+pip install synaptoroute[api]          # For FastAPI integration
+pip install synaptoroute[openai]       # For using OpenAI embeddings
+pip install synaptoroute[metrics]      # For telemetry and evaluation
+pip install synaptoroute[redis]        # For distributed deployment syncing
+pip install synaptoroute[faiss]        # For massive route scaling (50,000+)
+pip install synaptoroute[langchain]    # For LangChain ecosystem integration
+pip install synaptoroute[llamaindex]   # For LlamaIndex ecosystem integration
+pip install synaptoroute[all]          # Installs all optional dependencies
 ```
 
 ---
 
 ## Quick Start Guide
 
+### Basic Example
+
 ```python
 import asyncio
 from synaptoroute.router import AdaptiveRouter
-from synaptoroute.encoder import Encoder
+from synaptoroute.encoder import FastEmbedEncoder
 from synaptoroute.storage import SQLiteStorage
 from synaptoroute.models import Route
 
 async def main():
     # 1. Initialize Components
-    encoder = Encoder(providers=["CPUExecutionProvider"])
+    encoder = FastEmbedEncoder(model_name="BAAI/bge-small-en-v1.5")
     storage = SQLiteStorage("data/memory.sqlite")
-    router = AdaptiveRouter(encoder, storage)
+    router = AdaptiveRouter(encoder=encoder, storage=storage)
     
     # 2. Define Routes
     billing_route = Route(
         name="billing", 
-        utterances=["I need a refund", "Where is my receipt?", "Cancel my subscription"]
+        utterances=["I need a refund", "Where is my receipt?", "Cancel my subscription"],
+        threshold=0.60
     )
     router.add_route(billing_route)
     
@@ -115,7 +109,8 @@ async def main():
     
     # 4. Execute Async Queries
     result = await router.aquery("How do I get my money back?")
-    print(f"Matched Intent: {result.name}") # Output: billing
+    if result:
+        print(f"Matched Intent: {result.name}") # Output: billing
     
     # 5. Graceful Shutdown
     await router.stop()
@@ -126,18 +121,59 @@ if __name__ == "__main__":
 
 ---
 
-## System Limitations 
+## Advanced Configuration
 
-**Horizontal Scaling (Kubernetes Split-Brain)**  
-SynaptoRoute relies on a highly optimized, local in-memory NumPy tensor to achieve its routing speed. As such, it is structurally bound to a single node. If deployed across multiple load-balanced Kubernetes pods, a hot-reload request hitting Pod A will update Pod A's local memory, but Pod B will remain unaware. 
+### Optimization Profiles
+SynaptoRoute allows you to load strict optimization profiles depending on your infrastructure constraints:
+```python
+from synaptoroute import OptimizationProfile, AdaptiveRouter
 
-Evaluating distributed embedding synchronization (e.g., Redis Pub/Sub or shared-memory) to unblock horizontal scaling is a core research focus for `v0.3.0`.
+# THROUGHPUT: Maximizes QPS for heavy concurrent loads
+router = AdaptiveRouter(profile=OptimizationProfile.THROUGHPUT)
+
+# LATENCY: Minimizes response time for sequential or low-concurrency systems
+router = AdaptiveRouter(profile=OptimizationProfile.LATENCY)
+```
+*Caveat: `profile.threads` must be passed explicitly to `FastEmbedEncoder`. The router does not propagate thread count automatically.*
+
+### Distributed Deployment
+For multi-pod Kubernetes or horizontal scaling, SynaptoRoute uses `RedisSyncManager` to synchronize SQLite route databases across nodes:
+```python
+from synaptoroute.sync import RedisSyncManager
+
+sync_manager = RedisSyncManager(redis_url="redis://localhost:6379")
+router = AdaptiveRouter(sync_manager=sync_manager)
+```
+*Caveat: The current `RedisSyncManager` implementation does not retry on Redis disconnects.*
+
+## Roadmap
+
+SynaptoRoute is rapidly evolving from a high-speed text semantic router into a multi-modal, highly scalable routing framework for distributed architectures. 
+
+- **v0.4.0 (Observability):** Native OpenTelemetry/Prometheus `/metrics` integration to track P50/P99 latency, queue depth, and throughput in production.
+- **v0.5.0 (Dynamic Boundaries):** Automatic docstring extraction and LLM-assisted synthetic utterance generation to seed intents with zero manual configuration.
+- **v0.6.0 (Cross-Encoder Reranking):** Optional two-stage retrieval. When the top two routes score within a narrow margin, a Cross-Encoder (e.g., MS MARCO) will execute a surgical tie-break to improve lexical keyword traps and adversarial routing performance.
+- **v0.7.0 (Multi-Modal):** CLIP/ImageBind integration to accept `PIL.Image` objects and route visual data directly to specialized subsystems.
+
+For the detailed strategic vision, see [docs/ROADMAP.md](docs/ROADMAP.md).
+
+## Known Limitations
+
+1. **Directional Semantics:** Vector similarity cannot distinguish between "flight book" and "cancel flight".
+2. **Deep Logical Negation:** Modifiers like "don't", "never", and "not" are inherently problematic for dense embeddings.
+3. **Threshold Calibration:** Defining a global threshold across highly disparate intents requires manual tuning.
+4. **Mixed Intent Parsing:** Cannot natively split multi-action sentences into discrete routes.
+5. **Context Amnesia:** Evaluates single utterances strictly without conversation history.
+6. **Cross-Language Drift:** Cosine boundary margins differ significantly when evaluating multiple languages simultaneously.
+7. **Adversarial Resilience:** Keyword traps will natively bypass standard embeddings unless explicitly trained out.
+
+For a detailed analysis of these failure modes and how to implement recommended fallback mechanisms (like LLM verification), please read our [limitations documentation](docs/limitations.md).
 
 ---
 
 ## Community & Contributing
 
-We welcome contributions of all sizes from the open-source community! 
+We welcome professional contributions to expand the framework.
 
-- **Contributing:** Please read our [Contributing Guidelines](CONTRIBUTING.md) to learn how to set up your development environment.
-- **Issues:** If you discover a bug or have a feature request, please [open an issue](https://github.com/sitanshukr08/SynaptoRoute/issues).
+- **Contributing:** Review the [Contributing Guidelines](CONTRIBUTING.md) for architectural enforcement policies.
+- **Issues:** Report bugs or request features via the [Issue Tracker](https://github.com/sitanshukr08/SynaptoRoute/issues).

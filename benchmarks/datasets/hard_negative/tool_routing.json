@@ -1,0 +1,258 @@
+{
+  "routes": [
+    {
+      "name": "get_weather",
+      "utterances": [
+        "what is the weather like today",
+        "is it raining right now",
+        "do I need an umbrella in London",
+        "show me the temperature for tomorrow",
+        "forecast for the week"
+      ]
+    },
+    {
+      "name": "get_stock_price",
+      "utterances": [
+        "what is the current price of AAPL",
+        "how is the stock market doing today",
+        "show me TSLA ticker",
+        "did Microsoft go up or down",
+        "fetch the closing price for Google"
+      ]
+    },
+    {
+      "name": "search_web",
+      "utterances": [
+        "google the nearest coffee shop",
+        "look up the capital of France",
+        "search the internet for recent news on AI",
+        "find information about black holes",
+        "who won the super bowl in 2023"
+      ]
+    },
+    {
+      "name": "calculate_math",
+      "utterances": [
+        "what is 25 divided by 5",
+        "calculate the square root of 144",
+        "how much is 15 percent of 200",
+        "solve this equation for x",
+        "multiply 8 by 12"
+      ]
+    }
+  ],
+  "test_queries": [
+    {
+      "query": "wht is the wather in tokyo",
+      "expected_route": "get_weather"
+    },
+    {
+      "query": "search online for a good pizza recipe",
+      "expected_route": "search_web"
+    },
+    {
+      "query": "can you do some math for me",
+      "expected_route": "calculate_math"
+    },
+    {
+      "query": "how hot is it tomorrow this evening",
+      "expected_route": "get_weather"
+    },
+    {
+      "query": "forecast tomorrow",
+      "expected_route": "get_weather"
+    },
+    {
+      "query": "what's the weather outside right now",
+      "expected_route": "get_weather"
+    },
+    {
+      "query": "check the weather in london",
+      "expected_route": "get_weather"
+    },
+    {
+      "query": "check the weather outside please",
+      "expected_route": "get_weather"
+    },
+    {
+      "query": "how hot is it outside please",
+      "expected_route": "get_weather"
+    },
+    {
+      "query": "what's the weather today",
+      "expected_route": "get_weather"
+    },
+    {
+      "query": "forecast in london this evening",
+      "expected_route": "get_weather"
+    },
+    {
+      "query": "check the weather outside this evening",
+      "expected_route": "get_weather"
+    },
+    {
+      "query": "is it raining outside right now",
+      "expected_route": "get_weather"
+    },
+    {
+      "query": "stock price for apple stock",
+      "expected_route": "get_stock_price"
+    },
+    {
+      "query": "quote for TSLA doing today",
+      "expected_route": "get_stock_price"
+    },
+    {
+      "query": "quote for apple stock today",
+      "expected_route": "get_stock_price"
+    },
+    {
+      "query": "how is TSLA today",
+      "expected_route": "get_stock_price"
+    },
+    {
+      "query": "what is the price of apple stock",
+      "expected_route": "get_stock_price"
+    },
+    {
+      "query": "quote for AAPL right now",
+      "expected_route": "get_stock_price"
+    },
+    {
+      "query": "stock price for tesla shares",
+      "expected_route": "get_stock_price"
+    },
+    {
+      "query": "check stock AAPL",
+      "expected_route": "get_stock_price"
+    },
+    {
+      "query": "stock price for apple stock",
+      "expected_route": "get_stock_price"
+    },
+    {
+      "query": "check stock tesla shares doing today",
+      "expected_route": "get_stock_price"
+    },
+    {
+      "query": "look up python tutorials please",
+      "expected_route": "search_web"
+    },
+    {
+      "query": "query the web for the latest news please",
+      "expected_route": "search_web"
+    },
+    {
+      "query": "look up the current president please",
+      "expected_route": "search_web"
+    },
+    {
+      "query": "find information on the current president online",
+      "expected_route": "search_web"
+    },
+    {
+      "query": "query the web for the latest news",
+      "expected_route": "search_web"
+    },
+    {
+      "query": "find information on python tutorials please",
+      "expected_route": "search_web"
+    },
+    {
+      "query": "search for the current president",
+      "expected_route": "search_web"
+    },
+    {
+      "query": "google the world cup",
+      "expected_route": "search_web"
+    },
+    {
+      "query": "search for the world cup online",
+      "expected_route": "search_web"
+    },
+    {
+      "query": "query the web for the world cup online",
+      "expected_route": "search_web"
+    },
+    {
+      "query": "math: the square root of 144",
+      "expected_route": "calculate_math"
+    },
+    {
+      "query": "what is 12 times 12",
+      "expected_route": "calculate_math"
+    },
+    {
+      "query": "what is 12 times 12 please",
+      "expected_route": "calculate_math"
+    },
+    {
+      "query": "compute 2 + 2",
+      "expected_route": "calculate_math"
+    },
+    {
+      "query": "solve 2 + 2",
+      "expected_route": "calculate_math"
+    },
+    {
+      "query": "calculate 15% of 80 for me",
+      "expected_route": "calculate_math"
+    },
+    {
+      "query": "math: 2 + 2 please",
+      "expected_route": "calculate_math"
+    },
+    {
+      "query": "compute 12 times 12 for me",
+      "expected_route": "calculate_math"
+    },
+    {
+      "query": "math: the square root of 144",
+      "expected_route": "calculate_math"
+    },
+    {
+      "query": "solve 15% of 80",
+      "expected_route": "calculate_math"
+    },
+    {
+      "query": "play cook a steak quickly",
+      "expected_route": null
+    },
+    {
+      "query": "play the meaning of life quickly",
+      "expected_route": null
+    },
+    {
+      "query": "play the meaning of life in space",
+      "expected_route": null
+    },
+    {
+      "query": "set cook a steak",
+      "expected_route": null
+    },
+    {
+      "query": "play some music for 10 minutes",
+      "expected_route": null
+    },
+    {
+      "query": "tell me the meaning of life in space",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me some music",
+      "expected_route": null
+    },
+    {
+      "query": "how do I a joke",
+      "expected_route": null
+    },
+    {
+      "query": "how do I cook a steak",
+      "expected_route": null
+    },
+    {
+      "query": "explain to me a timer in space",
+      "expected_route": null
+    }
+  ]
+}

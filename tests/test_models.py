@@ -6,7 +6,7 @@ def test_route_creation():
     route = Route(name="greeting", utterances=["hello", "hi"])
     assert route.name == "greeting"
     assert route.utterances == ["hello", "hi"]
-    assert route.threshold == 0.0
+    assert route.threshold == 0.5
     assert route.metadata is None
 
 def test_route_with_metadata_and_threshold():

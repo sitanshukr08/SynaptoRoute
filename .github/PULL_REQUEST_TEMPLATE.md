@@ -11,8 +11,9 @@ Fixes # (issue)
 
 ## Checklist:
 - [ ] My code follows the architectural guidelines of this project (e.g. preserves $O(1)$ updates).
+- [ ] My code and commits strictly adhere to the professional linguistic guidelines (no hyperbolic or "AI" terminology).
 - [ ] I have performed a self-review of my own code.
 - [ ] I have commented my code, particularly in hard-to-understand areas.
-- [ ] I have made corresponding changes to the documentation (`README.md`, `notebooks/`).
-- [ ] I have added tests that prove my fix is effective or that my feature works.
+- [ ] I have made corresponding changes to the documentation (`README.md`, `BENCHMARKS.md`).
+- [ ] I have added tests that validate my fix or feature under concurrent load.
 - [ ] New and existing unit tests pass locally with my changes.
