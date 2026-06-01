@@ -4,9 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "synaptoroute"
-version = "0.3.0"
+version = "0.3.1"
 requires-python = ">=3.9"
-description = "A dynamic zero-token semantic router"
+description = "A local, blazingly fast Semantic Router designed for Agentic AI workflows."
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
