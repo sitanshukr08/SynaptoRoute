@@ -148,12 +148,9 @@ router = AdaptiveRouter(sync_manager=sync_manager)
 
 ## Roadmap
 
-SynaptoRoute is rapidly evolving from a high-speed text semantic router into a multi-modal, highly scalable routing framework for distributed architectures. 
-
-- **v0.4.0 (Observability):** Native OpenTelemetry/Prometheus `/metrics` integration to track P50/P99 latency, queue depth, and throughput in production.
-- **v0.5.0 (Dynamic Boundaries):** Automatic docstring extraction and LLM-assisted synthetic utterance generation to seed intents with zero manual configuration.
-- **v0.6.0 (Cross-Encoder Reranking):** Optional two-stage retrieval. When the top two routes score within a narrow margin, a Cross-Encoder (e.g., MS MARCO) will execute a surgical tie-break to improve lexical keyword traps and adversarial routing performance.
-- **v0.7.0 (Multi-Modal):** CLIP/ImageBind integration to accept `PIL.Image` objects and route visual data directly to specialized subsystems.
+- **v0.4.0 (Dynamic Boundaries):** Automatic docstring extraction and LLM-assisted synthetic utterance generation to seed intents with zero manual configuration. LangGraph native `ToolNode` injection.
+- **v0.5.0 (Multi-Modal):** CLIP/ImageBind integration to accept `PIL.Image` objects and route visual data directly to specialized subsystems.
+- **v0.6.0 (Advanced Network Distribution):** Packaging SynaptoRoute as a standalone gRPC microservice for federated remote cluster routing.
 
 For the detailed strategic vision, see [docs/ROADMAP.md](docs/ROADMAP.md).
 
