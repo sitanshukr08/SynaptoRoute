@@ -40,6 +40,7 @@ class AdaptiveRouter:
         # Dynamic Index (Numpy default, FAISS HNSW optional)
         self.index = get_index(dim=self.encoder.dim, max_capacity=self.max_capacity)
         self._route_map = {}
+        self._mutation_count = 0
         
         self._batch_queue = None
         self._worker_task = None
@@ -125,6 +126,7 @@ class AdaptiveRouter:
             self._route_map.pop(route_name)
             
             self.index.delete(route_name)
+            self._mutation_count += 1
             
             self.metrics.capacity_usage.set(self.index.total_vectors)
 
@@ -175,6 +177,7 @@ class AdaptiveRouter:
             try:
                 if num_embs > 0:
                     self.index.add(embeddings, route.name)
+                self._mutation_count += 1
             except Exception as e:
                 # Rollback: restore old route if index insertion failed
                 if is_overwrite and rollback.route is not None:
@@ -238,6 +241,7 @@ class AdaptiveRouter:
             
             try:
                 self.index.add(np.array([embedding]), route_name)
+                self._mutation_count += 1
             except ValueError as e:
                 if str(e) == "ID_OVERFLOW":
                     if not self._rebuild_pending:
@@ -283,13 +287,21 @@ class AdaptiveRouter:
             self.sync_manager.broadcast("add_utterance", {"route_name": route_name, "utterance": utterance}, embeddings=emb_bytes)
 
     async def _rebuild_index(self):
+        with self.lock:
+            start_mutations = self._mutation_count
+            
         try:
             routes, embeddings_map = await asyncio.to_thread(self.storage.load_all_routes)
             route_dict = {r.name: r for r in routes}
             new_index = get_index(dim=self.encoder.dim, max_capacity=self.max_capacity)
             await asyncio.to_thread(new_index.rebuild, route_dict, embeddings_map)
+            
             with self.lock:
-                self.index = new_index
+                # Generation validation: only swap if no writes occurred during rebuild
+                if self._mutation_count == start_mutations:
+                    self.index = new_index
+                else:
+                    logging.getLogger(__name__).info("Index rebuild aborted due to concurrent mutations. Will retry later.")
         except Exception as e:
             logging.getLogger(__name__).error(f"Rebuild failed: {e}")
             self.metrics.gc_errors.inc()
