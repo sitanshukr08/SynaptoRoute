@@ -16,9 +16,6 @@ def temp_db(tmp_path):
 def storage(temp_db):
     return SQLiteStorage(db_path=temp_db)
 
-@pytest.fixture
-def encoder():
-    return Encoder(model_name="BAAI/bge-small-en-v1.5")
 
 @pytest.mark.asyncio
 async def test_encoder_lock_concurrency(storage, encoder):

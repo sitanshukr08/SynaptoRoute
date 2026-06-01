@@ -15,9 +15,6 @@ def temp_db(tmp_path):
 def storage(temp_db):
     return SQLiteStorage(db_path=temp_db)
 
-@pytest.fixture
-def encoder():
-    return Encoder(model_name="BAAI/bge-small-en-v1.5")
 
 def test_static_routing(storage, encoder):
     router = AdaptiveRouter(encoder, storage)

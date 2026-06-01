@@ -14,9 +14,6 @@ def temp_db(tmp_path):
 def storage(temp_db):
     return SQLiteStorage(db_path=temp_db)
 
-@pytest.fixture
-def encoder():
-    return Encoder(model_name="BAAI/bge-small-en-v1.5")
 
 @pytest.mark.asyncio
 async def test_aquery(storage, encoder):
@@ -60,6 +57,13 @@ async def test_aquery_overload(storage, encoder):
     for t in tasks:
         if not t.done():
             t.cancel()
+            try:
+                await t
+            except asyncio.CancelledError:
+                pass
+        elif t.exception() is not None:
+            # retrieve the exception to avoid unhandled exception warnings
+            t.exception()
             
     assert overloaded, "RouterOverloadedError was not raised"
 
