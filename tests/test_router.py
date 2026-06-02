@@ -1,10 +1,8 @@
 import pytest
-import os
-import sqlite3
 from synaptoroute.router import AdaptiveRouter
 from synaptoroute.models import Route
-from synaptoroute.encoder import Encoder
 from synaptoroute.storage import SQLiteStorage
+from synaptoroute.exceptions import RouteNotFoundError, RouterCapacityError
 
 @pytest.fixture
 def temp_db(tmp_path):
@@ -53,8 +51,6 @@ def test_hot_reload_utterance(storage, encoder):
     
     # Verify the route object has the new utterance
     assert "I need assistance" in match.utterances
-
-from synaptoroute.exceptions import RouteNotFoundError, RouterCapacityError
 
 def test_add_utterance_unknown_route(storage, encoder):
     router = AdaptiveRouter(encoder, storage)
@@ -159,7 +155,6 @@ def test_add_route_overwrite_rollback_on_index_failure(storage, encoder):
     router.add_route(route)
     
     # Mock index.add to raise on the overwrite call
-    original_add = router.index.add
     def mock_add(embeddings, route_name):
         raise ValueError("ID_OVERFLOW")
     
@@ -179,11 +174,40 @@ def test_add_route_overwrite_rollback_on_index_failure(storage, encoder):
     assert r is not None
     assert r.utterances == ["bill 1"]
 
+def test_add_route_new_rollback_removes_storage_row(storage, fake_encoder):
+    router = AdaptiveRouter(fake_encoder, storage)
+
+    def mock_add(embeddings, route_name):
+        raise ValueError("boom")
+
+    router.index.add = mock_add
+
+    with pytest.raises(ValueError, match="boom"):
+        router.add_route(Route(name="orphan", utterances=["u1"], threshold=0.5))
+
+    routes, _ = storage.load_all_routes()
+    assert "orphan" not in {route.name for route in routes}
+
+def test_add_utterance_rollback_removes_storage_row(storage, fake_encoder):
+    router = AdaptiveRouter(fake_encoder, storage)
+    router.add_route(Route(name="billing", utterances=["bill 1"], threshold=0.5))
+
+    def mock_add(embeddings, route_name):
+        raise ValueError("boom")
+
+    router.index.add = mock_add
+
+    with pytest.raises(ValueError, match="boom"):
+        router.add_utterance("billing", "bad utterance")
+
+    routes, _ = storage.load_all_routes()
+    route = next(route for route in routes if route.name == "billing")
+    assert route.utterances == ["bill 1"]
+
 def test_load_routes_discards_wrong_dimension_blob(temp_db, encoder):
     import numpy as np
     storage = SQLiteStorage(temp_db)
     route = Route(name="bad_blob", utterances=["test 1"], threshold=0.5)
-    bad_blob = np.zeros(128, dtype=np.float32).tobytes()
     
     # Need to manually insert bad blob since save_route might not allow mismatch if it checks
     # But storage.save_route doesn't check dimensions, it just blindly saves.

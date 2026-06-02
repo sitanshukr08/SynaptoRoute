@@ -2,7 +2,6 @@ import pytest
 import asyncio
 from synaptoroute.router import AdaptiveRouter
 from synaptoroute.models import Route
-from synaptoroute.encoder import Encoder
 from synaptoroute.storage import SQLiteStorage
 from synaptoroute.exceptions import RouterOverloadedError
 
@@ -76,6 +75,17 @@ async def test_aquery_without_start(storage, encoder):
     router = AdaptiveRouter(encoder, storage)
     with pytest.raises(RuntimeError, match="Router must be started"):
         await router.aquery("hello")
+
+@pytest.mark.asyncio
+async def test_async_mutation_wrappers(storage, fake_encoder):
+    router = AdaptiveRouter(fake_encoder, storage)
+
+    await router.aadd_route(Route(name="async_route", utterances=["hello"], threshold=0.5))
+    await router.aadd_utterance("async_route", "hi")
+    await router.aupdate_threshold("async_route", 0.4)
+    await router.adelete_route("async_route")
+
+    assert router("hello") is None
 
 @pytest.mark.asyncio
 async def test_aquery_worker_crashed(storage, encoder):

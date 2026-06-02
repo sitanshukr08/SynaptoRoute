@@ -5,8 +5,9 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 # Attempt to import RedisSyncManager. We assume the Editor subagent will implement this.
 try:
-    from synaptoroute.sync import RedisSyncManager
+    from synaptoroute.sync import HAS_REDIS, RedisSyncManager
 except ImportError:
+    HAS_REDIS = False
     RedisSyncManager = None
 
 @pytest.fixture
@@ -14,10 +15,15 @@ def mock_router():
     """Mock router that will record any method calls made to it by the sync manager."""
     return MagicMock()
 
-@pytest.mark.asyncio
-async def test_broadcast_sends_message(mock_router):
+def require_redis_sync():
     if RedisSyncManager is None:
         pytest.skip("RedisSyncManager not yet implemented")
+    if not HAS_REDIS:
+        pytest.skip("redis extra is not installed")
+
+@pytest.mark.asyncio
+async def test_broadcast_sends_message(mock_router):
+    require_redis_sync()
 
     with patch('synaptoroute.sync.redis.from_url') as mock_redis_from_url:
         mock_redis = MagicMock()
@@ -62,8 +68,7 @@ async def test_broadcast_sends_message(mock_router):
 
 @pytest.mark.asyncio
 async def test_listener_ignores_own_sender_id(mock_router):
-    if RedisSyncManager is None:
-        pytest.skip("RedisSyncManager not yet implemented")
+    require_redis_sync()
 
     with patch('synaptoroute.sync.redis.from_url') as mock_redis_from_url:
         mock_redis = MagicMock()
@@ -115,8 +120,7 @@ async def test_listener_ignores_own_sender_id(mock_router):
         await manager.stop()
 
 def test_dispatch_rejects_mismatched_encoder_model():
-    if RedisSyncManager is None:
-        pytest.skip("RedisSyncManager not yet implemented")
+    require_redis_sync()
 
     manager = RedisSyncManager(redis_url="redis://localhost")
     
@@ -137,3 +141,57 @@ def test_dispatch_rejects_mismatched_encoder_model():
     # Should be rejected, router methods should not be called
     mock_router.add_route.assert_not_called()
     mock_router.add_utterance.assert_not_called()
+
+def test_state_request_broadcasts_targeted_snapshot(mock_router):
+    require_redis_sync()
+
+    from synaptoroute.models import Route
+
+    manager = RedisSyncManager(redis_url="redis://localhost")
+    mock_router.lock = MagicMock()
+    mock_router.lock.__enter__.return_value = None
+    mock_router.lock.__exit__.return_value = None
+    mock_router._route_map = {
+        "support": Route(name="support", utterances=["help"], threshold=0.5)
+    }
+    manager.register(mock_router)
+    manager.broadcast = MagicMock()
+
+    manager._dispatch({
+        "sender_id": "late-joiner",
+        "action": "sync_state_request",
+        "payload": {},
+    })
+
+    manager.broadcast.assert_called_once()
+    action, payload = manager.broadcast.call_args.args[:2]
+    assert action == "sync_state_response"
+    assert payload["target_sender_id"] == "late-joiner"
+    assert payload["routes"][0]["name"] == "support"
+
+def test_state_response_applies_only_when_targeted(mock_router):
+    require_redis_sync()
+
+    manager = RedisSyncManager(redis_url="redis://localhost")
+    manager.register(mock_router)
+    route_payload = {"name": "support", "utterances": ["help"], "threshold": 0.5}
+
+    manager._dispatch({
+        "sender_id": "peer",
+        "action": "sync_state_response",
+        "payload": {
+            "target_sender_id": "other-node",
+            "routes": [route_payload],
+        },
+    })
+    mock_router.add_route.assert_not_called()
+
+    manager._dispatch({
+        "sender_id": "peer",
+        "action": "sync_state_response",
+        "payload": {
+            "target_sender_id": manager.sender_id,
+            "routes": [route_payload],
+        },
+    })
+    mock_router.add_route.assert_called_once()

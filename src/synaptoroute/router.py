@@ -53,6 +53,8 @@ class AdaptiveRouter:
         self._loop = asyncio.get_running_loop()
         self._batch_queue = asyncio.Queue(maxsize=10000)
         self._worker_task = asyncio.create_task(self._batch_worker())
+        if self.sync_manager:
+            await self.sync_manager.start()
 
     async def stop(self):
         if self._worker_task:
@@ -64,11 +66,27 @@ class AdaptiveRouter:
         if self.sync_manager:
             await self.sync_manager.stop()
 
+    def _schedule_rebuild_locked(self) -> bool:
+        if self._rebuild_pending:
+            return True
+        self._rebuild_pending = True
+        try:
+            if hasattr(self, '_loop') and self._loop and not self._loop.is_closed():
+                self._loop.call_soon_threadsafe(lambda: asyncio.create_task(self._rebuild_index()))
+                return True
+        except Exception:
+            pass
+        self._rebuild_pending = False
+        return False
+
+    def _schedule_rebuild(self) -> bool:
+        with self.lock:
+            return self._schedule_rebuild_locked()
+
     def _load_routes(self):
         routes, embeddings_map = self.storage.load_all_routes()
         
         print(f"Loading {len(routes)} routes from storage...")
-        t_load = __import__('time').perf_counter()
         import sys
         for r_idx, route in enumerate(routes):
             if r_idx % 5000 == 0:
@@ -133,15 +151,7 @@ class AdaptiveRouter:
             live_vectors = max(1, self.index.total_vectors)
             tombstone_ratio = len(self.index.tombstones) / live_vectors
             if tombstone_ratio > 0.1 or len(self.index.tombstones) > 1500:
-                if not self._rebuild_pending:
-                    self._rebuild_pending = True
-                    try:
-                        if hasattr(self, '_loop') and self._loop and not self._loop.is_closed():
-                            self._loop.call_soon_threadsafe(lambda: asyncio.create_task(self._rebuild_index()))
-                        else:
-                            self._rebuild_pending = False
-                    except Exception:
-                        self._rebuild_pending = False
+                self._schedule_rebuild_locked()
 
         if _broadcast and self.sync_manager:
             self.sync_manager.broadcast("delete_route", {"route_name": route_name})
@@ -190,6 +200,13 @@ class AdaptiveRouter:
                     )
                 else:
                     self._route_map.pop(route.name, None)
+                    try:
+                        self.storage.delete_route(route.name)
+                    except Exception:
+                        logging.getLogger(__name__).exception(
+                            "Failed to delete route '%s' from storage during rollback.",
+                            route.name,
+                        )
                 raise
             
             self.metrics.capacity_usage.set(self.index.total_vectors)
@@ -197,15 +214,7 @@ class AdaptiveRouter:
             live_vectors = max(1, self.index.total_vectors)
             tombstone_ratio = len(self.index.tombstones) / live_vectors
             if is_overwrite and (tombstone_ratio > 0.1 or len(self.index.tombstones) > 1500):
-                if not self._rebuild_pending:
-                    self._rebuild_pending = True
-                    try:
-                        if hasattr(self, '_loop') and self._loop and not self._loop.is_closed():
-                            self._loop.call_soon_threadsafe(lambda: asyncio.create_task(self._rebuild_index()))
-                        else:
-                            self._rebuild_pending = False
-                    except Exception:
-                        self._rebuild_pending = False
+                self._schedule_rebuild_locked()
 
         if _broadcast and self.sync_manager:
             emb_bytes = embeddings.tobytes() if embeddings is not None else None
@@ -244,23 +253,37 @@ class AdaptiveRouter:
                 self._mutation_count += 1
             except ValueError as e:
                 if str(e) == "ID_OVERFLOW":
-                    if not self._rebuild_pending:
-                        self._rebuild_pending = True
-                        try:
-                            if hasattr(self, '_loop') and self._loop and not self._loop.is_closed():
-                                self._loop.call_soon_threadsafe(lambda: asyncio.create_task(self._rebuild_index()))
-                            else:
-                                self._rebuild_pending = False
-                        except Exception:
-                            self._rebuild_pending = False
-                    raise SynaptoRouteError("Index exhausted, triggered rebuild. Next query will incorporate DB utterance.") from e
+                    self._route_map[route_name] = rollback_route.route
+                    try:
+                        self.storage.delete_utterance(route_name, utterance)
+                    except Exception:
+                        logging.getLogger(__name__).exception(
+                            "Failed to delete utterance '%s' from storage during rollback.",
+                            utterance,
+                        )
+                    self._schedule_rebuild_locked()
+                    raise SynaptoRouteError("Index exhausted, triggered rebuild.") from e
                 
                 # Rollback
                 self._route_map[route_name] = rollback_route.route
+                try:
+                    self.storage.delete_utterance(route_name, utterance)
+                except Exception:
+                    logging.getLogger(__name__).exception(
+                        "Failed to delete utterance '%s' from storage during rollback.",
+                        utterance,
+                    )
                 raise
-            except Exception as e:
+            except Exception:
                 # Rollback
                 self._route_map[route_name] = rollback_route.route
+                try:
+                    self.storage.delete_utterance(route_name, utterance)
+                except Exception:
+                    logging.getLogger(__name__).exception(
+                        "Failed to delete utterance '%s' from storage during rollback.",
+                        utterance,
+                    )
                 raise
             
             route = self._route_map[route_name]
@@ -272,21 +295,14 @@ class AdaptiveRouter:
             live_vectors = max(1, self.index.total_vectors)
             tombstone_ratio = len(self.index.tombstones) / live_vectors
             if tombstone_ratio > 0.1 or len(self.index.tombstones) > 1500:
-                if not self._rebuild_pending:
-                    self._rebuild_pending = True
-                    try:
-                        if hasattr(self, '_loop') and self._loop and not self._loop.is_closed():
-                            self._loop.call_soon_threadsafe(lambda: asyncio.create_task(self._rebuild_index()))
-                        else:
-                            self._rebuild_pending = False
-                    except Exception:
-                        self._rebuild_pending = False
+                self._schedule_rebuild_locked()
 
         if _broadcast and self.sync_manager:
             emb_bytes = embedding.tobytes() if embedding is not None else None
             self.sync_manager.broadcast("add_utterance", {"route_name": route_name, "utterance": utterance}, embeddings=emb_bytes)
 
     async def _rebuild_index(self):
+        retry_needed = False
         with self.lock:
             start_mutations = self._mutation_count
             
@@ -302,11 +318,43 @@ class AdaptiveRouter:
                     self.index = new_index
                 else:
                     logging.getLogger(__name__).info("Index rebuild aborted due to concurrent mutations. Will retry later.")
+                    retry_needed = True
         except Exception as e:
             logging.getLogger(__name__).error(f"Rebuild failed: {e}")
             self.metrics.gc_errors.inc()
         finally:
-            self._rebuild_pending = False
+            with self.lock:
+                self._rebuild_pending = False
+            if retry_needed:
+                self._schedule_rebuild()
+
+    async def aadd_route(self, route: Route, _broadcast: bool = True, _precomputed_embeddings=None):
+        return await asyncio.to_thread(
+            self.add_route,
+            route,
+            _broadcast,
+            _precomputed_embeddings,
+        )
+
+    async def aadd_utterance(self, route_name: str, utterance: str, _broadcast: bool = True, _precomputed_embedding=None):
+        return await asyncio.to_thread(
+            self.add_utterance,
+            route_name,
+            utterance,
+            _broadcast,
+            _precomputed_embedding,
+        )
+
+    async def adelete_route(self, route_name: str, _broadcast: bool = True):
+        return await asyncio.to_thread(self.delete_route, route_name, _broadcast)
+
+    async def aupdate_threshold(self, route_name: str, threshold: float, _broadcast: bool = True):
+        return await asyncio.to_thread(
+            self.update_threshold,
+            route_name,
+            threshold,
+            _broadcast,
+        )
 
     def __call__(self, query: str) -> Optional[Route]:
         start_time = time.perf_counter()
