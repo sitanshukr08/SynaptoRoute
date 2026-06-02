@@ -56,20 +56,20 @@ SynaptoRoute has been rigorously benchmarked against both procedural stressors a
 
 ```mermaid
 graph TD
-    Client([Client / Microservice]) -->|aquery()| AR[AdaptiveRouter]
+    Client[Client] -->|aquery| AR[AdaptiveRouter]
     
     subgraph Routing Engine
-        AR -->|Queue| Worker[Batch Worker Task]
-        Worker -->|process_batch| Encoder[Encoder<br>FastEmbed / OpenAI]
-        Encoder -->|Vectors| Index[(Vector Index<br>Numpy / Faiss)]
+        AR -->|Queue| Worker[Batch Worker]
+        Worker -->|process| Encoder[FastEmbed]
+        Encoder -->|Vectors| Index[Faiss Index]
         Index -->|Top-K Match| AR
     end
     
     subgraph State Management
-        AR -->|Save/Load| SQL[(SQLiteStorage)]
+        AR -->|Save and Load| SQL[SQLiteStorage]
         SQL -.->|Hydrate| Index
-        AR <-->|Pub/Sub| Sync[RedisSyncManager]
-        Sync <-->|synaptoroute:sync| Cluster([Other Kubernetes Nodes])
+        AR <-->|Pub Sub| Sync[RedisSyncManager]
+        Sync <-->|Sync| Cluster[Other Nodes]
     end
 ```
 
