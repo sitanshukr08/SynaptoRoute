@@ -54,6 +54,25 @@ SynaptoRoute has been rigorously benchmarked against both procedural stressors a
 
 ## Architecture & Design
 
+```mermaid
+graph TD
+    Client([Client / Microservice]) -->|aquery()| AR[AdaptiveRouter]
+    
+    subgraph Routing Engine
+        AR -->|Queue| Worker[Batch Worker Task]
+        Worker -->|process_batch| Encoder[Encoder<br>FastEmbed / OpenAI]
+        Encoder -->|Vectors| Index[(Vector Index<br>Numpy / Faiss)]
+        Index -->|Top-K Match| AR
+    end
+    
+    subgraph State Management
+        AR -->|Save/Load| SQL[(SQLiteStorage)]
+        SQL -.->|Hydrate| Index
+        AR <-->|Pub/Sub| Sync[RedisSyncManager]
+        Sync <-->|synaptoroute:sync| Cluster([Other Kubernetes Nodes])
+    end
+```
+
 In modern microservice architectures, relying on external APIs for classification routing introduces high latency, cost, and rate limits. SynaptoRoute executes intent classification locally, avoiding two structural bottlenecks common in semantic routing:
 
 1. **Sequential Compute Starvation:** Processing single semantic requests sequentially creates a bottleneck for parallel API calls, eventually forcing thermal throttling or thread exhaustion on local hardware. SynaptoRoute captures concurrent requests in a background `_batch_worker` queue, groups them (e.g., batch size 32), and executes them in a single optimized pass through the inference engine.

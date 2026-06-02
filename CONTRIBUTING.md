@@ -2,6 +2,27 @@
 
 Thank you for considering contributing to SynaptoRoute. This repository enforces strict architectural and linguistic guidelines to maintain professional, objective engineering standards.
 
+## Architecture Overview
+
+```mermaid
+graph TD
+    Client([Client / Microservice]) -->|aquery()| AR[AdaptiveRouter]
+    
+    subgraph Routing Engine
+        AR -->|Queue| Worker[Batch Worker Task]
+        Worker -->|process_batch| Encoder[Encoder<br>FastEmbed / OpenAI]
+        Encoder -->|Vectors| Index[(Vector Index<br>Numpy / Faiss)]
+        Index -->|Top-K Match| AR
+    end
+    
+    subgraph State Management
+        AR -->|Save/Load| SQL[(SQLiteStorage)]
+        SQL -.->|Hydrate| Index
+        AR <-->|Pub/Sub| Sync[RedisSyncManager]
+        Sync <-->|synaptoroute:sync| Cluster([Other Kubernetes Nodes])
+    end
+```
+
 ## Development Setup
 
 1. **Fork the repository** on GitHub.
