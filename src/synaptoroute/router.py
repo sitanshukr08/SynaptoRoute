@@ -65,15 +65,16 @@ class AdaptiveRouter:
             await self.sync_manager.stop()
 
     def _load_routes(self):
+        if not self.storage:
+            return
+            
         routes, embeddings_map = self.storage.load_all_routes()
         
-        print(f"Loading {len(routes)} routes from storage...")
-        t_load = __import__('time').perf_counter()
-        import sys
+        logging.getLogger(__name__).debug(f"Loading {len(routes)} routes from storage...")
+        t_load = time.perf_counter()
         for r_idx, route in enumerate(routes):
             if r_idx % 5000 == 0:
-                print(f"Processed {r_idx}/{len(routes)} routes for loading...")
-                sys.stdout.flush()
+                logging.getLogger(__name__).debug(f"Processed {r_idx}/{len(routes)} routes for loading...")
             self._route_map[route.name] = route
             if not route.utterances:
                 continue
@@ -101,8 +102,7 @@ class AdaptiveRouter:
                     
             if missing_texts:
                 if r_idx % 5000 == 0:
-                    print(f"Route {r_idx}: re-encoding {len(missing_texts)} missing embeddings! e_bytes len was {len(embs_data[0]) if embs_data else 'None'}, expected {expected_bytes}")
-                    sys.stdout.flush()
+                    logging.getLogger(__name__).debug(f"Route {r_idx}: re-encoding {len(missing_texts)} missing embeddings! e_bytes len was {len(embs_data[0]) if embs_data else 'None'}, expected {expected_bytes}")
                 new_embs = self.encoder.encode_batch(missing_texts)
                 for i, new_emb in zip(missing_idx, new_embs):
                     final_embeddings[i] = new_emb
@@ -159,13 +159,14 @@ class AdaptiveRouter:
             
         with self.lock:
             is_overwrite = route.name in self._route_map
-            rollback = RollbackSnapshot(route=self._route_map.get(route.name)) if is_overwrite else None
+            rollback = RollbackSnapshot(route=self._route_map.get(route.name).model_copy(deep=True)) if is_overwrite else None
             net_increase = num_embs
             if is_overwrite:
                 net_increase -= len(self._route_map[route.name].utterances)
 
-            if getattr(self.index, '_next_id', self.index.total_vectors) + net_increase > self.max_capacity:
+            if self.index.total_vectors + net_increase > self.max_capacity:
                 raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
+
 
             self.storage.save_route(route, embeddings)
 
@@ -178,6 +179,32 @@ class AdaptiveRouter:
                 if num_embs > 0:
                     self.index.add(embeddings, route.name)
                 self._mutation_count += 1
+            except ValueError as e:
+                if str(e) == "ID_OVERFLOW":
+                    if not self._rebuild_pending:
+                        self._rebuild_pending = True
+                        try:
+                            if hasattr(self, '_loop') and self._loop and not self._loop.is_closed():
+                                self._loop.call_soon_threadsafe(lambda: asyncio.create_task(self._rebuild_index()))
+                            else:
+                                self._rebuild_pending = False
+                        except Exception:
+                            self._rebuild_pending = False
+                    
+                    if is_overwrite and rollback.route is not None:
+                        self._route_map[route.name] = rollback.route
+                        self.storage.save_route(rollback.route, None)
+                    else:
+                        self._route_map.pop(route.name, None)
+                    raise SynaptoRouteError("Index exhausted, triggered rebuild. Please retry after rebuild completes.") from e
+                
+                # Rollback
+                if is_overwrite and rollback.route is not None:
+                    self._route_map[route.name] = rollback.route
+                    self.storage.save_route(rollback.route, None)
+                else:
+                    self._route_map.pop(route.name, None)
+                raise
             except Exception as e:
                 # Rollback: restore old route if index insertion failed
                 if is_overwrite and rollback.route is not None:
@@ -188,6 +215,16 @@ class AdaptiveRouter:
                         f"'{route.name}'. Rolled back to previous route. "
                         f"Error: {e}"
                     )
+                    # Trigger a rebuild to recover the tombstoned vectors
+                    if not self._rebuild_pending:
+                        self._rebuild_pending = True
+                        try:
+                            if hasattr(self, '_loop') and self._loop and not self._loop.is_closed():
+                                self._loop.call_soon_threadsafe(lambda: asyncio.create_task(self._rebuild_index()))
+                            else:
+                                self._rebuild_pending = False
+                        except Exception:
+                            self._rebuild_pending = False
                 else:
                     self._route_map.pop(route.name, None)
                 raise
@@ -217,7 +254,7 @@ class AdaptiveRouter:
                 raise RouteNotFoundError(f"Route '{route_name}' not found.")
             if utterance in self._route_map[route_name].utterances:
                 return
-            if getattr(self.index, '_next_id', self.index.total_vectors) + 1 > self.max_capacity:
+            if self.index.total_vectors + 1 > self.max_capacity:
                 raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
                 
         if _precomputed_embedding is not None:
@@ -232,12 +269,12 @@ class AdaptiveRouter:
         with self.lock:
             if route_name not in self._route_map:
                 raise RouteNotFoundError(f"Route '{route_name}' was deleted during encoding.")
-            if getattr(self.index, '_next_id', self.index.total_vectors) + 1 > self.max_capacity:
+            if utterance in self._route_map[route_name].utterances:
+                return
+            if self.index.total_vectors + 1 > self.max_capacity:
                 raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
 
-            rollback_route = RollbackSnapshot(route=self._route_map.get(route_name))
-
-            self.storage.add_utterance(route_name, utterance, embedding)
+            rollback_route = RollbackSnapshot(route=self._route_map.get(route_name).model_copy(deep=True))
             
             try:
                 self.index.add(np.array([embedding]), route_name)
@@ -263,6 +300,9 @@ class AdaptiveRouter:
                 self._route_map[route_name] = rollback_route.route
                 raise
             
+            if self.storage:
+                self.storage.add_utterance(route_name, utterance, embedding)
+
             route = self._route_map[route_name]
             # Reassign to trigger pydantic validation
             route.utterances = route.utterances + [utterance]
@@ -325,20 +365,22 @@ class AdaptiveRouter:
         
         with self.lock:
             # If we have a reranker, use it
+            candidates = []
             if self.reranker is not None and len(results[0]) > 0:
-                candidates = []
                 for score, route_name in results[0]:
                     if route_name in self._route_map:
-                        candidates.append((score, self._route_map[route_name]))
-                
-                if not candidates:
-                    return None
-                    
-                # Evaluate with reranker
-                best_route = self.reranker.rerank(query, candidates)
-                self.metrics.inference_latency_seconds.observe(time.perf_counter() - start_time)
-                return best_route
+                        candidates.append((score, self._route_map[route_name].model_copy(deep=True)))
+                        
+        if self.reranker is not None and len(results[0]) > 0:
+            if not candidates:
+                return None
             
+            # Evaluate with reranker
+            best_route = self.reranker.rerank(query, candidates)
+            self.metrics.inference_latency_seconds.observe(time.perf_counter() - start_time)
+            return best_route
+            
+        with self.lock:
             # Standard embedding routing with margin gating
             best_route = None
             best_score = -1.0
@@ -450,21 +492,29 @@ class AdaptiveRouter:
                         search_results = self.index.search(query_embeddings, top_k=5)
                         
                         results = []
+                        all_candidates = []
                         with self.lock:
                             for i in range(len(qs)):
-                                q_text = qs[i]
                                 q_results = search_results[i]
-                                
+                                candidates = []
                                 if self.reranker is not None and len(q_results) > 0:
-                                    candidates = []
                                     for score, route_name in q_results:
                                         if route_name in self._route_map:
-                                            candidates.append((score, self._route_map[route_name]))
-                                    if candidates:
-                                        best_route = self.reranker.rerank(q_text, candidates)
-                                        results.append(best_route)
-                                        continue
-                                        
+                                            candidates.append((score, self._route_map[route_name].model_copy(deep=True)))
+                                all_candidates.append(candidates)
+
+                        for i in range(len(qs)):
+                            q_text = qs[i]
+                            q_results = search_results[i]
+                            candidates = all_candidates[i]
+                            
+                            if self.reranker is not None and len(q_results) > 0:
+                                if candidates:
+                                    best_route = self.reranker.rerank(q_text, candidates)
+                                    results.append(best_route)
+                                    continue
+                                    
+                            with self.lock:
                                 best_route = None
                                 best_score = -1.0
                                 second_best_score = -1.0

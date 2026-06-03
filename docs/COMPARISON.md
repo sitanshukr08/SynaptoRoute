@@ -48,7 +48,7 @@ These benchmarks stress the fundamental limits of dense vector similarity by usi
 | **Lexical Overlap** | 25.0% | 40.0% |
 | **Negation** | 0% | 15% |
 
-*Analysis: Semantic Router has superior default thresholding logic for handling hard negatives out-of-the-box using pure embeddings. SynaptoRoute plans to address these lexical traps in v0.6.0 via a Cross-Encoder reranking pipeline.*
+*Analysis: Semantic Router has superior default thresholding logic for handling hard negatives out-of-the-box using pure embeddings. SynaptoRoute addresses these lexical traps via an optional Cross-Encoder reranking pipeline.*
 
 ---
 

@@ -52,28 +52,6 @@ class NumpyIndex:
     def add(self, embeddings: np.ndarray, route_name: str):
         with self.lock:
             self._add_unlocked(embeddings, route_name)
-            num_embs = embeddings.shape[0]
-            if self._next_id + num_embs > self.max_capacity:
-                raise ValueError("Capacity exceeded")
-            
-            if embeddings.dtype != np.float32:
-                embeddings = embeddings.astype(np.float32)
-                
-            norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-            norms[norms == 0] = 1
-            embeddings = embeddings / norms
-            
-            self.embeddings[self._next_id:self._next_id + num_embs] = embeddings
-            ids = list(range(self._next_id, self._next_id + num_embs))
-            
-            if route_name not in self._route_to_ids:
-                self._route_to_ids[route_name] = []
-            self._route_to_ids[route_name].extend(ids)
-            for i in ids:
-                self._id_to_route[i] = route_name
-                
-            self._next_id += num_embs
-            self.ntotal += num_embs
 
     def delete(self, route_name: str):
         with self.lock:
@@ -162,7 +140,7 @@ class NumpyIndex:
 
 def get_index(dim: int, max_capacity: int = 50000):
     if HAS_FAISS:
-        return FaissIndex(dim)
+        return FaissIndex(dim, max_capacity=max_capacity)
     else:
         return NumpyIndex(dim, max_capacity)
 
@@ -171,8 +149,9 @@ class FaissIndex:
     A FAISS-based vector index utilizing HNSW for sub-linear search latency.
     Employs a Tombstone architecture for O(1) instantaneous deletions.
     """
-    def __init__(self, dim: int):
+    def __init__(self, dim: int, max_capacity: int = 50000):
         self.dim = dim
+        self.max_capacity = max_capacity
         self.lock = threading.Lock()
         
         # Inner Product (Cosine Similarity for normalized embeddings)

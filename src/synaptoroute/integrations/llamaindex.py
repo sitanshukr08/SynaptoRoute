@@ -1,8 +1,15 @@
 from typing import Sequence, Any
 
-from llama_index.core.schema import QueryBundle
-from llama_index.core.selectors import BaseSelector, SelectorResult, SingleSelection
-from llama_index.core.tools.types import ToolMetadata
+try:
+    from llama_index.core.schema import QueryBundle
+    from llama_index.core.selectors import BaseSelector, SelectorResult, SingleSelection
+    from llama_index.core.tools.types import ToolMetadata
+except ImportError:
+    BaseSelector = object
+    QueryBundle = Any
+    SelectorResult = Any
+    SingleSelection = Any
+    ToolMetadata = Any
 
 from synaptoroute.router import AdaptiveRouter
 
@@ -14,6 +21,8 @@ class SynaptoRouteSelector(BaseSelector):
 
     def __init__(self, router: AdaptiveRouter):
         super().__init__()
+        if BaseSelector is object:
+            raise ImportError("llama_index is not installed. Please install it using `pip install llama-index-core`")
         self.router = router
 
     def _get_prompts(self) -> dict:
@@ -32,7 +41,9 @@ class SynaptoRouteSelector(BaseSelector):
                     selections=[SingleSelection(index=i, reason=f"Matched route: {route_name}")]
                 )
         
-        raise ValueError(f"No matching choice found for route: {route_name}")
+        return SelectorResult(
+            selections=[SingleSelection(index=0, reason=f"No matching choice found for route: {route_name}, falling back to choice 0")]
+        )
 
     async def _aselect(self, choices: Sequence[ToolMetadata], query: QueryBundle) -> SelectorResult:
         result = await self.router.aquery(query.query_str)
@@ -44,4 +55,6 @@ class SynaptoRouteSelector(BaseSelector):
                     selections=[SingleSelection(index=i, reason=f"Matched route: {route_name}")]
                 )
                 
-        raise ValueError(f"No matching choice found for route: {route_name}")
+        return SelectorResult(
+            selections=[SingleSelection(index=0, reason=f"No matching choice found for route: {route_name}, falling back to choice 0")]
+        )

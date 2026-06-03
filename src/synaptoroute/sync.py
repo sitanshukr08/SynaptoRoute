@@ -22,7 +22,7 @@ class BaseSyncManager:
         pass
 
 class RedisSyncManager(BaseSyncManager):
-    def __init__(self, redis_url: str, sync_worker_count: int = 4, sync_queue_size: int = 1000):
+    def __init__(self, redis_url: str, sync_worker_count: int = 4, sync_queue_size: int = 1000, channel: str = "synaptoroute:sync"):
         super().__init__()
         self.sync_worker_count = sync_worker_count
         self.sync_queue_size = sync_queue_size
@@ -38,7 +38,7 @@ class RedisSyncManager(BaseSyncManager):
         self._outbound_queue: Optional[asyncio.Queue] = None
         self._inbound_queue: Optional[asyncio.Queue] = None
         self._dispatch_workers: list[asyncio.Task] = []
-        self._channel = "synaptoroute:sync"
+        self._channel = channel
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
     def register(self, router):
@@ -103,14 +103,17 @@ class RedisSyncManager(BaseSyncManager):
                             sender_id = data.get("sender_id")
                             if sender_id != self.sender_id:
                                 await self._inbound_queue.put(data)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            import logging
+                            logging.getLogger(__name__).warning(f"Failed to parse sync message: {e}")
             except asyncio.CancelledError:
                 break
-            except Exception:
+            except Exception as e:
                 await asyncio.sleep(1.0)
                 try:
                     await self._pubsub.subscribe(self._channel)
+                    import logging
+                    logging.getLogger(__name__).warning(f"Sync listener reconnected after error: {e}")
                 except Exception:
                     pass
 
@@ -118,7 +121,12 @@ class RedisSyncManager(BaseSyncManager):
         try:
             while True:
                 msg = await self._outbound_queue.get()
-                await self._redis_client.publish(self._channel, json.dumps(msg))
+                try:
+                    serialized = json.dumps(msg)
+                    await self._redis_client.publish(self._channel, serialized)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(f"Failed to publish sync message: {e}")
                 self._outbound_queue.task_done()
         except asyncio.CancelledError:
             pass
@@ -177,10 +185,17 @@ class RedisSyncManager(BaseSyncManager):
         action = data.get("action")
         payload = data.get("payload", {})
         
-        emb_b64 = payload.pop("_embeddings_b64", None)
+        emb_b64 = payload.get("_embeddings_b64", None)
         emb_bytes = base64.b64decode(emb_b64) if emb_b64 else None
-        precomputed_embeddings = np.frombuffer(emb_bytes, dtype=np.float32) if emb_bytes else None
-                
+        
+        precomputed_embeddings = None
+        if emb_bytes is not None:
+            if len(emb_bytes) % 4 == 0:
+                precomputed_embeddings = np.frombuffer(emb_bytes, dtype=np.float32)
+            else:
+                import logging
+                logging.getLogger(__name__).error(f"Invalid embedding bytes length: {len(emb_bytes)}")
+                        
         if action == "add_route":
             from synaptoroute.models import Route
             route = Route(**payload)

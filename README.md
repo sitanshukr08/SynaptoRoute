@@ -163,7 +163,6 @@ from synaptoroute.sync import RedisSyncManager
 sync_manager = RedisSyncManager(redis_url="redis://localhost:6379")
 router = AdaptiveRouter(sync_manager=sync_manager)
 ```
-*Caveat: The current `RedisSyncManager` implementation does not retry on Redis disconnects.*
 
 ## Roadmap
 

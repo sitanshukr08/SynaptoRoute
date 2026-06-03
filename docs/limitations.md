@@ -49,4 +49,4 @@ For use cases where the limitations above are unacceptable, you should employ:
 
 1. **LLM Verification:** Use SynaptoRoute to cheaply identify the correct subsystem, but force that subsystem's LLM to double-check the raw prompt for negations before executing destructive actions.
 2. **Explicit Workflows:** For multi-intent chaining, rely on orchestration frameworks (like LangChain or LangGraph) layered on top of SynaptoRoute.
-3. **Cross-Encoder Reranking (Planned for v0.6.0):** We are building an optional reranker pipeline to apply cross-attention models to the Top-K candidates. Benchmarks show this resolves keyword traps, but still struggles with deep logical negation.
+3. **Cross-Encoder Reranking (Delivered in v0.3.0):** We built an optional reranker pipeline to apply cross-attention models to the Top-K candidates. Benchmarks show this resolves keyword traps, but still struggles with deep logical negation.

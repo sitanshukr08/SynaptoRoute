@@ -3,14 +3,14 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator, StringConstraints, ConfigDict
 from typing_extensions import Annotated
 
-NonEmptyString = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+NonEmptyString = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=10000)]
 
 class Route(BaseModel):
     """
     Represents a single semantic route or intent.
     """
     model_config = ConfigDict(validate_assignment=True)
-    name: str = Field(..., min_length=1, pattern=r"^[a-zA-Z0-9_-]+$")
+    name: str = Field(..., min_length=1, max_length=256, pattern=r"^[a-zA-Z0-9_-]+$")
     utterances: List[NonEmptyString] = Field(..., min_length=1)
     threshold: float = Field(0.5, ge=-1.0, le=1.0)
     metadata: Optional[Dict[str, Any]] = None
@@ -44,4 +44,3 @@ import numpy as np
 @dataclass
 class RollbackSnapshot:
     route: Optional['Route'] = None
-    embeddings: Optional[np.ndarray] = None

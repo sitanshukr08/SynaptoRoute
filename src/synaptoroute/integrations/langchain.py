@@ -1,5 +1,9 @@
 from typing import Any, Optional
-from langchain_core.runnables import Runnable, RunnableConfig
+try:
+    from langchain_core.runnables import Runnable, RunnableConfig
+except ImportError:
+    Runnable = object
+    RunnableConfig = Any
 
 from synaptoroute.router import AdaptiveRouter
 
@@ -10,6 +14,8 @@ class SynaptoRouteChain(Runnable):
     """
     
     def __init__(self, router: AdaptiveRouter):
+        if Runnable is object:
+            raise ImportError("langchain_core is not installed. Please install it using `pip install langchain-core`")
         self.router = router
 
     def invoke(self, input: str, config: Optional[RunnableConfig] = None, **kwargs: Any) -> str:

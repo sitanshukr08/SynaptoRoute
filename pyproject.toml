@@ -32,7 +32,8 @@ Issues = "https://github.com/sitanshukr08/SynaptoRoute/issues"
 [project.optional-dependencies]
 test = [
     "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0"
+    "pytest-asyncio>=0.21.0",
+    "pytest-timeout>=2.1.0"
 ]
 api = [
     "fastapi>=0.100.0",
@@ -53,3 +54,6 @@ all = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/synaptoroute"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

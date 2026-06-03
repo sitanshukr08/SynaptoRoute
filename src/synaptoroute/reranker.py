@@ -37,7 +37,7 @@ class CrossEncoderReranker:
         scores = self.model.predict(pairs)
         
         # Find the route with the maximum score
-        best_score = -9999.0
+        best_score = float('-inf')
         best_route = None
         
         # Determine entailment index if 2D
