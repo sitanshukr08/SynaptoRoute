@@ -75,8 +75,11 @@ class OpenAIEncoder(BaseEncoder):
         try:
             import openai
         except ImportError as e:
-            raise RuntimeError("Please install synaptoroute[openai] to use the OpenAIEncoder. Run `pip install synaptoroute[openai]`.") from e
+            if client is None:
+                raise RuntimeError("Please install synaptoroute[openai] to use the OpenAIEncoder. Run `pip install synaptoroute[openai]`.") from e
+            openai = None
         self.model_name = model_name
+        self._openai_error = openai.OpenAIError if openai is not None else Exception
         self.client = client or openai.OpenAI()
         
         self.dimensions = dimensions
@@ -104,7 +107,6 @@ class OpenAIEncoder(BaseEncoder):
         return self._dim
 
     def encode(self, text: str) -> npt.NDArray[np.float32]:
-        import openai
         from synaptoroute.exceptions import SynaptoRouteError
         try:
             kwargs = {"input": [text], "model": self.model_name}
@@ -112,14 +114,13 @@ class OpenAIEncoder(BaseEncoder):
                 kwargs["dimensions"] = self.dimensions
             response = self.client.embeddings.create(**kwargs)
             return np.array(response.data[0].embedding, dtype=np.float32)
-        except openai.OpenAIError as e:
+        except self._openai_error as e:
             raise SynaptoRouteError(f"OpenAI API Error: {e}") from e
         
     def encode_batch(self, texts: List[str]) -> npt.NDArray[np.float32]:
         if not texts:
             return np.empty((0, self.dim), dtype=np.float32)
         
-        import openai
         from synaptoroute.exceptions import SynaptoRouteError
         try:
             chunk_size = 2048
@@ -133,7 +134,7 @@ class OpenAIEncoder(BaseEncoder):
                 embeddings = [data.embedding for data in response.data]
                 all_embeddings.extend(embeddings)
             return np.array(all_embeddings, dtype=np.float32)
-        except openai.OpenAIError as e:
+        except self._openai_error as e:
             raise SynaptoRouteError(f"OpenAI API Error: {e}") from e
 
 # Preserve backwards compatibility

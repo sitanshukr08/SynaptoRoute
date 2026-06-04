@@ -9,7 +9,7 @@ import logging
 from synaptoroute.metrics import MetricsRegistry
 from synaptoroute.models import Route, RollbackSnapshot
 from synaptoroute.encoder import Encoder
-from synaptoroute.storage import BaseStorage
+from synaptoroute.storage import BaseStorage, SQLiteStorage
 from synaptoroute.sync import BaseSyncManager
 from synaptoroute.exceptions import RouteNotFoundError, RouterOverloadedError, RouterCapacityError, SynaptoRouteError
 from synaptoroute.profile import OptimizationProfile, get_profile, ProfileType
@@ -24,7 +24,7 @@ class AdaptiveRouter:
             from synaptoroute.encoder import FastEmbedEncoder
             encoder = FastEmbedEncoder(threads=profile.threads)
         self.encoder = encoder
-        self.storage = storage
+        self.storage = storage or SQLiteStorage(":memory:")
         self.lock = threading.Lock()
         self._encoder_lock = threading.Lock()
         self._rebuild_pending = False

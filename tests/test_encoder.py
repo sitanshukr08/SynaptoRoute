@@ -1,5 +1,4 @@
 import numpy as np
-from synaptoroute.encoder import Encoder
 
 def test_encoder_initialization(encoder):
     assert encoder is not None

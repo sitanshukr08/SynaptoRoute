@@ -7,11 +7,13 @@ This document outlines the strategic vision and upcoming features for `SynaptoRo
 ## v0.2.0 - Production Readiness & Concurrency
 **Status:** Completed
 
-The v0.2.0 release transitioned the engine from a sequential prototype into an ACID-compliant, async batching router capable of safely absorbing asynchronous FastAPI server loads.
-* **SQLite Thread-Local Pooling:** Guaranteed 100% data integrity under heavy multithreaded writes.
-* **Amortized $O(1)$ Lazy Memory Slicing:** Eliminated the $O(N)$ reallocation cascade during live hot-reloading.
-* **Dynamic Asynchronous Batching:** Doubled hardware throughput via an internal `_batch_worker` queue.
-* **BLOB Caching (v0.2.1 Hotfix):** Slashed the 50,000-vector boot time from 20 minutes to 0.45 seconds.
+The v0.2.0 release moved the engine from a sequential prototype toward a
+stateful async router. Historical performance claims from this period require
+fresh reproduction before they should be cited.
+* **SQLite Persistence:** Added route and utterance storage.
+* **Lazy Deletion:** Added tombstoning for route deletes.
+* **Dynamic Asynchronous Batching:** Added an internal `_batch_worker` queue.
+* **Embedding BLOB Caching:** Added cached embeddings for faster reloads.
 
 ---
 
@@ -30,11 +32,12 @@ The v0.3.0 release addressed critical architectural gaps required for multi-node
 ## v0.3.1 - Stability & Data Integrity
 **Status:** Completed
 
-This critical patch hardened the core engine against race conditions and concurrency failures for enterprise deployments.
-* **Copy-On-Write GC:** Rebuilt background vector indices off-thread to achieve zero event loop stalling.
-* **Rollback Snapshots:** Guaranteed 100% data integrity during memory overflows by snapshotting route metadata and embeddings before mutations.
-* **Strict Thread Safety:** Bounded Redis dispatch queues and `BEGIN IMMEDIATE` SQLite transaction isolation.
-* **Independent Hardware Validation:** Formally verified semantic routing reproducibility across heterogeneous consumer laptops without GPU acceleration.
+This patch focused on stability and data integrity. Claims about enterprise
+readiness or independent hardware validation require reproducible logs before
+publication.
+* **Copy-On-Write GC:** Rebuild background vector indices off-thread.
+* **Rollback Snapshots:** Restore route metadata after failed mutations.
+* **Thread Safety:** Use bounded Redis dispatch queues and explicit SQLite transaction handling.
 
 ---
 

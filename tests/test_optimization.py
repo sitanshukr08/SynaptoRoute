@@ -1,4 +1,3 @@
-import pytest
 from synaptoroute.router import AdaptiveRouter
 from synaptoroute.encoder import Encoder
 from synaptoroute.storage import SQLiteStorage

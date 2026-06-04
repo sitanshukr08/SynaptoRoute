@@ -17,23 +17,18 @@ It is specifically designed for:
 
 ✓ **Async Batching Queue:** Prevents event loop blocking and absorbs massive concurrent loads without hardware lockup.
 ✓ **Fast Route Mutations:** Hot-swap intents in near-constant-time memory without rebuilding the search index.
-✓ **50,000+ Route Support:** Backed by an optional `Faiss` index to maintain interactivity at massive scale.
+✓ **Optional Faiss Backend:** Use `Faiss` for larger route sets when installed and validated in your environment.
 ✓ **Pluggable Architecture:** Seamlessly swap embedding providers (Local ONNX, OpenAI, etc.).
 ✓ **Distributed Sync:** Redis-backed pub/sub to keep Kubernetes replicas aligned.
 
 ---
 
-## Benchmark Highlights
+## Benchmark Status
 
-SynaptoRoute has been rigorously benchmarked against both procedural stressors and non-synthetic canonical datasets.
-
-- **50,000 routes tested** interactively.
-- **~49ms retrieval latency** at 250,000 embeddings.
-- **CLINC150:** 74.20% Top-1 Accuracy
-- **Banking77:** 91.81% Top-1 Accuracy (Zero-shot mapping on 77 highly overlapping intents)
-- **~302 QPS** on concurrent batched benchmark workloads.
-
-*For full statistical breakdowns, methodology, and comparisons, see [docs/BENCHMARKS.md](docs/BENCHMARKS.md) and [docs/COMPARISON.md](docs/COMPARISON.md).*
+Historical benchmark claims have been retracted until they are regenerated from
+the current repository with raw logs, environment metadata, and reproducible
+commands. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the current benchmark
+policy and runnable entry points.
 
 ---
 
@@ -42,7 +37,7 @@ SynaptoRoute has been rigorously benchmarked against both procedural stressors a
 **Use SynaptoRoute if:**
 - You need local, edge-deployed routing without API dependencies.
 - You need high concurrency capable of surviving asynchronous spikes.
-- You expect massive routing tables (1,000 to 50,000+ routes).
+- You expect routing tables large enough to benefit from an indexed local embedding store.
 - You want highly predictable query latency regardless of scale.
 
 **Consider alternatives if:**
@@ -71,7 +66,7 @@ pip install synaptoroute[api]          # For FastAPI integration
 pip install synaptoroute[openai]       # For using OpenAI embeddings
 pip install synaptoroute[metrics]      # For telemetry and evaluation
 pip install synaptoroute[redis]        # For distributed deployment syncing
-pip install synaptoroute[faiss]        # For massive route scaling (50,000+)
+pip install synaptoroute[faiss]        # For larger route sets after local validation
 pip install synaptoroute[langchain]    # For LangChain ecosystem integration
 pip install synaptoroute[llamaindex]   # For LlamaIndex ecosystem integration
 pip install synaptoroute[all]          # Installs all optional dependencies

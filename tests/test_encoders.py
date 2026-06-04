@@ -1,8 +1,7 @@
 import numpy as np
-import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock
 
-from synaptoroute.encoder import FastEmbedEncoder, OpenAIEncoder, BaseEncoder
+from synaptoroute.encoder import OpenAIEncoder
 from synaptoroute.router import AdaptiveRouter
 from synaptoroute.storage import BaseStorage
 from synaptoroute.models import Route

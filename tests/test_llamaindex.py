@@ -1,12 +1,13 @@
 import pytest
 from unittest.mock import Mock, AsyncMock, MagicMock
 
+pytest.importorskip("llama_index")
+
 from llama_index.core.schema import QueryBundle
 from llama_index.core.tools.types import ToolMetadata
-from llama_index.core.selectors import SelectorResult, SingleSelection
+from llama_index.core.selectors import SelectorResult
 
 from synaptoroute.integrations.llamaindex import SynaptoRouteSelector
-from synaptoroute.router import AdaptiveRouter
 from synaptoroute.models import Route
 
 def test_synaptoroute_selector_select():

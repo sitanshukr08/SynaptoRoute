@@ -1,4 +1,3 @@
-import json
 import asyncio
 from typing import Optional, List
 from pydantic import BaseModel
@@ -23,7 +22,7 @@ class SyntheticTuner:
     """
 
     def __init__(self, router: AdaptiveRouter, client: Optional["AsyncOpenAI"] = None):
-        if AsyncOpenAI is None:
+        if AsyncOpenAI is None and client is None:
             raise ImportError("openai is not installed. Please install it with `pip install openai`.")
         self.router = router
         self.client = client or AsyncOpenAI()
