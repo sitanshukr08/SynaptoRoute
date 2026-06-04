@@ -88,19 +88,19 @@ def main():
             
         # 2. Evaluate Reranker
         print("\n--- Evaluating Cross-Encoder Reranker ---")
-        synapto = init_synaptoroute(routes_data, model_name=model_name, storage_path=f"bench_v2_rerank.sqlite")
+        synapto = init_synaptoroute(routes_data, model_name=model_name, storage_path="bench_v2_rerank.sqlite")
         try:
             # We use a zero threshold for margin here because reranker takes over
             synapto.margin = 0.0
             
             print("\n--- Evaluating MS-Marco Cross-Encoder Reranker ---")
             synapto.reranker = CrossEncoderReranker(model_name="cross-encoder/ms-marco-MiniLM-L-6-v2", threshold=0.0) 
-            evaluate_router(synapto, eval_queries, f"SynaptoRoute (MS-Marco Reranker)")
+            evaluate_router(synapto, eval_queries, "SynaptoRoute (MS-Marco Reranker)")
             
             # Evaluate with NLI Reranker
             print("\n--- Evaluating NLI Cross-Encoder Reranker ---")
             synapto.reranker = CrossEncoderReranker(model_name="cross-encoder/nli-deberta-v3-small", threshold=0.0) 
-            evaluate_router(synapto, eval_queries, f"SynaptoRoute (NLI Reranker)")
+            evaluate_router(synapto, eval_queries, "SynaptoRoute (NLI Reranker)")
         except ImportError as e:
             print(f"Skipping Reranker eval: {e}")
 

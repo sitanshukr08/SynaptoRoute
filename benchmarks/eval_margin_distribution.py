@@ -10,7 +10,7 @@ from utils import init_synaptoroute
 
 def analyze_margin_distribution(dataset_path: str, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
     print(f"\n{'='*50}")
-    print(f"Margin Distribution Analysis")
+    print("Margin Distribution Analysis")
     print(f"Model: {model_name}")
     print(f"{'='*50}")
 
@@ -21,7 +21,7 @@ def analyze_margin_distribution(dataset_path: str, model_name: str = "sentence-t
     eval_queries = data["eval_queries"]
 
     print("Initializing SynaptoRoute...")
-    synapto = init_synaptoroute(routes_data, model_name=model_name, storage_path=f"bench_margin.sqlite")
+    synapto = init_synaptoroute(routes_data, model_name=model_name, storage_path="bench_margin.sqlite")
 
     correct_margins = []
     incorrect_margins = []

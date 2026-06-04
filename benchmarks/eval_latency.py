@@ -16,7 +16,7 @@ async def measure_latency(predict_fn, queries, is_async=False):
     if is_async:
         t0 = time.perf_counter()
         await asyncio.gather(*(predict_fn(q) for q in queries))
-        total = time.perf_counter() - t0
+        time.perf_counter() - t0
         # For pure concurrent latency without returning per-query wait times, 
         # we can just use total / len, but wait, the prompt asks for percentile profiles under load.
         # So we actually measure the time taken to process the batch of N queries.

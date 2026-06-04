@@ -10,7 +10,6 @@ import argparse
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from utils import init_synaptoroute
 from synaptoroute import AdaptiveRouter, Route
 
 def get_memory_mb():
@@ -160,7 +159,7 @@ async def main():
     print(f"Concurrent Throughput: {t_concurrent:.2f}s for 1000 queries")
     
     await router.stop()
-    print(f"\nDone.")
+    print("\nDone.")
 
 if __name__ == "__main__":
     asyncio.run(main())

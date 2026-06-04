@@ -1,7 +1,6 @@
 import os
 import sys
 import numpy as np
-import time
 from sklearn.metrics import f1_score, precision_score, recall_score
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))

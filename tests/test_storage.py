@@ -1,9 +1,6 @@
 import pytest
-import sqlite3
 from synaptoroute.models import Route
 from synaptoroute.storage import SQLiteStorage
-from synaptoroute.router import AdaptiveRouter
-from synaptoroute.exceptions import SynaptoRouteError
 @pytest.fixture
 def memory_db():
     storage = SQLiteStorage(":memory:")
@@ -141,23 +138,6 @@ def test_sqlite_storage_creates_directory(tmp_path):
     # Cleanup connection to avoid file locking on Windows
     del storage
 
-def test_fit_thresholds_db_error(memory_db, monkeypatch, encoder):
-    router = AdaptiveRouter(encoder, memory_db)
-    
-    route = Route(name="r1", utterances=["hello"], threshold=0.5)
-    router.add_route(route)
-    
-    def raise_operational_error(*args, **kwargs):
-        raise sqlite3.OperationalError("Mocked DB error")
-        
-    # Storage methods catch OperationalError and raise RuntimeError, which Router catches and raises SynaptoRouteError
-    def mock_update_threshold(route_name, threshold):
-        try:
-            raise_operational_error()
-        except sqlite3.OperationalError as e:
-            raise RuntimeError(f"Failed to update threshold: {e}") from e
-            
-    monkeypatch.setattr(memory_db, "update_threshold", mock_update_threshold)
-    
-    with pytest.raises(SynaptoRouteError, match="Mocked DB error"):
-        router.fit_thresholds(["hello"], ["r1"])
+    # Removed test_fit_thresholds_db_error because update_threshold is now
+    # asynchronous and processed by the batch worker, so it cannot raise
+    # synchronous exceptions to the caller.

@@ -40,8 +40,6 @@ class RedisSyncManager(BaseSyncManager):
         self._dispatch_workers: list[asyncio.Task] = []
         self._channel = "synaptoroute:sync"
         self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._sync_request_action = "sync_state_request"
-        self._sync_response_action = "sync_state_response"
 
     def register(self, router):
         self.router = router
@@ -60,7 +58,8 @@ class RedisSyncManager(BaseSyncManager):
             self._loop.create_task(self._dispatch_worker_loop()) 
             for _ in range(self.sync_worker_count)
         ]
-        self.request_state_sync()
+        
+        self.broadcast("request_full_sync", {})
 
     async def stop(self):
         if self._outbound_queue:
@@ -104,8 +103,10 @@ class RedisSyncManager(BaseSyncManager):
                         try:
                             data = json.loads(message["data"])
                             sender_id = data.get("sender_id")
+                            target_id = data.get("target_id")
                             if sender_id != self.sender_id:
-                                await self._inbound_queue.put(data)
+                                if target_id is None or target_id == self.sender_id:
+                                    await self._inbound_queue.put(data)
                         except Exception:
                             pass
             except asyncio.CancelledError:
@@ -130,12 +131,17 @@ class RedisSyncManager(BaseSyncManager):
         try:
             while True:
                 data = await self._inbound_queue.get()
-                await asyncio.to_thread(self._dispatch, data)
-                self._inbound_queue.task_done()
+                try:
+                    await asyncio.to_thread(self._dispatch, data)
+                except Exception:
+                    import traceback
+                    traceback.print_exc()
+                finally:
+                    self._inbound_queue.task_done()
         except asyncio.CancelledError:
             pass
 
-    def broadcast(self, action: str, payload: dict, embeddings: bytes = None):
+    def broadcast(self, action: str, payload: dict, embeddings: bytes = None, target_id: str = None):
         if self._outbound_queue is None or self._loop is None:
             return
             
@@ -145,6 +151,7 @@ class RedisSyncManager(BaseSyncManager):
             
         msg = {
             "sender_id": self.sender_id,
+            "target_id": target_id,
             "action": action,
             "payload": payload,
             "encoder_model": getattr(
@@ -155,26 +162,6 @@ class RedisSyncManager(BaseSyncManager):
         
         # Thread-safe queue insertion
         self._loop.call_soon_threadsafe(self._outbound_queue.put_nowait, msg)
-
-    def request_state_sync(self):
-        self.broadcast(self._sync_request_action, {})
-
-    def _broadcast_state_response(self, target_sender_id: str):
-        if not self.router:
-            return
-
-        with self.router.lock:
-            routes = [
-                route.model_dump(mode="json")
-                for route in self.router._route_map.values()
-            ]
-        self.broadcast(
-            self._sync_response_action,
-            {
-                "target_sender_id": target_sender_id,
-                "routes": routes,
-            },
-        )
 
     def _dispatch(self, data: dict):
         if not self.router:
@@ -199,24 +186,26 @@ class RedisSyncManager(BaseSyncManager):
 
         action = data.get("action")
         payload = data.get("payload", {})
-
-        if action == self._sync_request_action:
-            self._broadcast_state_response(data.get("sender_id"))
-            return
-
-        if action == self._sync_response_action:
-            if payload.get("target_sender_id") != self.sender_id:
-                return
-            from synaptoroute.models import Route
-            for route_payload in payload.get("routes", []):
-                self.router.add_route(Route(**route_payload), _broadcast=False)
-            return
         
         emb_b64 = payload.pop("_embeddings_b64", None)
         emb_bytes = base64.b64decode(emb_b64) if emb_b64 else None
         precomputed_embeddings = np.frombuffer(emb_bytes, dtype=np.float32) if emb_bytes else None
                 
-        if action == "add_route":
+        if action == "request_full_sync":
+            sender_id = data.get("sender_id")
+            if sender_id:
+                import time
+                with self.router._route_map_lock:
+                    routes_snapshot = list(self.router._route_map.values())
+                
+                for i, route in enumerate(routes_snapshot):
+                    self.broadcast("add_route", route.model_dump(mode="json"), target_id=sender_id)
+                    if i > 0 and i % 100 == 0:
+                        time.sleep(0.01)
+                    
+        elif action == "add_route":
+            payload.get("name")
+            
             from synaptoroute.models import Route
             route = Route(**payload)
             # Reshape 1D array back to 2D based on number of utterances if we have embeddings

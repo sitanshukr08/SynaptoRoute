@@ -1,0 +1,8 @@
+{
+  "benchmark": "Banking77",
+  "date": "2026-06-04",
+  "commit": "v0.4.0",
+  "cpu": "Standard",
+  "dataset": "mteb/banking77",
+  "accuracy": 91.16
+}

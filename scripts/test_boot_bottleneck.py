@@ -1,4 +1,3 @@
-import os
 import time
 from synaptoroute.router import AdaptiveRouter
 from synaptoroute.encoder import Encoder

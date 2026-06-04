@@ -1,7 +1,7 @@
-import json
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Any
 import numpy as np
+import json
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator, StringConstraints, ConfigDict
 from typing_extensions import Annotated
 
@@ -39,6 +39,7 @@ class Route(BaseModel):
         if not deduped:
             raise ValueError("Route must have at least one valid utterance.")
         return deduped
+
 
 @dataclass
 class RollbackSnapshot:

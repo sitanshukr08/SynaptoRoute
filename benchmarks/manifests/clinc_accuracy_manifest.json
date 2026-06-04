@@ -1,0 +1,16 @@
+{
+  "synaptoroute_version": "0.4.0",
+  "git_commit": "f2937d2",
+  "cpu": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "os": "Windows 11",
+  "python": "3.12.10",
+  "dataset": "clinc150 (train/test)",
+  "encoder": "FastEmbedEncoder (all-MiniLM-L6-v2)",
+  "route_count": 150,
+  "test_queries": 250,
+  "top1_acc": 0.92,
+  "top3_acc": 0.96,
+  "top5_acc": 0.976,
+  "f1_score": 0.9316328307707618,
+  "timestamp": "2026-06-04T11:16:02Z"
+}

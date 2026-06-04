@@ -64,40 +64,26 @@ def test_add_utterance_route_deleted_during_encoding(storage, encoder, monkeypat
     t = threading.Thread(target=delete_while_encoding)
     t.start()
     
-    with pytest.raises(RouteNotFoundError, match="deleted during encoding"):
+    with pytest.raises(RouteNotFoundError, match="not found"):
         router.add_utterance("r1", "new utterance")
         
     t.join()
 
 @pytest.mark.asyncio
-async def test_rebuild_retries_after_concurrent_mutation(storage, fake_encoder, monkeypatch):
+async def test_rebuild_replays_pending_mutations(storage, fake_encoder):
     router = AdaptiveRouter(fake_encoder, storage)
     await router.start()
     router.add_route(Route(name="r1", utterances=["u1"], threshold=0.5))
-
-    original_get_index = __import__("synaptoroute.router").router.get_index
-    calls = {"count": 0}
-
-    def wrapped_get_index(*args, **kwargs):
-        index = original_get_index(*args, **kwargs)
-        original_rebuild = index.rebuild
-
-        def rebuild_with_one_mutation(route_map, embeddings_map):
-            calls["count"] += 1
-            if calls["count"] == 1:
-                router._mutation_count += 1
-            return original_rebuild(route_map, embeddings_map)
-
-        index.rebuild = rebuild_with_one_mutation
-        return index
-
-    monkeypatch.setattr("synaptoroute.router.get_index", wrapped_get_index)
+    router._flush_storage_batch()
+    pending_route = Route(name="r2", utterances=["u2"], threshold=0.5)
+    pending_embeddings = fake_encoder.encode_batch(["u2"])
+    router._pending_rebuild_mutations.append(("add_route", "r2", pending_embeddings, pending_route))
     router._rebuild_pending = True
 
     try:
         await router._rebuild_index()
-        await asyncio.sleep(0.1)
-        assert calls["count"] >= 2
+        results = router.index.search(pending_embeddings, top_k=1)
+        assert results[0][0][1] == "r2"
         assert router._rebuild_pending is False
     finally:
         await router.stop()

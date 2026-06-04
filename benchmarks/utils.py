@@ -1,6 +1,6 @@
 import json
 import os
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Tuple
 
 # Semantic Router imports
 from semantic_router import Route as SemanticRoute

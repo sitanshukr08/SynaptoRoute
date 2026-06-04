@@ -1,8 +1,6 @@
-import os
 import json
 import glob
 from pathlib import Path
-from collections import defaultdict
 
 def calculate_similarity(s1, s2):
     # Simple Jaccard similarity for near-duplicate filtering

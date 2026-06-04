@@ -1,0 +1,20 @@
+{
+  "benchmark": "Bottleneck_Attribution",
+  "timestamp": "2026-06-04T11:52:53.473789",
+  "metrics": {
+    "cold_start": {
+      "total_ms": 8.76359999892884,
+      "encoder_ms": 6.39950000004319,
+      "faiss_ms": 2.2408999993785983,
+      "sqlite_ms": 0.12090000018361025,
+      "router_overhead_ms": 0.0022999993234407157
+    },
+    "warm_start": {
+      "total_ms": 7.802207999939128,
+      "encoder_ms": 7.619299000034516,
+      "faiss_ms": 0.09875700003249221,
+      "sqlite_ms": 0.0824470000952715,
+      "router_overhead_ms": 0.0017049997768483686
+    }
+  }
+}
