@@ -1,7 +1,7 @@
 import abc
 import numpy as np
 import numpy.typing as npt
-from typing import Optional, List, Optional
+from typing import List, Optional
 
 class BaseEncoder(abc.ABC):
     """
