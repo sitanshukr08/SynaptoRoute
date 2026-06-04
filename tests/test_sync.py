@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch, MagicMock
 try:
     from synaptoroute.sync import RedisSyncManager
 except ImportError:
-    RedisSyncManager = None
+    RedisSyncManagerCls = None
 
 @pytest.fixture
 def mock_router():

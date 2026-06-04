@@ -17,10 +17,10 @@ class NumpyIndex:
         self.dim = dim
         self.lock = threading.Lock()
         self.embeddings = np.zeros((max_capacity, dim), dtype=np.float32)
-        self.tombstones = set()
+        self.tombstones: set = set()
         self._tombstone_array = np.array([], dtype=int)
-        self._id_to_route = {}
-        self._route_to_ids = {}
+        self._id_to_route: dict = {}
+        self._route_to_ids: dict = {}
         self._next_id = 0
         self.max_capacity = max_capacity
         self.ntotal = 0
@@ -84,7 +84,7 @@ class NumpyIndex:
                 
             scores = np.dot(query_embeddings, self.embeddings[:self._next_id].T)
             
-            results = []
+            results: List[List[Tuple[float, str]]] = []
             for i in range(scores.shape[0]):
                 valid_scores = scores[i][valid_mask]
                 valid_indices = np.arange(self._next_id)[valid_mask]
@@ -101,7 +101,7 @@ class NumpyIndex:
                 else:
                     sort_idx = np.argsort(valid_scores)[::-1]
                 
-                query_results = []
+                query_results: List[Tuple[float, str]] = []
                 for idx in sort_idx:
                     real_idx = valid_indices[idx]
                     route_name = self._id_to_route[real_idx]
@@ -157,11 +157,11 @@ class FaissIndex:
         base_index = faiss.IndexHNSWFlat(self.dim, 32, faiss.METRIC_INNER_PRODUCT)
         self.index = faiss.IndexIDMap(base_index)
         
-        self.tombstones = set()
+        self.tombstones: set = set()
         
         # Bidirectional mapping
-        self._id_to_route = {}
-        self._route_to_ids = {}
+        self._id_to_route: dict = {}
+        self._route_to_ids: dict = {}
         self._next_id = 0
 
     def add(self, embeddings: np.ndarray, route_name: str):
@@ -207,9 +207,9 @@ class FaissIndex:
             faiss.normalize_L2(query_embeddings)
             distances, indices = self.index.search(query_embeddings, search_k)
             
-            results = []
+            results: List[List[Tuple[float, str]]] = []
             for i in range(query_embeddings.shape[0]):
-                query_results = []
+                query_results: List[Tuple[float, str]] = []
                 for j in range(search_k):
                     idx = int(indices[i][j])
                     if idx != -1 and idx not in self.tombstones:

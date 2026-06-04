@@ -1,5 +1,5 @@
 try:
-    from prometheus_client import Histogram, Gauge, Counter, generate_latest, CollectorRegistry
+    from prometheus_client import Histogram, Gauge, Counter, generate_latest, CollectorRegistry  # type: ignore
     HAS_PROMETHEUS = True
 except ImportError:
     HAS_PROMETHEUS = False

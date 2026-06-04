@@ -42,7 +42,7 @@ class SQLiteStorage(BaseStorage):
             if dirname:
                 os.makedirs(dirname, exist_ok=True)
                 
-        self._pool = queue.Queue(maxsize=10)
+        self._pool: queue.Queue = queue.Queue(maxsize=10)
         self._pool_sema = threading.Semaphore(10)
         
         self._init_db()
@@ -186,8 +186,8 @@ class SQLiteStorage(BaseStorage):
                 conn.commit()
                 conn.isolation_level = original_isolation
                 
-                utt_dict = {}
-                emb_dict = {}
+                utt_dict: dict = {}
+                emb_dict: dict = {}
                 for route_name, utt, emb in utterance_rows:
                     if route_name not in utt_dict:
                         utt_dict[route_name] = []

@@ -1,6 +1,6 @@
 import threading
 import numpy as np
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score  # type: ignore
 from typing import Optional
 import time
 import asyncio
@@ -17,7 +17,7 @@ from synaptoroute.profile import OptimizationProfile, get_profile, ProfileType
 from synaptoroute.index import get_index
 
 class AdaptiveRouter:
-    def __init__(self, encoder: Optional[Encoder] = None, storage: BaseStorage = None, profile: OptimizationProfile = None, max_capacity: int = 50000, max_queue_size: int = 10000, metrics: MetricsRegistry = None, sync_manager: Optional[BaseSyncManager] = None, margin: float = 0.0, reranker=None):
+    def __init__(self, encoder: Optional[Encoder] = None, storage: Optional[BaseStorage] = None, profile: Optional[OptimizationProfile] = None, max_capacity: int = 50000, max_queue_size: int = 10000, metrics: Optional[MetricsRegistry] = None, sync_manager: Optional[BaseSyncManager] = None, margin: float = 0.0, reranker=None):
         if profile is None:
             profile = get_profile(ProfileType.THROUGHPUT)
             
@@ -41,13 +41,13 @@ class AdaptiveRouter:
         self.reranker = reranker
         
         self.index = get_index(dim=self.encoder.dim, max_capacity=self.max_capacity)
-        self._route_map = {}
+        self._route_map: dict = {}
         self._route_map_lock = threading.Lock()
         self._mutation_count = 0
-        self._pending_rebuild_mutations = []
+        self._pending_rebuild_mutations: list = []
         
         import queue
-        self._storage_queue = queue.Queue()
+        self._storage_queue: queue.Queue = queue.Queue()
         self._storage_worker_thread = threading.Thread(target=self._storage_worker, daemon=True)
         self._storage_worker_thread.start()
         

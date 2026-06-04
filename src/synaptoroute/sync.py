@@ -15,7 +15,7 @@ class BaseSyncManager:
     async def stop(self):
         pass
 
-    def broadcast(self, action: str, payload: dict, embeddings: bytes = None):
+    def broadcast(self, action: str, payload: dict, embeddings: Optional[bytes] = None):
         pass
 
     def register(self, router):
@@ -141,7 +141,7 @@ class RedisSyncManager(BaseSyncManager):
         except asyncio.CancelledError:
             pass
 
-    def broadcast(self, action: str, payload: dict, embeddings: bytes = None, target_id: str = None):
+    def broadcast(self, action: str, payload: dict, embeddings: Optional[bytes] = None, target_id: Optional[str] = None):
         if self._outbound_queue is None or self._loop is None:
             return
             
