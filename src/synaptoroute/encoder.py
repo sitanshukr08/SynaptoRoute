@@ -39,7 +39,7 @@ class FastEmbedEncoder(BaseEncoder):
     
     @property
     def requires_lock(self) -> bool:
-        return True
+        return False
 
     @property
     def dim(self) -> int:

@@ -12,7 +12,7 @@ from utils import init_synaptoroute, init_semantic_router
 
 def evaluate_on_stress_dataset(dataset_path: str, model_names: list):
     print(f"\n{'='*50}")
-    print(f"Adversarial & Hard-Negative Stress Test")
+    print("Adversarial & Hard-Negative Stress Test")
     print(f"Dataset: {dataset_path}")
     print(f"{'='*50}")
 
@@ -124,7 +124,7 @@ def evaluate_on_stress_dataset(dataset_path: str, model_names: list):
         if ood_total > 0:
             syn_ood = (ood_synapto_correct / ood_total) * 100
             sr_ood = (ood_sr_correct / ood_total) * 100
-            print(f"\nOOD Rejection Accuracy:")
+            print("\nOOD Rejection Accuracy:")
             print(f"SynaptoRoute:    {syn_ood:.1f}%")
             print(f"Semantic Router: {sr_ood:.1f}%")
 

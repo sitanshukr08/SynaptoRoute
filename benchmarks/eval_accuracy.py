@@ -1,7 +1,6 @@
 import os
 import sys
 import numpy as np
-import time
 from sklearn.metrics import precision_score, recall_score, f1_score
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -36,7 +35,7 @@ def evaluate_top_k_semantic_router(layer, queries, expected, k_list=[1, 3, 5]):
     correct_k = {k: 0 for k in k_list}
     
     for q, exp in zip(queries, expected):
-        emb = layer.encoder([q])[0]
+        layer.encoder([q])[0]
         # semantic_router index query returns tuple of (scores, route_names) or (route_names, scores)?
         # Actually layer.index.query returns (scores, names) or something. 
         # Let's just use layer.route(q) which is private, wait, no, layer(q) returns the single choice.

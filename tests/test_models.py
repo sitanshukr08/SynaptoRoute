@@ -1,6 +1,4 @@
-import pytest
 from synaptoroute.models import Route
-from synaptoroute.exceptions import RouteNotFoundError
 
 def test_route_creation():
     route = Route(name="greeting", utterances=["hello", "hi"])

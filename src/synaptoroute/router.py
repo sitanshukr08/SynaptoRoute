@@ -5,18 +5,19 @@ from typing import Optional
 import time
 import asyncio
 import logging
+import concurrent.futures
 
 from synaptoroute.metrics import MetricsRegistry
-from synaptoroute.models import Route, RollbackSnapshot
+from synaptoroute.models import Route
 from synaptoroute.encoder import Encoder
 from synaptoroute.storage import BaseStorage
 from synaptoroute.sync import BaseSyncManager
-from synaptoroute.exceptions import RouteNotFoundError, RouterOverloadedError, RouterCapacityError, SynaptoRouteError
+from synaptoroute.exceptions import RouteNotFoundError, RouterOverloadedError, RouterCapacityError
 from synaptoroute.profile import OptimizationProfile, get_profile, ProfileType
 from synaptoroute.index import get_index
 
 class AdaptiveRouter:
-    def __init__(self, encoder: Optional[Encoder] = None, storage: BaseStorage = None, profile: OptimizationProfile = None, max_capacity: int = 50000, metrics: MetricsRegistry = None, sync_manager: Optional[BaseSyncManager] = None, margin: float = 0.0, reranker=None):
+    def __init__(self, encoder: Optional[Encoder] = None, storage: BaseStorage = None, profile: OptimizationProfile = None, max_capacity: int = 50000, max_queue_size: int = 10000, metrics: MetricsRegistry = None, sync_manager: Optional[BaseSyncManager] = None, margin: float = 0.0, reranker=None):
         if profile is None:
             profile = get_profile(ProfileType.THROUGHPUT)
             
@@ -25,7 +26,8 @@ class AdaptiveRouter:
             encoder = FastEmbedEncoder(threads=profile.threads)
         self.encoder = encoder
         self.storage = storage
-        self.lock = threading.Lock()
+        from synaptoroute.locks import RWLock
+        self.rwlock = RWLock()
         self._encoder_lock = threading.Lock()
         self._rebuild_pending = False
         self.metrics = metrics or MetricsRegistry()
@@ -34,24 +36,42 @@ class AdaptiveRouter:
             self.sync_manager.register(self)
         
         self.max_capacity = max_capacity
+        self.max_queue_size = max_queue_size
         self.margin = margin
         self.reranker = reranker
         
-        # Dynamic Index (Numpy default, FAISS HNSW optional)
         self.index = get_index(dim=self.encoder.dim, max_capacity=self.max_capacity)
         self._route_map = {}
+        self._route_map_lock = threading.Lock()
         self._mutation_count = 0
+        self._pending_rebuild_mutations = []
+        
+        import queue
+        self._storage_queue = queue.Queue()
+        self._storage_worker_thread = threading.Thread(target=self._storage_worker, daemon=True)
+        self._storage_worker_thread.start()
         
         self._batch_queue = None
         self._worker_task = None
         self.batch_size = profile.batch_size
         self.batch_timeout = profile.batch_timeout
         
+        self._read_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=max(4, profile.threads),
+            thread_name_prefix="router_read"
+        )
+        self._write_pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=max(2, profile.threads // 2),
+            thread_name_prefix="router_write"
+        )
+        
         self._load_routes()
         
     async def start(self):
+        if self.sync_manager:
+            await self.sync_manager.start()
         self._loop = asyncio.get_running_loop()
-        self._batch_queue = asyncio.Queue(maxsize=10000)
+        self._batch_queue = asyncio.Queue(maxsize=self.max_queue_size)
         self._worker_task = asyncio.create_task(self._batch_worker())
 
     async def stop(self):
@@ -63,12 +83,16 @@ class AdaptiveRouter:
                 pass
         if self.sync_manager:
             await self.sync_manager.stop()
+        if hasattr(self, '_read_pool'):
+            self._read_pool.shutdown(wait=False)
+        if hasattr(self, '_write_pool'):
+            self._write_pool.shutdown(wait=False)
 
     def _load_routes(self):
         routes, embeddings_map = self.storage.load_all_routes()
         
         print(f"Loading {len(routes)} routes from storage...")
-        t_load = __import__('time').perf_counter()
+        __import__('time').perf_counter()
         import sys
         for r_idx, route in enumerate(routes):
             if r_idx % 5000 == 0:
@@ -118,108 +142,121 @@ class AdaptiveRouter:
         self.metrics.capacity_usage.set(self.index.total_vectors)
 
     def delete_route(self, route_name: str, _broadcast: bool = True):
-        with self.lock:
+        with self._route_map_lock:
             if route_name not in self._route_map:
                 return
             
-            self.storage.delete_route(route_name)
             self._route_map.pop(route_name)
-            
-            self.index.delete(route_name)
             self._mutation_count += 1
             
-            self.metrics.capacity_usage.set(self.index.total_vectors)
-
-            live_vectors = max(1, self.index.total_vectors)
-            tombstone_ratio = len(self.index.tombstones) / live_vectors
-            if tombstone_ratio > 0.1 or len(self.index.tombstones) > 1500:
-                if not self._rebuild_pending:
-                    self._rebuild_pending = True
-                    try:
-                        if hasattr(self, '_loop') and self._loop and not self._loop.is_closed():
-                            self._loop.call_soon_threadsafe(lambda: asyncio.create_task(self._rebuild_index()))
-                        else:
-                            self._rebuild_pending = False
-                    except Exception:
-                        self._rebuild_pending = False
+        self._storage_queue.put(("delete_route", (route_name,)))
 
         if _broadcast and self.sync_manager:
             self.sync_manager.broadcast("delete_route", {"route_name": route_name})
 
+    def _flush_storage_batch(self):
+        import queue
+        batch = []
+        try:
+            item = self._storage_queue.get(timeout=0.1)
+            batch.append(item)
+            while len(batch) < 250:
+                try:
+                    batch.append(self._storage_queue.get_nowait())
+                except queue.Empty:
+                    break
+        except queue.Empty:
+            pass
+        
+        if batch:
+            # Batch apply index mutations under a single write lock acquisition
+            with self.rwlock.write_lock():
+                import numpy as np
+                for action, args in batch:
+                    try:
+                        if action == "add_route":
+                            route, embeddings = args
+                            if route.name in self._route_map:
+                                self.index.delete(route.name)
+                            if embeddings is not None:
+                                self.index.add(embeddings, route.name)
+                                if self._rebuild_pending:
+                                    self._pending_rebuild_mutations.append(("add_route", route.name, embeddings, route))
+                        elif action == "delete_route":
+                            route_name = args[0]
+                            self.index.delete(route_name)
+                            if self._rebuild_pending:
+                                self._pending_rebuild_mutations.append(("delete_route", route_name, None, None))
+                        elif action == "add_utterance":
+                            route_name, utterance, embedding = args
+                            self.index.add(np.array([embedding]), route_name)
+                            if self._rebuild_pending:
+                                self._pending_rebuild_mutations.append(("add_utterance", route_name, np.array([embedding]), utterance))
+                    except Exception as e:
+                        print(f"FATAL ERROR IN BATCH PROCESSING FOR {action}: {e}")
+                
+                self.metrics.capacity_usage.set(self.index.total_vectors)
+            
+            # Flush storage without holding the lock
+            try:
+                if self.storage:
+                    for action, args in batch:
+                        if action == "add_route":
+                            route, embeddings = args
+                            self.storage.save_route(route, embeddings)
+                        elif action == "delete_route":
+                            self.storage.delete_route(args[0])
+                        elif action == "update_threshold":
+                            self.storage.update_threshold(*args)
+                        elif action == "add_utterance":
+                            route_name, utterance, embedding = args
+                            self.storage.add_utterance(route_name, utterance)
+            except Exception as e:
+                import logging
+                print(f"SQLITE BATCH ERROR: {e}")
+                logging.getLogger(__name__).error(f"Storage batch worker failed: {e}")
+                
+            if not self._rebuild_pending and len(self.index.tombstones) > 1000 and len(self.index.tombstones) > self.index.total_vectors * 0.2:
+                self._rebuild_pending = True
+                if self._loop and not self._loop.is_closed():
+                    asyncio.run_coroutine_threadsafe(self._rebuild_index(), self._loop)
+                
+    def _storage_worker(self):
+        while True:
+            try:
+                self._flush_storage_batch()
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"FATAL ERROR IN STORAGE WORKER: {e}")
+
     def add_route(self, route: Route, _broadcast: bool = True, _precomputed_embeddings=None):
         embeddings = _precomputed_embeddings
-        num_embs = 0
         if embeddings is None and route.utterances:
             if getattr(self.encoder, 'requires_lock', True):
                 with self._encoder_lock:
                     embeddings = self.encoder.encode_batch(route.utterances)
             else:
                 embeddings = self.encoder.encode_batch(route.utterances)
-            num_embs = len(embeddings)
-            
-        with self.lock:
-            is_overwrite = route.name in self._route_map
-            rollback = RollbackSnapshot(route=self._route_map.get(route.name)) if is_overwrite else None
-            net_increase = num_embs
-            if is_overwrite:
-                net_increase -= len(self._route_map[route.name].utterances)
+            len(embeddings)
 
-            if getattr(self.index, '_next_id', self.index.total_vectors) + net_increase > self.max_capacity:
+        with self._route_map_lock:
+            
+            # Check capacity based on vectors
+            new_vectors = len(route.utterances)
+            current_capacity = getattr(self.index, '_next_id', self.index.total_vectors)
+            if current_capacity + new_vectors > self.max_capacity:
                 raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
-
-            self.storage.save_route(route, embeddings)
-
-            if is_overwrite:
-                self.index.delete(route.name)
-
+            
             self._route_map[route.name] = route
-
-            try:
-                if num_embs > 0:
-                    self.index.add(embeddings, route.name)
-                self._mutation_count += 1
-            except Exception as e:
-                # Rollback: restore old route if index insertion failed
-                if is_overwrite and rollback.route is not None:
-                    self._route_map[route.name] = rollback.route
-                    self.storage.save_route(rollback.route, None)
-                    logging.getLogger(__name__).error(
-                        f"Index add failed during overwrite of "
-                        f"'{route.name}'. Rolled back to previous route. "
-                        f"Error: {e}"
-                    )
-                else:
-                    self._route_map.pop(route.name, None)
-                raise
+            self._mutation_count += 1
             
-            self.metrics.capacity_usage.set(self.index.total_vectors)
-            
-            live_vectors = max(1, self.index.total_vectors)
-            tombstone_ratio = len(self.index.tombstones) / live_vectors
-            if is_overwrite and (tombstone_ratio > 0.1 or len(self.index.tombstones) > 1500):
-                if not self._rebuild_pending:
-                    self._rebuild_pending = True
-                    try:
-                        if hasattr(self, '_loop') and self._loop and not self._loop.is_closed():
-                            self._loop.call_soon_threadsafe(lambda: asyncio.create_task(self._rebuild_index()))
-                        else:
-                            self._rebuild_pending = False
-                    except Exception:
-                        self._rebuild_pending = False
+        self._storage_queue.put(("add_route", (route, embeddings)))
 
         if _broadcast and self.sync_manager:
             emb_bytes = embeddings.tobytes() if embeddings is not None else None
             self.sync_manager.broadcast("add_route", route.model_dump(mode="json"), embeddings=emb_bytes)
 
     def add_utterance(self, route_name: str, utterance: str, _broadcast: bool = True, _precomputed_embedding=None):
-        with self.lock:
-            if route_name not in self._route_map:
-                raise RouteNotFoundError(f"Route '{route_name}' not found.")
-            if utterance in self._route_map[route_name].utterances:
-                return
-            if getattr(self.index, '_next_id', self.index.total_vectors) + 1 > self.max_capacity:
-                raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
-                
         if _precomputed_embedding is not None:
             embedding = _precomputed_embedding
         else:
@@ -229,79 +266,53 @@ class AdaptiveRouter:
             else:
                 embedding = self.encoder.encode(utterance)
         
-        with self.lock:
+        with self._route_map_lock:
             if route_name not in self._route_map:
-                raise RouteNotFoundError(f"Route '{route_name}' was deleted during encoding.")
+                raise RouteNotFoundError(f"Route '{route_name}' not found.")
+            if utterance in self._route_map[route_name].utterances:
+                return
             if getattr(self.index, '_next_id', self.index.total_vectors) + 1 > self.max_capacity:
                 raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
 
-            rollback_route = RollbackSnapshot(route=self._route_map.get(route_name))
-
-            self.storage.add_utterance(route_name, utterance, embedding)
+            self._route_map[route_name].utterances.append(utterance)
+            self._mutation_count += 1
             
-            try:
-                self.index.add(np.array([embedding]), route_name)
-                self._mutation_count += 1
-            except ValueError as e:
-                if str(e) == "ID_OVERFLOW":
-                    if not self._rebuild_pending:
-                        self._rebuild_pending = True
-                        try:
-                            if hasattr(self, '_loop') and self._loop and not self._loop.is_closed():
-                                self._loop.call_soon_threadsafe(lambda: asyncio.create_task(self._rebuild_index()))
-                            else:
-                                self._rebuild_pending = False
-                        except Exception:
-                            self._rebuild_pending = False
-                    raise SynaptoRouteError("Index exhausted, triggered rebuild. Next query will incorporate DB utterance.") from e
-                
-                # Rollback
-                self._route_map[route_name] = rollback_route.route
-                raise
-            except Exception as e:
-                # Rollback
-                self._route_map[route_name] = rollback_route.route
-                raise
-            
-            route = self._route_map[route_name]
-            # Reassign to trigger pydantic validation
-            route.utterances = route.utterances + [utterance]
-            
-            self.metrics.capacity_usage.set(self.index.total_vectors)
-
-            live_vectors = max(1, self.index.total_vectors)
-            tombstone_ratio = len(self.index.tombstones) / live_vectors
-            if tombstone_ratio > 0.1 or len(self.index.tombstones) > 1500:
-                if not self._rebuild_pending:
-                    self._rebuild_pending = True
-                    try:
-                        if hasattr(self, '_loop') and self._loop and not self._loop.is_closed():
-                            self._loop.call_soon_threadsafe(lambda: asyncio.create_task(self._rebuild_index()))
-                        else:
-                            self._rebuild_pending = False
-                    except Exception:
-                        self._rebuild_pending = False
+        self._storage_queue.put(("add_utterance", (route_name, utterance, embedding)))
 
         if _broadcast and self.sync_manager:
             emb_bytes = embedding.tobytes() if embedding is not None else None
             self.sync_manager.broadcast("add_utterance", {"route_name": route_name, "utterance": utterance}, embeddings=emb_bytes)
 
     async def _rebuild_index(self):
-        with self.lock:
-            start_mutations = self._mutation_count
-            
         try:
             routes, embeddings_map = await asyncio.to_thread(self.storage.load_all_routes)
             route_dict = {r.name: r for r in routes}
             new_index = get_index(dim=self.encoder.dim, max_capacity=self.max_capacity)
             await asyncio.to_thread(new_index.rebuild, route_dict, embeddings_map)
             
-            with self.lock:
-                # Generation validation: only swap if no writes occurred during rebuild
-                if self._mutation_count == start_mutations:
-                    self.index = new_index
-                else:
-                    logging.getLogger(__name__).info("Index rebuild aborted due to concurrent mutations. Will retry later.")
+            with self.rwlock.write_lock():
+                self.index = new_index
+                if hasattr(self, '_pending_rebuild_mutations'):
+                    for action, r_name, data, extra in self._pending_rebuild_mutations:
+                        try:
+                            if action == "add_route" and data is not None:
+                                self.index.delete(r_name)
+                                self.index.add(data, r_name)
+                                route_dict[r_name] = extra
+                            elif action == "add_utterance" and data is not None:
+                                utterance = extra
+                                if r_name in route_dict:
+                                    if utterance not in route_dict[r_name].utterances:
+                                        self.index.add(data, r_name)
+                                        route_dict[r_name].utterances.append(utterance)
+                                else:
+                                    self.index.add(data, r_name)
+                            elif action == "delete_route":
+                                self.index.delete(r_name)
+                                route_dict.pop(r_name, None)
+                        except Exception as e:
+                            logging.getLogger(__name__).warning(f"Failed to replay WAL mutation {action} on {r_name}: {e}")
+                    self._pending_rebuild_mutations.clear()
         except Exception as e:
             logging.getLogger(__name__).error(f"Rebuild failed: {e}")
             self.metrics.gc_errors.inc()
@@ -311,19 +322,19 @@ class AdaptiveRouter:
     def __call__(self, query: str) -> Optional[Route]:
         start_time = time.perf_counter()
         
-        if getattr(self.encoder, 'requires_lock', True):
-            with self._encoder_lock:
-                query_embedding = self.encoder.encode(query)
-        else:
-            query_embedding = self.encoder.encode(query)
+        def _encode():
+            if getattr(self.encoder, 'requires_lock', True):
+                with self._encoder_lock:
+                    return self.encoder.encode(query)
+            return self.encoder.encode(query)
+            
+        query_embedding = self._read_pool.submit(_encode).result()
         
-        with self.lock:
+        with self.rwlock.read_lock():
             if self.index.total_vectors == 0:
                 return None
-                
-        results = self.index.search(np.array([query_embedding]), top_k=5)
-        
-        with self.lock:
+            results = self.index.search(np.array([query_embedding]), top_k=5)
+            
             # If we have a reranker, use it
             if self.reranker is not None and len(results[0]) > 0:
                 candidates = []
@@ -384,7 +395,9 @@ class AdaptiveRouter:
             self._batch_queue.put_nowait((query, future))
             self.metrics.queue_depth.inc()
         except asyncio.QueueFull:
-            raise RouterOverloadedError("Router queue is full (max 10000). Shedding load.")
+            future.set_exception(RouterOverloadedError("Router overloaded. Too many requests in queue."))
+        except Exception as e:
+            future.set_exception(e)
             
         start_time = time.perf_counter()
         try:
@@ -408,16 +421,12 @@ class AdaptiveRouter:
                     self.metrics.queue_depth.dec()
                     batch.append(item)
                     
-                    timeout_end = time.monotonic() + self.batch_timeout
                     while len(batch) < self.batch_size:
                         try:
-                            time_left = timeout_end - time.monotonic()
-                            if time_left <= 0:
-                                break
-                            item = await asyncio.wait_for(self._batch_queue.get(), timeout=time_left)
+                            item = self._batch_queue.get_nowait()
                             self.metrics.queue_depth.dec()
                             batch.append(item)
-                        except asyncio.TimeoutError:
+                        except asyncio.QueueEmpty:
                             break
                 except asyncio.CancelledError:
                     for _, future in batch:
@@ -443,74 +452,81 @@ class AdaptiveRouter:
                 futures = [f for _, f in batch]
 
                 try:
-                    def process_batch(qs):
-                        if getattr(self.encoder, 'requires_lock', True):
-                            with self._encoder_lock:
-                                query_embeddings = self.encoder.encode_batch(qs)
-                        else:
-                            query_embeddings = self.encoder.encode_batch(qs)
-                            
-                        with self.lock:
-                            if self.index.total_vectors == 0:
-                                return [None] * len(qs)
-                                
-                        search_results = self.index.search(query_embeddings, top_k=5)
-                        
-                        results = []
-                        with self.lock:
-                            for i in range(len(qs)):
-                                q_text = qs[i]
-                                q_results = search_results[i]
-                                
-                                if self.reranker is not None and len(q_results) > 0:
-                                    candidates = []
-                                    for score, route_name in q_results:
-                                        if route_name in self._route_map:
-                                            candidates.append((score, self._route_map[route_name]))
-                                    if candidates:
-                                        best_route = self.reranker.rerank(q_text, candidates)
-                                        results.append(best_route)
-                                        continue
+                    async def _dispatch_batch(batch):
+                        qs = [q for q, f in batch]
+                        fs = [f for q, f in batch]
+                        try:
+                            def _resolve_task(query_strings):
+                                # Encode
+                                if getattr(self.encoder, 'requires_lock', True):
+                                    with self._encoder_lock:
+                                        query_embeddings = self.encoder.encode_batch(query_strings)
+                                else:
+                                    query_embeddings = self.encoder.encode_batch(query_strings)
+                                    
+                                # Resolve
+                                with self.rwlock.read_lock():
+                                    if self.index.total_vectors == 0:
+                                        return [None] * len(query_strings)
                                         
-                                best_route = None
-                                best_score = -1.0
-                                second_best_score = -1.0
-                                
-                                for score, route_name in q_results:
-                                    if route_name not in self._route_map:
-                                        continue
-                                    route = self._route_map[route_name]
-                                    if score >= route.threshold:
-                                        if score > best_score:
-                                            if best_route is not None and route.name != best_route.name:
-                                                second_best_score = best_score
-                                            best_score = score
-                                            best_route = route
-                                        elif score > second_best_score and (best_route is None or route.name != best_route.name):
-                                            second_best_score = score
-                                            
-                                if best_route is not None:
-                                    if second_best_score != -1.0 and (best_score - second_best_score) < self.margin:
+                                    search_results = self.index.search(query_embeddings, top_k=5)
+                                    results = []
+                                    for i in range(len(query_strings)):
+                                        q_text = query_strings[i]
+                                        q_results = search_results[i]
+                                        
+                                        if self.reranker is not None and len(q_results) > 0:
+                                            candidates = []
+                                            for score, route_name in q_results:
+                                                if route_name in self._route_map:
+                                                    candidates.append((score, self._route_map[route_name]))
+                                            if candidates:
+                                                best_route = self.reranker.rerank(q_text, candidates)
+                                                results.append(best_route)
+                                                continue
+                                                
                                         best_route = None
-                                results.append(best_route)
-                            return results
+                                        best_score = -1.0
+                                        
+                                        for score, route_name in q_results:
+                                            if route_name not in self._route_map:
+                                                continue
+                                            route = self._route_map[route_name]
+                                            if score >= route.threshold:
+                                                if score > best_score:
+                                                    best_score = score
+                                                    best_route = route
+                                        results.append(best_route)
+                                return results
 
-                    results = await asyncio.to_thread(process_batch, queries)
-                    
-                    for future, result in zip(futures, results):
-                        if not future.done():
-                            future.set_result(result)
-                except asyncio.CancelledError:
-                    break
+                            def _dispatch_and_set(query_strings, futures, event_loop):
+                                try:
+                                    res = _resolve_task(query_strings)
+                                    for f, r in zip(futures, res):
+                                        if not f.done():
+                                            event_loop.call_soon_threadsafe(f.set_result, r)
+                                except Exception as e:
+                                    for f in futures:
+                                        if not f.done():
+                                            event_loop.call_soon_threadsafe(f.set_exception, e)
+
+                            loop = asyncio.get_running_loop()
+                            loop.run_in_executor(self._read_pool, _dispatch_and_set, qs, fs, loop)
+                            
+                        except Exception as e:
+                            for f in fs:
+                                if not f.done():
+                                    f.set_exception(e)
+                        finally:
+                            for _ in qs:
+                                self._batch_queue.task_done()
+
+                    asyncio.create_task(_dispatch_batch(batch))
                 except Exception as e:
                     for future in futures:
                         if not future.done():
                             future.set_exception(e)
-                finally:
-                    for _, future in batch:
-                        if not future.done():
-                            future.set_exception(asyncio.CancelledError())
-                    for _ in batch:
+                    for _ in queries:
                         self._batch_queue.task_done()
         finally:
             while not self._batch_queue.empty():
@@ -523,16 +539,10 @@ class AdaptiveRouter:
                     break
 
     def update_threshold(self, route_name: str, threshold: float, _broadcast: bool = True):
-        with self.lock:
+        with self._route_map_lock:
             if route_name in self._route_map:
-                route = self._route_map[route_name]
-                old_t = route.threshold
-                try:
-                    route.threshold = threshold
-                    self.storage.update_threshold(route_name, threshold)
-                except Exception as e:
-                    route.threshold = old_t
-                    raise SynaptoRouteError(f"Failed: {e}") from e
+                self._route_map[route_name].threshold = threshold
+                self._storage_queue.put(("update_threshold", (route_name, threshold)))
 
         if _broadcast and self.sync_manager:
             self.sync_manager.broadcast("update_threshold", {"route_name": route_name, "threshold": threshold})
@@ -545,9 +555,11 @@ class AdaptiveRouter:
             
         query_embeddings = self.encoder.encode_batch(samples)
         
-        with self.lock:
+        with self.rwlock.read_lock():
             if self.index.total_vectors == 0:
                 return
+                
+        with self._route_map_lock:
             if not self._route_map:
                 return
             route_map_snapshot = dict(self._route_map)
@@ -573,6 +585,8 @@ class AdaptiveRouter:
                     b_score = -1.0
                     sb_score = -1.0
                     for score, r_name in search_results[i]:
+                        if r_name not in route_map_snapshot:
+                            continue
                         test_threshold = t if r_name == route_name else route_map_snapshot[r_name].threshold
                         if score >= test_threshold:
                             if score > b_score:
@@ -592,7 +606,7 @@ class AdaptiveRouter:
                 if f1 >= best_f1:
                     best_f1 = f1
                     best_t = t
-            new_thresholds[route_name] = float(best_t)
+            new_thresholds[route_name] = round(float(best_t), 4)
             
         for route_name, t in new_thresholds.items():
             self.update_threshold(route_name, t)

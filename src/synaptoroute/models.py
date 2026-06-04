@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+import numpy as np
 import json
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator, StringConstraints, ConfigDict
@@ -38,8 +40,6 @@ class Route(BaseModel):
             raise ValueError("Route must have at least one valid utterance.")
         return deduped
 
-from dataclasses import dataclass
-import numpy as np
 
 @dataclass
 class RollbackSnapshot:

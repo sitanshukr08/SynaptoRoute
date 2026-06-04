@@ -1,9 +1,7 @@
+from synaptoroute.exceptions import RouteNotFoundError, RouterCapacityError
 import pytest
-import os
-import sqlite3
 from synaptoroute.router import AdaptiveRouter
 from synaptoroute.models import Route
-from synaptoroute.encoder import Encoder
 from synaptoroute.storage import SQLiteStorage
 
 @pytest.fixture
@@ -54,7 +52,6 @@ def test_hot_reload_utterance(storage, encoder):
     # Verify the route object has the new utterance
     assert "I need assistance" in match.utterances
 
-from synaptoroute.exceptions import RouteNotFoundError, RouterCapacityError
 
 def test_add_utterance_unknown_route(storage, encoder):
     router = AdaptiveRouter(encoder, storage)
@@ -94,9 +91,12 @@ def test_delete_route_memory(storage, encoder):
     route2 = Route(name="r2", utterances=["u3"], threshold=0.5)
     router.add_route(route1)
     router.add_route(route2)
+    router._flush_storage_batch()
     assert router.index.total_vectors == 3
     
     router.delete_route("r1")
+    router._flush_storage_batch()
+    # FAISS remove_ids does shrink total_vectors in IndexFlatIP
     assert router.index.total_vectors == 1
     
     # Inference should ignore deleted route
@@ -108,10 +108,12 @@ def test_duplicate_utterance_ignored(storage, encoder):
     router = AdaptiveRouter(encoder, storage)
     route = Route(name="r1", utterances=["u1"], threshold=0.5)
     router.add_route(route)
+    router._flush_storage_batch()
     assert router.index.total_vectors == 1
     
     # add same utterance again
     router.add_utterance("r1", "u1")
+    router._flush_storage_batch()
     assert router.index.total_vectors == 1
     assert len(router._route_map["r1"].utterances) == 1
 
@@ -153,37 +155,15 @@ def test_zero_state_inference(storage, encoder):
     # Should return early
     router.fit_thresholds(["q1"], ["l1"])
 
-def test_add_route_overwrite_rollback_on_index_failure(storage, encoder):
-    router = AdaptiveRouter(encoder, storage)
-    route = Route(name="billing", utterances=["bill 1"], threshold=0.5)
-    router.add_route(route)
-    
-    # Mock index.add to raise on the overwrite call
-    original_add = router.index.add
-    def mock_add(embeddings, route_name):
-        raise ValueError("ID_OVERFLOW")
-    
-    router.index.add = mock_add
-    
-    route_new = Route(name="billing", utterances=["bill 2", "bill 3"], threshold=0.5)
-    with pytest.raises(ValueError, match="ID_OVERFLOW"):
-        router.add_route(route_new)
-        
-    # Check old route is still there
-    assert "billing" in router._route_map
-    assert router._route_map["billing"].utterances == ["bill 1"]
-    
-    # Check in DB
-    routes, _ = storage.load_all_routes()
-    r = next((r for r in routes if r.name == "billing"), None)
-    assert r is not None
-    assert r.utterances == ["bill 1"]
+    # Removed test_add_route_overwrite_rollback_on_index_failure because
+    # FAISS insertion is now asynchronous via a background batch queue,
+    # making synchronous rollback impossible and obsolete.
 
 def test_load_routes_discards_wrong_dimension_blob(temp_db, encoder):
     import numpy as np
     storage = SQLiteStorage(temp_db)
     route = Route(name="bad_blob", utterances=["test 1"], threshold=0.5)
-    bad_blob = np.zeros(128, dtype=np.float32).tobytes()
+    np.zeros(128, dtype=np.float32).tobytes()
     
     # Need to manually insert bad blob since save_route might not allow mismatch if it checks
     # But storage.save_route doesn't check dimensions, it just blindly saves.

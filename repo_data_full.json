@@ -1,0 +1,916 @@
+[
+  {
+    "path": "src/synaptoroute/encoder.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "synaptoroute.exceptions",
+      "typing",
+      "numpy.typing",
+      "abc",
+      "numpy",
+      "fastembed",
+      "openai"
+    ],
+    "exports": [
+      "__init__",
+      "SynaptoRouteError",
+      "dim",
+      "requires_lock",
+      "OpenAIEncoder",
+      "encode",
+      "encode_batch",
+      "BaseEncoder",
+      "FastEmbedEncoder",
+      "Optional",
+      "List",
+      "TextEmbedding"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/exceptions.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [],
+    "exports": [
+      "RouteNotFoundError",
+      "RouterOverloadedError",
+      "SynaptoRouteError",
+      "ModelLoadError",
+      "RouterCapacityError"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/index.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "threading",
+      "numpy",
+      "typing",
+      "faiss"
+    ],
+    "exports": [
+      "Tuple",
+      "__init__",
+      "FaissIndex",
+      "get_index",
+      "add",
+      "delete",
+      "rebuild",
+      "_add_unlocked",
+      "total_vectors",
+      "List",
+      "NumpyIndex",
+      "search"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/locks.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "threading"
+    ],
+    "exports": [
+      "release_read",
+      "__init__",
+      "read_lock",
+      "write_lock",
+      "acquire_write",
+      "__enter__",
+      "__exit__",
+      "WriteLockContext",
+      "RWLock",
+      "release_write",
+      "acquire_read",
+      "ReadLockContext"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/metrics.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "collections",
+      "prometheus_client"
+    ],
+    "exports": [
+      "Gauge",
+      "CollectorRegistry",
+      "__init__",
+      "Counter",
+      "_MockHistogram",
+      "inc",
+      "generate_latest",
+      "export_metrics",
+      "dec",
+      "Histogram",
+      "MetricsRegistry",
+      "_MockCounter",
+      "set",
+      "observe",
+      "_MockGauge"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/models.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "dataclasses",
+      "typing",
+      "typing_extensions",
+      "pydantic",
+      "json",
+      "numpy"
+    ],
+    "exports": [
+      "validate_metadata_serializable",
+      "Dict",
+      "deduplicate_utterances",
+      "field_validator",
+      "Route",
+      "Field",
+      "BaseModel",
+      "ConfigDict",
+      "Annotated",
+      "RollbackSnapshot",
+      "dataclass",
+      "Any",
+      "Optional",
+      "List",
+      "StringConstraints"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/profile.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "dataclasses",
+      "enum",
+      "os"
+    ],
+    "exports": [
+      "ProfileType",
+      "Enum",
+      "OptimizationProfile",
+      "dataclass",
+      "get_profile"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/reranker.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "synaptoroute.models",
+      "typing",
+      "sentence_transformers"
+    ],
+    "exports": [
+      "Tuple",
+      "CrossEncoder",
+      "Route",
+      "__init__",
+      "rerank",
+      "CrossEncoderReranker",
+      "Optional",
+      "List"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/router.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "logging",
+      "time",
+      "synaptoroute.index",
+      "synaptoroute.exceptions",
+      "concurrent.futures",
+      "synaptoroute.encoder",
+      "synaptoroute.locks",
+      "synaptoroute.profile",
+      "numpy",
+      "threading",
+      "synaptoroute.models",
+      "synaptoroute.storage",
+      "sklearn.metrics",
+      "sys",
+      "asyncio",
+      "typing",
+      "synaptoroute.metrics",
+      "queue",
+      "synaptoroute.sync"
+    ],
+    "exports": [
+      "Encoder",
+      "f1_score",
+      "update_threshold",
+      "_flush_storage_batch",
+      "_load_routes",
+      "_dispatch_and_set",
+      "delete_route",
+      "start",
+      "aquery",
+      "_encode",
+      "_batch_worker",
+      "BaseSyncManager",
+      "BaseStorage",
+      "_dispatch_batch",
+      "Optional",
+      "_rebuild_index",
+      "add_route",
+      "RouterCapacityError",
+      "get_profile",
+      "add_utterance",
+      "fit_thresholds",
+      "get_index",
+      "RollbackSnapshot",
+      "OptimizationProfile",
+      "MetricsRegistry",
+      "_resolve_task",
+      "__call__",
+      "ProfileType",
+      "__init__",
+      "Route",
+      "_storage_worker",
+      "RouteNotFoundError",
+      "RouterOverloadedError",
+      "stop",
+      "RWLock",
+      "AdaptiveRouter",
+      "FastEmbedEncoder",
+      "SynaptoRouteError"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/storage.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "typing",
+      "queue",
+      "sqlite3",
+      "os",
+      "threading",
+      "json",
+      "contextlib",
+      "synaptoroute.models",
+      "abc"
+    ],
+    "exports": [
+      "_init_db",
+      "add_utterance",
+      "ABC",
+      "__init__",
+      "Route",
+      "load_all_routes",
+      "delete_route",
+      "__del__",
+      "save_route",
+      "abstractmethod",
+      "SQLiteStorage",
+      "update_threshold",
+      "BaseStorage",
+      "_get_connection",
+      "List"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/sync.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "logging",
+      "asyncio",
+      "base64",
+      "typing",
+      "uuid",
+      "time",
+      "redis.asyncio",
+      "json",
+      "traceback",
+      "synaptoroute.models",
+      "numpy"
+    ],
+    "exports": [
+      "__init__",
+      "register",
+      "_publisher_loop",
+      "_dispatch_worker_loop",
+      "start",
+      "Route",
+      "BaseSyncManager",
+      "RedisSyncManager",
+      "_listener_loop",
+      "stop",
+      "broadcast",
+      "_dispatch",
+      "Optional"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/trainer.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "asyncio",
+      "typing",
+      "synaptoroute.router",
+      "pydantic",
+      "json",
+      "openai"
+    ],
+    "exports": [
+      "__init__",
+      "tune_route",
+      "BaseModel",
+      "AsyncOpenAI",
+      "AdaptiveRouter",
+      "SyntheticResponse",
+      "Optional",
+      "List",
+      "SyntheticTuner"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/__init__.py",
+    "purpose": "SynaptoRoute\nA high-throughput, local semantic routing engine.",
+    "imports": [
+      "importlib.metadata",
+      "synaptoroute.models",
+      "synaptoroute.router",
+      "synaptoroute.encoder",
+      "synaptoroute.storage"
+    ],
+    "exports": [
+      "Route",
+      "Encoder",
+      "SQLiteStorage",
+      "BaseStorage",
+      "AdaptiveRouter"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/integrations/langchain.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "synaptoroute.router",
+      "typing",
+      "langchain_core.runnables"
+    ],
+    "exports": [
+      "ainvoke",
+      "__init__",
+      "Runnable",
+      "SynaptoRouteChain",
+      "Any",
+      "invoke",
+      "AdaptiveRouter",
+      "Optional",
+      "RunnableConfig"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/integrations/llamaindex.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "llama_index.core.tools.types",
+      "typing",
+      "llama_index.core.schema",
+      "synaptoroute.router",
+      "llama_index.core.selectors"
+    ],
+    "exports": [
+      "_get_prompts",
+      "Sequence",
+      "ToolMetadata",
+      "__init__",
+      "_update_prompts",
+      "SingleSelection",
+      "_aselect",
+      "SelectorResult",
+      "Any",
+      "QueryBundle",
+      "AdaptiveRouter",
+      "BaseSelector",
+      "SynaptoRouteSelector",
+      "_select"
+    ]
+  },
+  {
+    "path": "src/synaptoroute/integrations/__init__.py",
+    "purpose": "SynaptoRoute integrations for external frameworks like LangChain and LlamaIndex.",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "tests/conftest.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "synaptoroute.encoder",
+      "pytest"
+    ],
+    "exports": [
+      "encoder",
+      "Encoder"
+    ]
+  },
+  {
+    "path": "tests/test_async.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "synaptoroute.exceptions",
+      "asyncio",
+      "pytest",
+      "synaptoroute.router",
+      "synaptoroute.encoder",
+      "synaptoroute.storage",
+      "synaptoroute.models"
+    ],
+    "exports": [
+      "test_aquery_worker_crashed",
+      "Route",
+      "test_aquery_without_start",
+      "test_aquery",
+      "RouterOverloadedError",
+      "temp_db",
+      "Encoder",
+      "mock_worker",
+      "test_aquery_raises_if_worker_crashes_while_pending",
+      "SQLiteStorage",
+      "AdaptiveRouter",
+      "test_batch_worker_shutdown",
+      "test_aquery_overload",
+      "storage"
+    ]
+  },
+  {
+    "path": "tests/test_concurrency.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "synaptoroute.exceptions",
+      "asyncio",
+      "pytest",
+      "synaptoroute.router",
+      "time",
+      "threading",
+      "synaptoroute.encoder",
+      "synaptoroute.storage",
+      "synaptoroute.models"
+    ],
+    "exports": [
+      "sync_add_routes",
+      "Route",
+      "delete_while_encoding",
+      "RouteNotFoundError",
+      "slow_encode",
+      "temp_db",
+      "Encoder",
+      "test_encoder_lock_concurrency",
+      "add_routes",
+      "test_add_utterance_route_deleted_during_encoding",
+      "run_queries",
+      "SQLiteStorage",
+      "AdaptiveRouter",
+      "storage"
+    ]
+  },
+  {
+    "path": "tests/test_encoder.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "synaptoroute.encoder",
+      "numpy"
+    ],
+    "exports": [
+      "test_encode_batch",
+      "test_encode",
+      "test_encoder_initialization",
+      "Encoder"
+    ]
+  },
+  {
+    "path": "tests/test_encoders.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "pytest",
+      "synaptoroute.models",
+      "synaptoroute.router",
+      "synaptoroute.encoder",
+      "synaptoroute.storage",
+      "numpy",
+      "unittest.mock"
+    ],
+    "exports": [
+      "test_fastembed_encoder",
+      "add_utterance",
+      "Route",
+      "clear",
+      "Mock",
+      "load_all_routes",
+      "delete_route",
+      "side_effect",
+      "OpenAIEncoder",
+      "save_route",
+      "MagicMock",
+      "update_threshold",
+      "BaseEncoder",
+      "BaseStorage",
+      "AdaptiveRouter",
+      "DummyStorage",
+      "FastEmbedEncoder",
+      "test_openai_encoder_mocked"
+    ]
+  },
+  {
+    "path": "tests/test_langchain.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "synaptoroute.models",
+      "synaptoroute.integrations.langchain",
+      "pytest",
+      "unittest.mock"
+    ],
+    "exports": [
+      "test_synaptoroute_chain_ainvoke_no_route",
+      "Route",
+      "test_synaptoroute_chain_ainvoke_with_route",
+      "SynaptoRouteChain",
+      "test_synaptoroute_chain_invoke_with_route",
+      "MagicMock",
+      "test_synaptoroute_chain_invoke_no_route",
+      "AsyncMock"
+    ]
+  },
+  {
+    "path": "tests/test_llamaindex.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "llama_index.core.tools.types",
+      "pytest",
+      "llama_index.core.schema",
+      "synaptoroute.router",
+      "synaptoroute.integrations.llamaindex",
+      "llama_index.core.selectors",
+      "synaptoroute.models",
+      "unittest.mock"
+    ],
+    "exports": [
+      "ToolMetadata",
+      "Route",
+      "Mock",
+      "SingleSelection",
+      "test_synaptoroute_selector_no_match",
+      "SelectorResult",
+      "test_synaptoroute_selector_select",
+      "MagicMock",
+      "QueryBundle",
+      "AdaptiveRouter",
+      "test_synaptoroute_selector_aselect",
+      "SynaptoRouteSelector",
+      "AsyncMock"
+    ]
+  },
+  {
+    "path": "tests/test_metrics.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "synaptoroute.metrics",
+      "pytest",
+      "unittest.mock"
+    ],
+    "exports": [
+      "test_metrics_registry_mock_fallback",
+      "MetricsRegistry",
+      "patch"
+    ]
+  },
+  {
+    "path": "tests/test_models.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "synaptoroute.exceptions",
+      "synaptoroute.models",
+      "pytest"
+    ],
+    "exports": [
+      "test_route_creation",
+      "RouteNotFoundError",
+      "Route",
+      "test_route_with_metadata_and_threshold"
+    ]
+  },
+  {
+    "path": "tests/test_optimization.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "pytest",
+      "synaptoroute.router",
+      "synaptoroute.encoder",
+      "synaptoroute.storage",
+      "synaptoroute.models",
+      "numpy"
+    ],
+    "exports": [
+      "__init__",
+      "Route",
+      "test_fit_thresholds",
+      "dim",
+      "MockEncoder",
+      "Encoder",
+      "encode",
+      "SQLiteStorage",
+      "encode_batch",
+      "AdaptiveRouter"
+    ]
+  },
+  {
+    "path": "tests/test_profile.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "pytest",
+      "synaptoroute.router",
+      "os",
+      "synaptoroute.encoder",
+      "synaptoroute.profile",
+      "synaptoroute.storage"
+    ],
+    "exports": [
+      "test_throughput_profile_defaults",
+      "Encoder",
+      "test_latency_profile_defaults",
+      "SQLiteStorage",
+      "AdaptiveRouter",
+      "get_profile",
+      "test_router_inherits_profile",
+      "ProfileType"
+    ]
+  },
+  {
+    "path": "tests/test_router.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "synaptoroute.exceptions",
+      "pytest",
+      "sqlite3",
+      "synaptoroute.router",
+      "os",
+      "synaptoroute.encoder",
+      "synaptoroute.storage",
+      "synaptoroute.models",
+      "numpy"
+    ],
+    "exports": [
+      "test_static_routing",
+      "temp_db",
+      "Encoder",
+      "test_top_1_masking_fallback",
+      "test_delete_route_memory",
+      "test_max_capacity_load_routes",
+      "test_overwrite_route_capacity",
+      "test_fit_thresholds_mismatched_lengths",
+      "SQLiteStorage",
+      "test_add_utterance_unknown_route",
+      "test_duplicate_utterance_ignored",
+      "RouterCapacityError",
+      "test_zero_state_inference",
+      "test_delete_nonexistent_route",
+      "test_load_routes_discards_wrong_dimension_blob",
+      "test_max_capacity_add_route",
+      "test_hot_reload_utterance",
+      "Route",
+      "RouteNotFoundError",
+      "AdaptiveRouter",
+      "test_max_capacity_add_utterance",
+      "storage"
+    ]
+  },
+  {
+    "path": "tests/test_storage.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "synaptoroute.exceptions",
+      "pytest",
+      "sqlite3",
+      "os",
+      "synaptoroute.router",
+      "synaptoroute.encoder",
+      "synaptoroute.storage",
+      "synaptoroute.models"
+    ],
+    "exports": [
+      "test_delete_route_storage",
+      "test_add_utterance",
+      "Route",
+      "test_save_and_load_route",
+      "test_sqlite_storage_creates_directory",
+      "memory_db",
+      "test_save_route_replace",
+      "Encoder",
+      "SQLiteStorage",
+      "test_corrupt_json_metadata",
+      "AdaptiveRouter",
+      "SynaptoRouteError"
+    ]
+  },
+  {
+    "path": "tests/test_sync.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "asyncio",
+      "pytest",
+      "json",
+      "unittest.mock",
+      "synaptoroute.sync"
+    ],
+    "exports": [
+      "test_dispatch_rejects_mismatched_encoder_model",
+      "test_broadcast_sends_message",
+      "patch",
+      "mock_listen",
+      "RedisSyncManager",
+      "MagicMock",
+      "test_listener_ignores_own_sender_id",
+      "AsyncMock",
+      "mock_router"
+    ]
+  },
+  {
+    "path": "tests/test_trainer.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "synaptoroute.router",
+      "pytest",
+      "unittest.mock",
+      "synaptoroute.trainer"
+    ],
+    "exports": [
+      "mock_openai_client",
+      "test_synthetic_tuner_tune_route",
+      "MagicMock",
+      "AdaptiveRouter",
+      "SyntheticResponse",
+      "SyntheticTuner",
+      "AsyncMock",
+      "mock_router"
+    ]
+  },
+  {
+    "path": "tests/test_validation_gaps.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "asyncio",
+      "pytest",
+      "synaptoroute",
+      "synaptoroute.trainer",
+      "synaptoroute.encoder",
+      "synaptoroute.profile",
+      "synaptoroute.storage",
+      "unittest.mock"
+    ],
+    "exports": [
+      "create_side_effect",
+      "update_threshold",
+      "DummyStorage",
+      "delete_route",
+      "BaseStorage",
+      "SyntheticTuner",
+      "get_profile",
+      "DummyParsed",
+      "add_utterance",
+      "test_openai_encoder_chunking",
+      "patch",
+      "load_all_routes",
+      "OpenAIEncoder",
+      "DummyChoice",
+      "AsyncMock",
+      "ProfileType",
+      "DummyData",
+      "__init__",
+      "Route",
+      "test_fit_thresholds_async_loop_safety",
+      "DummyMsg",
+      "save_route",
+      "MagicMock",
+      "AdaptiveRouter",
+      "test_latency_profile_propagates_threads",
+      "FastEmbedEncoder",
+      "DummyResp"
+    ]
+  },
+  {
+    "path": "tests/__init__.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "docs/ARCHITECTURE.md",
+    "purpose": "# SynaptoRoute System Architecture\n\nThis document maps the core subsystems of SynaptoRoute v0.4.0, defining strict ownership, dependencies, and known failure modes to facilitate safe architectural reasoning for contributors.\n\n## Subsystem 1: Router (`AdaptiveRouter`)",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "docs/BENCHMARK_EVIDENCE_INDEX.md",
+    "purpose": "# Benchmark Evidence Traceability Index\n\nThis matrix maps every metric in the `BENCHMARK_REGISTRY.md` to its origin benchmark script and raw output artifact.\n\n| Metric | Registry Entry | Benchmark Script | Raw JSON Manifest | Status |",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "docs/BENCHMARK_REGISTRY.md",
+    "purpose": "# SynaptoRoute Benchmark Registry\n\nThis document serves as the authoritative ledger for all SynaptoRoute performance, accuracy, and scaling benchmarks.\n\n## Verification Tiers",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "docs/CONTRIBUTOR_QUICKSTART.md",
+    "purpose": "# Contributor Quickstart\n\nWelcome to the SynaptoRoute project! This guide will get you oriented with the v0.4.0 architecture so you can run benchmarks, reproduce results, and contribute effectively.\n\n## 1. Architecture Overview",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "docs/SYNAPTOROUTE_TECHNICAL_REFERENCE.md",
+    "purpose": "# SynaptoRoute Technical Reference\n\n> **Authoritative Documentation \u2013 SynaptoRoute v0.4.0**\n\n## 1. Executive Summary",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "analyze_repo2.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "ast",
+      "os",
+      "json"
+    ],
+    "exports": [
+      "analyze_file",
+      "main",
+      "extract_docstring"
+    ]
+  },
+  {
+    "path": "ARCHITECTURE_REPORT.md",
+    "purpose": "# Architecture Report\n\n## Dependency Graph\n```mermaid\ngraph TD",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "BENCHMARKS.md",
+    "purpose": "# SynaptoRoute Benchmarks\n\nThis file summarizes the benchmark performance of SynaptoRoute. All claims are backed by empirical telemetry found in the [BENCHMARK_REGISTRY.md](docs/BENCHMARK_REGISTRY.md).\n\n## Metric Definitions",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "COMPARISON.md",
+    "purpose": "# Competitor Comparison Matrix\n\nThis document provides a realistic, evidence-backed assessment of how SynaptoRoute compares to alternative routing frameworks in the industry.\n\nTo prevent accidental overclaiming, every comparison is explicitly tagged with the constraints under which it was evaluated, and classified as `[MEASURED]`, `[ESTIMATED]`, or `[UNKNOWN]`.",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "CONTRIBUTING.md",
+    "purpose": "# Contributing to SynaptoRoute\n\nSynaptoRoute operates under an extremely rigid set of engineering principles. To maintain the project's reliability and architectural honesty, all contributors must strictly adhere to the following workflows.\n\n## 1. Development Flow",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "generate_reports.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "os",
+      "json"
+    ],
+    "exports": [
+      "generate_repo_map",
+      "detect_risks",
+      "main",
+      "generate_arch_report"
+    ]
+  },
+  {
+    "path": "LIMITATIONS.md",
+    "purpose": "# Verified and Unknown Boundaries\n\nTo maintain engineering trust, SynaptoRoute explicitly separates verified system limits from theoretical or unknown boundaries. This document outlines the absolute edge of our confidence in the current v0.4.0 architecture.\n\n---",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "README.md",
+    "purpose": "# SynaptoRoute\n\nSynaptoRoute is an adaptive, high-throughput semantic router. It is **not** a large language model (LLM), an embedding model, or a conversational agent. It is a highly optimized control plane that ingests natural language queries and deterministically routes them to predefined system actions (\"routes\") based on semantic similarity.\n\nIt is designed to sit at the edge of your infrastructure, intercepting user intents in milliseconds to bypass heavy LLM generation where predefined workflows (e.g., billing, password resets, API lookups) exist.",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "REPOSITORY_MAP.md",
+    "purpose": "# Repository Map\n\n## Overview\n\nThis document maps the files, their purposes, dependencies, and exported components within the repository.",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "ROADMAP.md",
+    "purpose": "# SynaptoRoute Roadmap\n\nThis roadmap documents the architectural and research trajectory for SynaptoRoute.\n\n## Completed (Verified in v0.4.0)",
+    "imports": [],
+    "exports": []
+  },
+  {
+    "path": "test_fastembed.py",
+    "purpose": "No explicit purpose documented.",
+    "imports": [
+      "onnxruntime",
+      "fastembed"
+    ],
+    "exports": [
+      "TextEmbedding"
+    ]
+  }
+]

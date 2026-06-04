@@ -3,7 +3,7 @@ import asyncio
 from unittest.mock import AsyncMock, patch, MagicMock
 
 from synaptoroute import AdaptiveRouter, Route
-from synaptoroute.encoder import OpenAIEncoder, FastEmbedEncoder
+from synaptoroute.encoder import OpenAIEncoder
 from synaptoroute.storage import BaseStorage
 from synaptoroute.profile import get_profile, ProfileType
 from synaptoroute.trainer import SyntheticTuner

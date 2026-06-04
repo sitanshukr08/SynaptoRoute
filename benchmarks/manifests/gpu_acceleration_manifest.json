@@ -1,0 +1,12 @@
+{
+  "benchmark": "GPU_Acceleration",
+  "timestamp": "2026-06-04T12:02:46.076495",
+  "cpu_metrics": {
+    "startup_time": 0.6756358000002365,
+    "encode_time_300": 2.3359007999988535
+  },
+  "gpu_metrics": {
+    "encode_time_300": 1.662274799999068
+  },
+  "gpu_status": "SUCCESS"
+}

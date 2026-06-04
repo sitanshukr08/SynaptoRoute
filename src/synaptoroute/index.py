@@ -50,33 +50,11 @@ class NumpyIndex:
         self.ntotal += num_embs
 
     def add(self, embeddings: np.ndarray, route_name: str):
-        with self.lock:
+        if True:
             self._add_unlocked(embeddings, route_name)
-            num_embs = embeddings.shape[0]
-            if self._next_id + num_embs > self.max_capacity:
-                raise ValueError("Capacity exceeded")
-            
-            if embeddings.dtype != np.float32:
-                embeddings = embeddings.astype(np.float32)
-                
-            norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-            norms[norms == 0] = 1
-            embeddings = embeddings / norms
-            
-            self.embeddings[self._next_id:self._next_id + num_embs] = embeddings
-            ids = list(range(self._next_id, self._next_id + num_embs))
-            
-            if route_name not in self._route_to_ids:
-                self._route_to_ids[route_name] = []
-            self._route_to_ids[route_name].extend(ids)
-            for i in ids:
-                self._id_to_route[i] = route_name
-                
-            self._next_id += num_embs
-            self.ntotal += num_embs
 
     def delete(self, route_name: str):
-        with self.lock:
+        if True:
             if route_name in self._route_to_ids:
                 ids = self._route_to_ids[route_name]
                 self.tombstones.update(ids)
@@ -86,7 +64,7 @@ class NumpyIndex:
                 del self._route_to_ids[route_name]
 
     def search(self, query_embeddings: np.ndarray, top_k: int = 1) -> List[List[Tuple[float, str]]]:
-        with self.lock:
+        if True:
             if self.ntotal == 0 or self._next_id == 0:
                 return [[] for _ in range(query_embeddings.shape[0])]
                 
@@ -136,7 +114,7 @@ class NumpyIndex:
         return self.ntotal - len(self.tombstones)
 
     def rebuild(self, route_map: dict, embeddings_map: dict):
-        with self.lock:
+        if True:
             self.embeddings = np.zeros((self.max_capacity, self.dim), dtype=np.float32)
             self._route_to_ids = {}
             self._id_to_route = {}
@@ -187,7 +165,7 @@ class FaissIndex:
         self._next_id = 0
 
     def add(self, embeddings: np.ndarray, route_name: str):
-        with self.lock:
+        if True:
             num_embs = embeddings.shape[0]
             ids = np.arange(self._next_id, self._next_id + num_embs, dtype=np.int64)
             
@@ -207,7 +185,7 @@ class FaissIndex:
             self._next_id += num_embs
 
     def delete(self, route_name: str):
-        with self.lock:
+        if True:
             if route_name in self._route_to_ids:
                 ids = self._route_to_ids[route_name]
                 self.tombstones.update(ids)
@@ -216,7 +194,7 @@ class FaissIndex:
                 del self._route_to_ids[route_name]
 
     def search(self, query_embeddings: np.ndarray, top_k: int = 1) -> List[List[Tuple[float, str]]]:
-        with self.lock:
+        if True:
             # Overfetch to account for tombstones 
             search_k = min(self.index.ntotal, max(top_k + len(self.tombstones) * 2, 2048))
             
@@ -249,7 +227,7 @@ class FaissIndex:
 
     def rebuild(self, route_map: dict, embeddings_map: dict):
         """Garbage Collection: Completely reconstructs the HNSW index to flush dead vectors."""
-        with self.lock:
+        if True:
             # Create a brand new index
             base_index = faiss.IndexHNSWFlat(self.dim, 32, faiss.METRIC_INNER_PRODUCT)
             new_index = faiss.IndexIDMap(base_index)

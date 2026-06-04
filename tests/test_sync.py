@@ -12,7 +12,10 @@ except ImportError:
 @pytest.fixture
 def mock_router():
     """Mock router that will record any method calls made to it by the sync manager."""
-    return MagicMock()
+    m = MagicMock()
+    m.encoder = MagicMock()
+    m.encoder.model_name = "mock-model"
+    return m
 
 @pytest.mark.asyncio
 async def test_broadcast_sends_message(mock_router):
@@ -73,6 +76,7 @@ async def test_listener_ignores_own_sender_id(mock_router):
         mock_pubsub.unsubscribe = AsyncMock()
         mock_pubsub.get_message = AsyncMock()
         mock_pubsub.close = AsyncMock()
+        mock_redis.publish = AsyncMock()
         mock_redis.pubsub.return_value = mock_pubsub
         mock_redis_from_url.return_value = mock_redis
         

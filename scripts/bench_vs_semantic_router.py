@@ -2,7 +2,6 @@ import time
 import asyncio
 import os
 
-import random
 from typing import List
 
 # Semantic Router imports

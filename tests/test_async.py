@@ -2,7 +2,6 @@ import pytest
 import asyncio
 from synaptoroute.router import AdaptiveRouter
 from synaptoroute.models import Route
-from synaptoroute.encoder import Encoder
 from synaptoroute.storage import SQLiteStorage
 from synaptoroute.exceptions import RouterOverloadedError
 
@@ -83,7 +82,7 @@ async def test_batch_worker_shutdown(storage, encoder):
     
     await router.stop()
     
-    with pytest.raises(asyncio.CancelledError):
+    with pytest.raises(RuntimeError, match="Router worker stopped before completing this query"):
         await task
 
 @pytest.mark.asyncio

@@ -1,8 +1,6 @@
-import pytest
 import os
 from synaptoroute.profile import get_profile, ProfileType
 from synaptoroute.router import AdaptiveRouter
-from synaptoroute.encoder import Encoder
 from synaptoroute.storage import SQLiteStorage
 
 def test_throughput_profile_defaults():

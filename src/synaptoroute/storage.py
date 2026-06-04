@@ -3,6 +3,7 @@ import json
 import os
 import threading
 import contextlib
+import queue
 from abc import ABC, abstractmethod
 from typing import List
 
@@ -40,24 +41,42 @@ class SQLiteStorage(BaseStorage):
             dirname = os.path.dirname(self.db_path)
             if dirname:
                 os.makedirs(dirname, exist_ok=True)
+                
+        self._pool = queue.Queue(maxsize=10)
+        self._pool_sema = threading.Semaphore(10)
+        
         self._init_db()
 
     def __del__(self):
         if hasattr(self, '_memory_conn') and self._memory_conn is not None:
             self._memory_conn.close()
+        if hasattr(self, '_pool'):
+            while not self._pool.empty():
+                try:
+                    conn = self._pool.get_nowait()
+                    conn.close()
+                except queue.Empty:
+                    break
 
     @contextlib.contextmanager
     def _get_connection(self):
         if self._memory_conn is not None:
             yield self._memory_conn
         else:
-            conn = sqlite3.connect(self.db_path, timeout=15.0)
-            conn.execute('PRAGMA journal_mode=WAL;')
-            conn.execute('PRAGMA foreign_keys = ON')
+            self._pool_sema.acquire()
             try:
-                yield conn
+                try:
+                    conn = self._pool.get_nowait()
+                except queue.Empty:
+                    conn = sqlite3.connect(self.db_path, timeout=15.0, check_same_thread=False)
+                    conn.execute('PRAGMA journal_mode=WAL;')
+                    conn.execute('PRAGMA foreign_keys = ON')
+                try:
+                    yield conn
+                finally:
+                    self._pool.put_nowait(conn)
             finally:
-                conn.close()
+                self._pool_sema.release()
 
     def _init_db(self):
         try:

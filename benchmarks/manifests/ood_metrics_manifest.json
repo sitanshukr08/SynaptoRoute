@@ -1,0 +1,10 @@
+{
+  "benchmark": "OOD_Metrics",
+  "timestamp": "2026-06-04T11:51:43.099865",
+  "metrics": {
+    "AUROC": 0.908875,
+    "AUPRC": 0.8986315355239005,
+    "FPR@95": 0.365,
+    "Threshold_at_95_TPR": 0.6848105192184448
+  }
+}

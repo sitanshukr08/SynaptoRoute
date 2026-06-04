@@ -1,5 +1,4 @@
 import os
-import sys
 import platform
 import subprocess
 import asyncio
@@ -11,10 +10,8 @@ from datetime import datetime
 # Import benchmark modules
 import eval_accuracy
 import eval_latency
-import eval_accuracy_scale
 import eval_mutation
 import eval_efficiency
-import eval_growth_stress
 import eval_components
 
 from history.regression_tracker import track_and_compare

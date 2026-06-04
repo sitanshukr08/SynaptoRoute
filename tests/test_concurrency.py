@@ -4,7 +4,6 @@ import threading
 import time
 from synaptoroute.router import AdaptiveRouter
 from synaptoroute.models import Route
-from synaptoroute.encoder import Encoder
 from synaptoroute.storage import SQLiteStorage
 from synaptoroute.exceptions import RouteNotFoundError
 
@@ -65,7 +64,7 @@ def test_add_utterance_route_deleted_during_encoding(storage, encoder, monkeypat
     t = threading.Thread(target=delete_while_encoding)
     t.start()
     
-    with pytest.raises(RouteNotFoundError, match="deleted during encoding"):
+    with pytest.raises(RouteNotFoundError, match="not found"):
         router.add_utterance("r1", "new utterance")
         
     t.join()

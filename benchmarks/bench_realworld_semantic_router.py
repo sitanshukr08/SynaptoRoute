@@ -4,11 +4,7 @@ os.environ["ONNXRUNTIME_NUM_THREADS"] = "4"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import time
-import json
-import argparse
-from typing import List, Dict, Set
 from collections import defaultdict
-import numpy as np
 
 from datasets import load_dataset
 from sklearn.metrics import precision_recall_fscore_support
@@ -44,9 +40,9 @@ def calculate_metrics(y_true, y_pred, y_pred_topk, num_intents, is_ood_true=None
     return top1, top3, top5, p, r, f1, coverage, ood_acc
 
 def evaluate_dataset(name: str, ds_name: str, ds_config: str, intent_key: str, text_key: str, ood_label: int = None, model_name="BAAI/bge-small-en-v1.5"):
-    print(f"\n============================================================")
+    print("\n============================================================")
     print(f"BENCHMARK: {name} (Semantic Router)")
-    print(f"============================================================")
+    print("============================================================")
     
     print(f"Loading {name} from HuggingFace...")
     ds = load_dataset(ds_name, ds_config) if ds_config else load_dataset(ds_name)
