@@ -8,7 +8,7 @@ try:
     from synaptoroute.sync import HAS_REDIS, RedisSyncManager
 except ImportError:
     HAS_REDIS = False
-    RedisSyncManager = None
+    RedisSyncManager = None  # type: ignore
 
 @pytest.fixture
 def mock_router():

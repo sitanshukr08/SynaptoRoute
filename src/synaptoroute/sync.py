@@ -218,3 +218,20 @@ class RedisSyncManager(BaseSyncManager):
             self.router.delete_route(payload["route_name"], _broadcast=False)
         elif action == "update_threshold":
             self.router.update_threshold(payload["route_name"], payload["threshold"], _broadcast=False)
+        elif action == "sync_state_request":
+            sender_id = data.get("sender_id")
+            if sender_id:
+                with self.router._route_map_lock:
+                    routes_snapshot = [r.model_dump(mode="json") for r in self.router._route_map.values()]
+                self.broadcast("sync_state_response", {
+                    "target_sender_id": sender_id,
+                    "routes": routes_snapshot
+                })
+        elif action == "sync_state_response":
+            target_id = payload.get("target_sender_id")
+            if target_id == self.sender_id:
+                from synaptoroute.models import Route
+                routes = payload.get("routes", [])
+                for r_dict in routes:
+                    route = Route(**r_dict)
+                    self.router.add_route(route, _broadcast=False)

@@ -77,7 +77,7 @@ class OpenAIEncoder(BaseEncoder):
         except ImportError as e:
             if client is None:
                 raise RuntimeError("Please install synaptoroute[openai] to use the OpenAIEncoder. Run `pip install synaptoroute[openai]`.") from e
-            openai = None
+            openai = None  # type: ignore
         self.model_name = model_name
         self._openai_error = openai.OpenAIError if openai is not None else Exception
         self.client = client or openai.OpenAI()

@@ -16,6 +16,10 @@ class FakeEncoder:
     def _vector(self, text: str):
         lowered = text.lower()
         vector = np.zeros(self.dim, dtype=np.float32)
+        if "almost exactly this" in lowered:
+            vector[5] = 0.9
+            vector[6] = 0.1
+            return vector
         keyword_groups = [
             ("greeting", ["hello", "hi"]),
             ("farewell", ["bye", "goodbye", "see you"]),
