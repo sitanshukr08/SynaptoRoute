@@ -32,3 +32,9 @@ def test_router_inherits_profile(tmp_path, encoder):
     default_router = AdaptiveRouter(encoder, storage)
     assert default_router.batch_size == 32
     assert default_router.batch_timeout == 0.005
+
+def test_router_defaults_to_memory_storage(fake_encoder):
+    router = AdaptiveRouter(encoder=fake_encoder)
+
+    assert router.storage is not None
+    assert router.index.total_vectors == 0

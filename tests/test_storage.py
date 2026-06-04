@@ -62,6 +62,20 @@ def test_add_utterance(memory_db):
     assert loaded_route.name == "dynamic_route"
     assert set(loaded_route.utterances) == {"start", "new utterance 1", "new utterance 2"}
 
+def test_sqlite_connections_use_immediate_isolation(memory_db):
+    with memory_db._get_connection() as conn:
+        assert conn.isolation_level == "IMMEDIATE"
+
+def test_delete_utterance_storage(memory_db):
+    route = Route(name="dynamic_route", utterances=["start"], threshold=0.5)
+    memory_db.save_route(route)
+    memory_db.add_utterance("dynamic_route", "temporary")
+
+    memory_db.delete_utterance("dynamic_route", "temporary")
+
+    routes, _ = memory_db.load_all_routes()
+    assert routes[0].utterances == ["start"]
+
 def test_save_route_replace(memory_db):
     route = Route(
         name="replaceable",

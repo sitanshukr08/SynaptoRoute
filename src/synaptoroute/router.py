@@ -10,7 +10,7 @@ import concurrent.futures
 from synaptoroute.metrics import MetricsRegistry
 from synaptoroute.models import Route
 from synaptoroute.encoder import Encoder
-from synaptoroute.storage import BaseStorage
+from synaptoroute.storage import BaseStorage, SQLiteStorage
 from synaptoroute.sync import BaseSyncManager
 from synaptoroute.exceptions import RouteNotFoundError, RouterOverloadedError, RouterCapacityError
 from synaptoroute.profile import OptimizationProfile, get_profile, ProfileType
@@ -25,7 +25,7 @@ class AdaptiveRouter:
             from synaptoroute.encoder import FastEmbedEncoder
             encoder = FastEmbedEncoder(threads=profile.threads)
         self.encoder = encoder
-        self.storage = storage
+        self.storage = storage or SQLiteStorage(":memory:")
         from synaptoroute.locks import RWLock
         self.rwlock = RWLock()
         self._encoder_lock = threading.Lock()
@@ -92,7 +92,6 @@ class AdaptiveRouter:
         routes, embeddings_map = self.storage.load_all_routes()
         
         print(f"Loading {len(routes)} routes from storage...")
-        __import__('time').perf_counter()
         import sys
         for r_idx, route in enumerate(routes):
             if r_idx % 5000 == 0:
@@ -210,7 +209,7 @@ class AdaptiveRouter:
                             self.storage.update_threshold(*args)
                         elif action == "add_utterance":
                             route_name, utterance, embedding = args
-                            self.storage.add_utterance(route_name, utterance)
+                            self.storage.add_utterance(route_name, utterance, embedding)
             except Exception as e:
                 import logging
                 print(f"SQLITE BATCH ERROR: {e}")
@@ -243,8 +242,10 @@ class AdaptiveRouter:
             
             # Check capacity based on vectors
             new_vectors = len(route.utterances)
-            current_capacity = getattr(self.index, '_next_id', self.index.total_vectors)
-            if current_capacity + new_vectors > self.max_capacity:
+            current_vectors = sum(len(existing.utterances) for existing in self._route_map.values())
+            if route.name in self._route_map:
+                current_vectors -= len(self._route_map[route.name].utterances)
+            if current_vectors + new_vectors > self.max_capacity:
                 raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
             
             self._route_map[route.name] = route
@@ -271,7 +272,8 @@ class AdaptiveRouter:
                 raise RouteNotFoundError(f"Route '{route_name}' not found.")
             if utterance in self._route_map[route_name].utterances:
                 return
-            if getattr(self.index, '_next_id', self.index.total_vectors) + 1 > self.max_capacity:
+            current_vectors = sum(len(route.utterances) for route in self._route_map.values())
+            if current_vectors + 1 > self.max_capacity:
                 raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
 
             self._route_map[route_name].utterances.append(utterance)
@@ -318,6 +320,34 @@ class AdaptiveRouter:
             self.metrics.gc_errors.inc()
         finally:
             self._rebuild_pending = False
+
+    async def aadd_route(self, route: Route, _broadcast: bool = True, _precomputed_embeddings=None):
+        return await asyncio.to_thread(
+            self.add_route,
+            route,
+            _broadcast,
+            _precomputed_embeddings,
+        )
+
+    async def aadd_utterance(self, route_name: str, utterance: str, _broadcast: bool = True, _precomputed_embedding=None):
+        return await asyncio.to_thread(
+            self.add_utterance,
+            route_name,
+            utterance,
+            _broadcast,
+            _precomputed_embedding,
+        )
+
+    async def adelete_route(self, route_name: str, _broadcast: bool = True):
+        return await asyncio.to_thread(self.delete_route, route_name, _broadcast)
+
+    async def aupdate_threshold(self, route_name: str, threshold: float, _broadcast: bool = True):
+        return await asyncio.to_thread(
+            self.update_threshold,
+            route_name,
+            threshold,
+            _broadcast,
+        )
 
     def __call__(self, query: str) -> Optional[Route]:
         start_time = time.perf_counter()
@@ -395,7 +425,7 @@ class AdaptiveRouter:
             self._batch_queue.put_nowait((query, future))
             self.metrics.queue_depth.inc()
         except asyncio.QueueFull:
-            future.set_exception(RouterOverloadedError("Router overloaded. Too many requests in queue."))
+            raise RouterOverloadedError("Router queue is full (max 10000). Shedding load.")
         except Exception as e:
             future.set_exception(e)
             

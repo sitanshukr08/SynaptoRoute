@@ -68,3 +68,22 @@ def test_add_utterance_route_deleted_during_encoding(storage, encoder, monkeypat
         router.add_utterance("r1", "new utterance")
         
     t.join()
+
+@pytest.mark.asyncio
+async def test_rebuild_replays_pending_mutations(storage, fake_encoder):
+    router = AdaptiveRouter(fake_encoder, storage)
+    await router.start()
+    router.add_route(Route(name="r1", utterances=["u1"], threshold=0.5))
+    router._flush_storage_batch()
+    pending_route = Route(name="r2", utterances=["u2"], threshold=0.5)
+    pending_embeddings = fake_encoder.encode_batch(["u2"])
+    router._pending_rebuild_mutations.append(("add_route", "r2", pending_embeddings, pending_route))
+    router._rebuild_pending = True
+
+    try:
+        await router._rebuild_index()
+        results = router.index.search(pending_embeddings, top_k=1)
+        assert results[0][0][1] == "r2"
+        assert router._rebuild_pending is False
+    finally:
+        await router.stop()

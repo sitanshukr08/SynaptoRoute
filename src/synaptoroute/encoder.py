@@ -30,6 +30,8 @@ class FastEmbedEncoder(BaseEncoder):
     Handles local intent embeddings using fastembed ONNX models.
     """
     def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5", providers: Optional[List[str]] = None, threads: Optional[int] = None):
+        import threading
+        self._lock = threading.Lock()
         from fastembed import TextEmbedding
         if providers is None:
             providers = ["CPUExecutionProvider"]
@@ -46,8 +48,9 @@ class FastEmbedEncoder(BaseEncoder):
         return self._dim
 
     def encode(self, text: str) -> npt.NDArray[np.float32]:
-        embeddings = list(self.model.embed([text]))
-        return embeddings  # type: ignore  # type: ignore[0]
+        with self._lock:
+            embeddings = list(self.model.embed([text]))
+            return embeddings[0]  # type: ignore
         
     def encode_batch(self, texts: List[str]) -> npt.NDArray[np.float32]:
         if not texts:
@@ -56,10 +59,11 @@ class FastEmbedEncoder(BaseEncoder):
             
         chunk_size = 500
         all_embeddings = []
-        for i in range(0, len(texts), chunk_size):
-            chunk = texts[i:i + chunk_size]
-            embeddings = list(self.model.embed(chunk))
-            all_embeddings.extend(embeddings)
+        with self._lock:
+            for i in range(0, len(texts), chunk_size):
+                chunk = texts[i:i + chunk_size]
+                embeddings = list(self.model.embed(chunk))
+                all_embeddings.extend(embeddings)
             
         return np.array(all_embeddings, dtype=np.float32)
 
@@ -71,8 +75,11 @@ class OpenAIEncoder(BaseEncoder):
         try:
             import openai  # type: ignore
         except ImportError as e:
-            raise RuntimeError("Please install synaptoroute[openai] to use the OpenAIEncoder. Run `pip install synaptoroute[openai]`.") from e
+            if client is None:
+                raise RuntimeError("Please install synaptoroute[openai] to use the OpenAIEncoder. Run `pip install synaptoroute[openai]`.") from e
+            openai = None
         self.model_name = model_name
+        self._openai_error = openai.OpenAIError if openai is not None else Exception
         self.client = client or openai.OpenAI()
         
         self.dimensions = dimensions
@@ -100,7 +107,7 @@ class OpenAIEncoder(BaseEncoder):
         return self._dim
 
     def encode(self, text: str) -> npt.NDArray[np.float32]:
-        import openai  # type: ignore
+
         from synaptoroute.exceptions import SynaptoRouteError
         try:
             kwargs: dict = {"input": [text], "model": self.model_name}
@@ -109,14 +116,14 @@ class OpenAIEncoder(BaseEncoder):
                 # type: ignore
             response = self.client.embeddings.create(**kwargs)  # type: ignore  # type: ignore
             return np.array(response.data[0].embedding, dtype=np.float32)
-        except openai.OpenAIError as e:
+        except self._openai_error as e:
             raise SynaptoRouteError(f"OpenAI API Error: {e}") from e
         
     def encode_batch(self, texts: List[str]) -> npt.NDArray[np.float32]:
         if not texts:
             return np.empty((0, self.dim), dtype=np.float32)
         
-        import openai  # type: ignore
+
         from synaptoroute.exceptions import SynaptoRouteError
         try:
             chunk_size = 2048
@@ -131,7 +138,7 @@ class OpenAIEncoder(BaseEncoder):
                 embeddings = [data.embedding for data in response.data]
                 all_embeddings.extend(embeddings)
             return np.array(all_embeddings, dtype=np.float32)
-        except openai.OpenAIError as e:
+        except self._openai_error as e:
             raise SynaptoRouteError(f"OpenAI API Error: {e}") from e
 
 # Preserve backwards compatibility

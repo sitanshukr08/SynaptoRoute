@@ -30,13 +30,16 @@ class BaseStorage(ABC):
     def delete_route(self, route_name: str):
         pass
 
+    def delete_utterance(self, route_name: str, utterance: str):
+        raise NotImplementedError
+
 class SQLiteStorage(BaseStorage):
     def __init__(self, db_path: str):
         self.db_path = db_path
         self._memory_conn = None
         if self.db_path == ':memory:':
             self._memory_conn = sqlite3.connect(self.db_path, timeout=15.0, check_same_thread=False)
-            self._memory_conn.execute('PRAGMA foreign_keys = ON')
+            self._configure_connection(self._memory_conn)
         else:
             dirname = os.path.dirname(self.db_path)
             if dirname:
@@ -69,14 +72,19 @@ class SQLiteStorage(BaseStorage):
                     conn = self._pool.get_nowait()
                 except queue.Empty:
                     conn = sqlite3.connect(self.db_path, timeout=15.0, check_same_thread=False)
-                    conn.execute('PRAGMA journal_mode=WAL;')
-                    conn.execute('PRAGMA foreign_keys = ON')
+                    self._configure_connection(conn)
                 try:
                     yield conn
                 finally:
                     self._pool.put_nowait(conn)
             finally:
                 self._pool_sema.release()
+
+    def _configure_connection(self, conn: sqlite3.Connection):
+        conn.isolation_level = "IMMEDIATE"
+        conn.execute('PRAGMA journal_mode=WAL;')
+        conn.execute('PRAGMA foreign_keys = ON')
+        conn.execute('PRAGMA busy_timeout = 15000')
 
     def _init_db(self):
         try:
@@ -173,18 +181,23 @@ class SQLiteStorage(BaseStorage):
         try:
             with self._get_connection() as conn:
                 original_isolation = conn.isolation_level
-                conn.isolation_level = None
-                cursor = conn.cursor()
-                cursor.execute('BEGIN IMMEDIATE')
-                
-                cursor.execute('SELECT name, threshold, metadata FROM routes')
-                route_rows = cursor.fetchall()
-                
-                cursor.execute('SELECT route_name, utterance, embedding FROM utterances')
-                utterance_rows = cursor.fetchall()
-                
-                conn.commit()
-                conn.isolation_level = original_isolation
+                try:
+                    conn.isolation_level = None
+                    cursor = conn.cursor()
+                    cursor.execute('BEGIN IMMEDIATE')
+                    
+                    cursor.execute('SELECT name, threshold, metadata FROM routes')
+                    route_rows = cursor.fetchall()
+                    
+                    cursor.execute('SELECT route_name, utterance, embedding FROM utterances')
+                    utterance_rows = cursor.fetchall()
+                    
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+                    raise
+                finally:
+                    conn.isolation_level = original_isolation
                 
                 utt_dict: dict = {}
                 emb_dict: dict = {}
@@ -224,3 +237,15 @@ class SQLiteStorage(BaseStorage):
                 conn.commit()
         except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
             raise RuntimeError(f"Failed to delete route: {e}") from e
+
+    def delete_utterance(self, route_name: str, utterance: str):
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    'DELETE FROM utterances WHERE route_name = ? AND utterance = ?',
+                    (route_name, utterance),
+                )
+                conn.commit()
+        except (sqlite3.OperationalError, sqlite3.IntegrityError, sqlite3.DatabaseError) as e:
+            raise RuntimeError(f"Failed to delete utterance: {e}") from e

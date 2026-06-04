@@ -1,7 +1,10 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from synaptoroute.integrations.langchain import SynaptoRouteChain
 from synaptoroute.models import Route
+
+pytest.importorskip("langchain_core")
+
+from synaptoroute.integrations.langchain import SynaptoRouteChain
 
 def test_synaptoroute_chain_invoke_with_route():
     mock_router = MagicMock()
