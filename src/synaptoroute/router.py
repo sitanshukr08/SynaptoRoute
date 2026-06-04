@@ -315,7 +315,6 @@ class AdaptiveRouter:
                         except Exception as e:
                             logging.getLogger(__name__).warning(f"Failed to replay WAL mutation {action} on {r_name}: {e}")
                     self._pending_rebuild_mutations.clear()
-                self._route_map = route_dict
         except Exception as e:
             logging.getLogger(__name__).error(f"Rebuild failed: {e}")
             self.metrics.gc_errors.inc()
