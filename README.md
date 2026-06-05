@@ -20,7 +20,7 @@ Instead of relying on expensive and comparatively slow LLM generations to infer 
 
 ## Why use SynaptoRoute?
 
-* **Low Latency:** Achieves ~3.0ms median retrieval latency on 100,000 route indices. 
+* **Low Latency:** Achieves 3.0ms P95 worst-case retrieval latency on a 1,000,000 vector index. 
 * **Zero-Cost Routing:** Defaults to `FastEmbedEncoder` for zero-overhead, local vector generation on the CPU, avoiding external API token costs.
 * **Dynamically Mutable:** Routes can be added, updated, or deleted in memory without requiring a server restart, safely executing under heavy load.
 * **Persistent Storage:** All routing logic is persisted to an embedded SQLite database using Write-Ahead Logging (WAL) for robust state recovery.
