@@ -4,7 +4,7 @@ This document serves as the architectural and feature trajectory for SynaptoRout
 
 ---
 
-## ✅ Completed (v0.4.1 and prior)
+## Completed (v0.4.1 and prior)
 
 * **SQLite WAL Persistence:** Replaced brittle JSON snapshotting with a robust embedded SQLite database using Write-Ahead Logging (WAL) and `IMMEDIATE` transaction isolation.
 * **Asynchronous Micro-Batching:** Re-architected the `AdaptiveRouter` to use an `asyncio.Queue` worker that dynamically micro-batches incoming queries, lifting throughput limits significantly and successfully satisfying the "Encoder Throughput Batching" goal.
@@ -13,7 +13,7 @@ This document serves as the architectural and feature trajectory for SynaptoRout
 
 ---
 
-## 🚀 v0.5.0 (Upcoming: Enterprise Stability & OOD Rejection)
+## v0.5.0 (Upcoming: Enterprise Stability & OOD Rejection)
 
 ### Goal: Automated Distributed Regression Suite
 * **Why It Matters:** While standard unit tests ensure single-node validity, multi-node deployments are prone to race conditions and eventual consistency failures over long uptimes.
@@ -31,7 +31,7 @@ This document serves as the architectural and feature trajectory for SynaptoRout
 
 ---
 
-## 🌐 v0.6.0 (Upcoming: Distributed Scaling)
+## v0.6.0 (Upcoming: Distributed Scaling)
 
 ### Goal: Distributed Bootstrapping Overhaul
 * **Why It Matters:** The current `request_full_sync` Redis PubSub implementation requires `O(N×M)` full-state broadcasting when a new node boots. This causes immediate network saturation and OOM faults above 100,000 routes in enterprise-scale environments.
