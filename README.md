@@ -1,33 +1,34 @@
 <div align="center">
-  <h1>🧠 SynaptoRoute</h1>
-  <p><strong>A blazing-fast, high-throughput semantic router for AI agents and LLM applications.</strong></p>
+  <h1>SynaptoRoute</h1>
+  <p><strong>A high-throughput semantic router for AI agents and LLM applications.</strong></p>
 
   [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-  [![Status](https://img.shields.io/badge/status-production_ready-brightgreen.svg)]()
+  [![PyPI Version](https://img.shields.io/pypi/v/synaptoroute.svg)](https://pypi.org/project/synaptoroute/)
+  [![CI Build](https://github.com/sitanshukr08/SynaptoRoute/actions/workflows/ci.yml/badge.svg)](https://github.com/sitanshukr08/SynaptoRoute/actions)
 </div>
 
 ---
 
 ## What is SynaptoRoute?
 
-SynaptoRoute is an ultra-fast control plane that sits at the edge of your infrastructure. It intercepts natural language queries from users and **deterministically routes them** to predefined tools, APIs, or workflows based on semantic meaning. 
+SynaptoRoute is an adaptive control plane designed to sit at the edge of your infrastructure. It intercepts natural language queries and deterministically routes them to predefined system actions, APIs, or workflows based on semantic meaning. 
 
-**It is not an LLM.** It is a mathematical routing engine.
+It is **not** a large language model (LLM). It is a highly optimized mathematical routing engine.
 
-Instead of paying for expensive, slow LLM generations just to figure out what a user wants, SynaptoRoute mathematically calculates the user's intent in **milliseconds** using local embeddings. If the user wants to check their billing, SynaptoRoute instantly triggers the billing workflow—bypassing the LLM entirely.
+Instead of relying on expensive and comparatively slow LLM generations to infer user intent, SynaptoRoute calculates intent locally using dense vector embeddings. If a query matches a known workflow (e.g., billing inquiries or password resets), SynaptoRoute triggers the action immediately, bypassing the LLM entirely.
 
-## ⚡ Why use SynaptoRoute?
+## Why use SynaptoRoute?
 
-* **Insanely Fast:** ~3.0ms median retrieval latency on 100,000 routes. 
-* **Zero-Cost Routing:** By default, it uses `FastEmbedEncoder` to generate vectors locally on your CPU. No API calls, no token costs.
-* **Dynamically Mutable:** Add, update, or delete routes in memory in real-time without restarting your server.
-* **Bulletproof Persistence:** All routing logic is instantly persisted to an embedded SQLite database using Write-Ahead Logging (WAL) to guarantee zero data loss.
-* **Agent Framework Ready:** Native integrations for LangChain and LlamaIndex to use as a smart tool-selector.
+* **Low Latency:** Achieves ~3.0ms median retrieval latency on 100,000 route indices. 
+* **Zero-Cost Routing:** Defaults to `FastEmbedEncoder` for zero-overhead, local vector generation on the CPU, avoiding external API token costs.
+* **Dynamically Mutable:** Routes can be added, updated, or deleted in memory without requiring a server restart, safely executing under heavy load.
+* **Persistent Storage:** All routing logic is persisted to an embedded SQLite database using Write-Ahead Logging (WAL) for robust state recovery.
+* **Framework Integration:** Includes native integrations for LangChain and LlamaIndex to serve as a deterministic tool-selector.
 
 ---
 
-## 🚀 Quickstart
+## Quickstart
 
 ### Installation
 
@@ -35,17 +36,17 @@ Instead of paying for expensive, slow LLM generations just to figure out what a 
 pip install synaptoroute
 ```
 
-### 1-Minute Example
+### Usage Example
 
 ```python
 import asyncio
 from synaptoroute import AdaptiveRouter, Route
 
 async def main():
-    # 1. Initialize the router (automatically uses local FastEmbed models)
+    # 1. Initialize the router (defaults to local FastEmbed models)
     router = AdaptiveRouter()
     
-    # 2. Define your workflows (routes)
+    # 2. Define workflows (routes)
     billing_route = Route(
         name="billing_inquiry",
         utterances=["how much do I owe?", "view my invoice", "payment history"],
@@ -62,20 +63,20 @@ async def main():
     router.add_route(password_route)
     await router.start()
     
-    # 4. Route incoming user queries in milliseconds
+    # 4. Route incoming user queries
     match = await router.aquery("Where is my latest bill?")
     
     if match and match.name == "billing_inquiry":
-        print("Triggering the Billing Workflow! 💸")
+        print("Triggering the billing workflow.")
     else:
-        print("Falling back to standard LLM generation...")
+        print("Falling back to standard LLM generation.")
 
 asyncio.run(main())
 ```
 
 ---
 
-## 🏗️ How it Works (Architecture)
+## Architecture Design
 
 SynaptoRoute separates concerns across strict boundary layers to guarantee stability under concurrent load:
 
@@ -95,23 +96,23 @@ graph TD
     end
 ```
 
-For a detailed breakdown of subsystem ownership and failure modes, refer to the [Architecture Documentation](docs/ARCHITECTURE.md).
+For a detailed breakdown of subsystem ownership and failure domains, refer to the [Architecture Documentation](docs/ARCHITECTURE.md).
 
 ---
 
-## 🛡️ Engineering Integrity & Transparency
+## Engineering Integrity
 
-We believe in uncompromising engineering rigor. Mistakes in open source are inevitable, but hiding them is unacceptable.
+SynaptoRoute bases its claims strictly on automated, reproducible telemetry located in [BENCHMARK_REGISTRY.md](docs/BENCHMARK_REGISTRY.md).
 
-* **Mathematical Honesty:** Our performance claims are strictly based on automated, reproducible telemetry located in [BENCHMARK_REGISTRY.md](docs/BENCHMARK_REGISTRY.md). 
-* **Safe for Production:** Single-node deployments (local SQLite and FAISS memory boundaries) are fully concurrent-safe and production-ready.
-* **Distributed Sync Limitations:** Enterprise-scale distributed deployments (>5 nodes) using Redis PubSub currently suffer from O(N×M) network bottlenecks during cold-boot. We recommend standard multi-node deployments for staging only until our Durable Ledger upgrade is released.
+* **Mathematical Honesty:** During the v0.3.0 architectural transition, independent benchmark audits uncovered a telemetry unit conversion bug regarding latency claims. The prior benchmarks were formally retracted, and a strict registry was created to hold unalterable telemetry data.
+* **Production Readiness:** Single-node deployments utilizing local SQLite and FAISS memory boundaries are fully concurrent-safe and ready for production use.
+* **Distributed Sync Limitations:** Enterprise-scale deployments (>5 nodes) using Redis PubSub currently face O(N×M) network bottlenecks during cold-boot synchronization. We recommend multi-node deployments for staging only until the integration of a durable external ledger is complete.
 
-## 📚 Developer Resources
+## Developer Resources
 
-* **[CONTRIBUTING.md](CONTRIBUTING.md):** Rules for merging code and tests.
-* **[ROADMAP.md](ROADMAP.md):** Status of our research and engineering goals.
+* **[CONTRIBUTING.md](CONTRIBUTING.md):** Rules for merging code, tests, and benchmark verifications.
+* **[ROADMAP.md](ROADMAP.md):** Current status of research and engineering goals.
 * **[BENCHMARKS.md](BENCHMARKS.md):** Methodology and deep-dive telemetry.
-* **[LIMITATIONS.md](LIMITATIONS.md):** A brutally honest assessment of where the framework falls short.
+* **[LIMITATIONS.md](LIMITATIONS.md):** An assessment of current framework limitations.
 * **[COMPARISON.md](COMPARISON.md):** Objective reviews of alternatives like Semantic Router.
 * **[ARCHITECTURE.md](docs/ARCHITECTURE.md):** Subsystem ownership and failure domains.
