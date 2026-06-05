@@ -65,3 +65,15 @@ This document serves as the historical and future architectural trajectory for S
 * **Success Criteria:**
   * Enable the dynamic creation and routing of isolated `FaissIndex` instances on a per-tenant API key basis.
   * Negligible overhead impact on concurrent memory utilization.
+
+
+---
+
+## v0.7.0 (Upcoming: Next-Generation Capabilities)
+
+### Goal: Multimodal Semantic Routing
+* **Why It Matters:** As agentic frameworks evolve to handle vision and audio inputs (Vision-Language Models, Speech-to-Text pipelines), semantic routing must natively understand multi-modal objects. This allows a user to pass an image of a receipt directly to the router, and have the router instantly trigger the 'Billing API' without requiring an expensive LLM to analyze the image first.
+* **Success Criteria:**
+  * Implement a pluggable MultimodalEncoder (e.g., utilizing OpenAI CLIP or SentenceTransformers).
+  * Expand Route ingestion definitions to accept image bytes, file paths, and audio snippets seamlessly alongside traditional text strings.
+  * Ensure the underlying FaissIndex and margin gating logic remains completely unimpacted by the data source.
