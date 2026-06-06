@@ -400,8 +400,15 @@ class AdaptiveRouter:
                         
             if best_route is not None:
                 # Apply margin gating
-                if second_best_score != -1.0 and (best_score - second_best_score) < self.margin:
+                margin_val = best_score - second_best_score if second_best_score != -1.0 else best_score
+                if second_best_score != -1.0 and margin_val < self.margin:
                     best_route = None
+                else:
+                    best_route = best_route.model_copy()
+                    if best_route.metadata is None:
+                        best_route.metadata = {}
+                    best_route.metadata["match_score"] = float(best_score)
+                    best_route.metadata["match_margin"] = float(margin_val)
                     
             self.metrics.inference_latency_seconds.observe(time.perf_counter() - start_time)
             return best_route
@@ -517,6 +524,7 @@ class AdaptiveRouter:
                                                 
                                         best_route = None
                                         best_score = -1.0
+                                        second_best_score = -1.0
                                         
                                         for score, route_name in q_results:
                                             if route_name not in self._route_map:
@@ -524,8 +532,25 @@ class AdaptiveRouter:
                                             route = self._route_map[route_name]
                                             if score >= route.threshold:
                                                 if score > best_score:
+                                                    if best_route is not None and route.name != best_route.name:
+                                                        second_best_score = best_score
                                                     best_score = score
                                                     best_route = route
+                                                elif score > second_best_score and (best_route is None or route.name != best_route.name):
+                                                    second_best_score = score
+                                                    
+                                        if best_route is not None:
+                                            # Apply margin gating
+                                            margin_val = best_score - second_best_score if second_best_score != -1.0 else best_score
+                                            if second_best_score != -1.0 and margin_val < self.margin:
+                                                best_route = None
+                                            else:
+                                                best_route = best_route.model_copy()
+                                                if best_route.metadata is None:
+                                                    best_route.metadata = {}
+                                                best_route.metadata["match_score"] = float(best_score)
+                                                best_route.metadata["match_margin"] = float(margin_val)
+                                                
                                         results.append(best_route)
                                 return results
 
