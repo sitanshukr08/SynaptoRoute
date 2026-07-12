@@ -1,6 +1,7 @@
 # Multi-Seed Diagnostic Results
 
-Date: 2026-07-13  
+Date: 2026-07-13
+
 Status: unverified development evidence; not paper evidence
 
 These studies execute the fixed seeds `13`, `29`, `42`, `71`, and `101` with

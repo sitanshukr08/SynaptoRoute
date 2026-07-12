@@ -1,6 +1,7 @@
 # Mutation And Durability Contract
 
-Status: implemented single-process contract  
+Status: implemented single-process contract
+
 Scope: `AdaptiveRouter` with `SQLiteStorage`
 
 ## Acknowledgement Levels

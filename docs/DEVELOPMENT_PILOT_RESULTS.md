@@ -1,6 +1,7 @@
 # Development Pilot Results
 
-Date: 2026-07-13  
+Date: 2026-07-13
+
 Status: diagnostic only; not paper evidence
 
 These pilots validate the external-data experiment path and identify the next

@@ -1,7 +1,9 @@
 # SynaptoRoute Research Protocol
 
-Version: 0.2  
-Status: final-experiment protocol; development pilots completed  
+Version: 0.2
+
+Status: final-experiment protocol; development pilots completed
+
 Scope: single-node semantic routing; Redis synchronization is excluded from
 the primary paper claim.
 
