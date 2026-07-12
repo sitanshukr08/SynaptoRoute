@@ -1,12 +1,37 @@
 {
-  "benchmark": "GPU_Acceleration",
-  "timestamp": "2026-06-04T12:02:46.076495",
-  "cpu_metrics": {
-    "startup_time": 0.6756358000002365,
-    "encode_time_300": 2.3359007999988535
+  "schema_version": 1,
+  "benchmark": "gpu_acceleration",
+  "status": "unverified",
+  "timestamp_utc": "2026-06-04T12:02:46.076495Z",
+  "git_commit": "unknown",
+  "command": null,
+  "environment": {
+    "python_version": "unknown",
+    "platform": "unknown",
+    "cpu": "unknown",
+    "gpu": "DirectML-capable GPU, exact device unknown"
   },
-  "gpu_metrics": {
-    "encode_time_300": 1.662274799999068
+  "dataset": "synthetic batch of 300 inputs",
+  "encoder": "unknown",
+  "route_count": null,
+  "query_count": 300,
+  "metrics": {
+    "cpu_startup_time_seconds": 0.6756358000002365,
+    "cpu_encode_time_300_seconds": 2.3359007999988535,
+    "gpu_encode_time_300_seconds": 1.662274799999068,
+    "gpu_status": "SUCCESS"
   },
-  "gpu_status": "SUCCESS"
+  "evidence": {
+    "script_path": null,
+    "raw_output_path": null,
+    "timing_unit": "seconds",
+    "notes": "Historical claim retained for audit only. Raw logs, exact command, and device metadata were not archived."
+  },
+  "missing_evidence": [
+    "runnable benchmark script",
+    "raw benchmark output",
+    "exact command",
+    "seed",
+    "full GPU device metadata"
+  ]
 }

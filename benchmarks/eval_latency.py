@@ -1,94 +1,164 @@
-import os
-import sys
-import numpy as np
-import time
+"""Measure comparable end-to-end routing latency under bounded concurrency."""
+
+from __future__ import annotations
+
+import argparse
 import asyncio
+import time
+from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
+from typing import Any
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+import numpy as np
 
-from utils import load_datasets, init_synaptoroute, init_semantic_router
-from stats_utils import calculate_statistics, print_statistics_report
 
-async def measure_latency(predict_fn, queries, is_async=False):
-    latencies = []
-    
-    if is_async:
-        t0 = time.perf_counter()
-        await asyncio.gather(*(predict_fn(q) for q in queries))
-        time.perf_counter() - t0
-        # For pure concurrent latency without returning per-query wait times, 
-        # we can just use total / len, but wait, the prompt asks for percentile profiles under load.
-        # So we actually measure the time taken to process the batch of N queries.
-        # But wait, the standard way is to record the end-to-end time for each query.
-        
-        async def timed_query(q):
-            start = time.perf_counter()
-            await predict_fn(q)
-            return time.perf_counter() - start
-            
-        latencies = await asyncio.gather(*(timed_query(q) for q in queries))
-    else:
-        for q in queries:
-            start = time.perf_counter()
-            predict_fn(q)
-            latencies.append(time.perf_counter() - start)
-            
-    return latencies
+@dataclass(frozen=True)
+class LatencyMeasurement:
+    latencies_seconds: list[float]
+    wall_seconds: float
 
-async def main():
-    print("=== Running Latency Evaluation (Model: BAAI/bge-small-en-v1.5) ===")
-    print("Initializing Routers...")
+    @property
+    def throughput_qps(self) -> float:
+        return len(self.latencies_seconds) / self.wall_seconds if self.wall_seconds > 0 else 0.0
+
+
+async def measure_latency(
+    predict_fn: Callable[[str], Awaitable[Any]],
+    queries: Sequence[str],
+    *,
+    max_concurrency: int,
+) -> LatencyMeasurement:
+    """Execute every query exactly once and include harness queueing latency."""
+    if max_concurrency < 1:
+        raise ValueError("max_concurrency must be positive")
+    if not queries:
+        raise ValueError("queries must not be empty")
+
+    semaphore = asyncio.Semaphore(max_concurrency)
+
+    async def timed_query(query: str) -> float:
+        start = time.perf_counter()
+        async with semaphore:
+            await predict_fn(query)
+        return time.perf_counter() - start
+
+    wall_start = time.perf_counter()
+    latencies = await asyncio.gather(*(timed_query(query) for query in queries))
+    wall_seconds = time.perf_counter() - wall_start
+    return LatencyMeasurement(latencies_seconds=list(latencies), wall_seconds=wall_seconds)
+
+
+def percentile_ms(samples_seconds: Sequence[float], percentile: float) -> float:
+    return float(np.percentile(samples_seconds, percentile) * 1000.0)
+
+
+def print_measurement(name: str, measurement: LatencyMeasurement) -> None:
+    samples = measurement.latencies_seconds
+    print(
+        f"[{name}] P50: {percentile_ms(samples, 50):.2f}ms "
+        f"| P90: {percentile_ms(samples, 90):.2f}ms "
+        f"| P95: {percentile_ms(samples, 95):.2f}ms "
+        f"| P99: {percentile_ms(samples, 99):.2f}ms "
+        f"| Max: {max(samples) * 1000.0:.2f}ms "
+        f"| Wall: {measurement.wall_seconds * 1000.0:.2f}ms "
+        f"| Throughput: {measurement.throughput_qps:.2f} qps"
+    )
+
+
+async def run_latency_evaluation(
+    model_name: str,
+    load_profiles: Sequence[int],
+    max_concurrency: int,
+    warmup_count: int,
+) -> None:
+    from stats_utils import calculate_statistics, print_statistics_report
+    from utils import init_semantic_router, init_synaptoroute, load_datasets
+
+    print(f"=== Running Latency Evaluation (Model: {model_name}) ===")
     dataset_version, routes_data, test_queries = load_datasets()
-    query_texts = [q["query"] for q in test_queries]
-    
-    router = init_synaptoroute(routes_data)
-    layer = init_semantic_router(routes_data)
-    
-    await router.start()
-    
-    # Warmup
-    print("Warming up...")
-    await router.aquery("warmup")
-    layer("warmup")
-    
-    load_profiles = [1, 100, 1000]
-    for count in load_profiles:
-        print(f"\n--- Load Profile: {count} Concurrent Queries ---")
-        
-        # Test queries expanded to match profile count
-        test_queries_expanded = (query_texts * (count // len(query_texts) + 1))[:count]
-        
-        # Semantic Router Latency
-        sr_latencies = []
-        chunk_size = 100
-        for i in range(0, len(test_queries_expanded), chunk_size):
-            chunk = test_queries_expanded[i:i+chunk_size]
-            async def sr_predict(q):
-                return await asyncio.to_thread(layer, q)
-            chunk_lat = await measure_latency(sr_predict, chunk, is_async=True)
-            sr_latencies.extend(chunk_lat)
-        sr_p50 = np.percentile(sr_latencies, 50) * 1000
-        sr_p90 = np.percentile(sr_latencies, 90) * 1000
-        sr_p95 = np.percentile(sr_latencies, 95) * 1000
-        sr_p99 = np.percentile(sr_latencies, 99) * 1000
-        sr_worst = np.max(sr_latencies) * 1000
-        
-        # SynaptoRoute Latency
-        s_latencies = await measure_latency(router.aquery, test_queries_expanded, is_async=True)
-        s_p50 = np.percentile(s_latencies, 50) * 1000
-        s_p90 = np.percentile(s_latencies, 90) * 1000
-        s_p95 = np.percentile(s_latencies, 95) * 1000
-        s_p99 = np.percentile(s_latencies, 99) * 1000
-        s_worst = np.max(s_latencies) * 1000
-        
-        print(f"[Semantic Router] P50: {sr_p50:.2f}ms | P90: {sr_p90:.2f}ms | P95: {sr_p95:.2f}ms | P99: {sr_p99:.2f}ms | Worst: {sr_worst:.2f}ms")
-        print(f"[SynaptoRoute]    P50: {s_p50:.2f}ms | P90: {s_p90:.2f}ms | P95: {s_p95:.2f}ms | P99: {s_p99:.2f}ms | Worst: {s_worst:.2f}ms")
-        
-        stats_res = calculate_statistics(s_latencies, sr_latencies)
-        print_statistics_report(stats_res, name_a="SynaptoRoute", name_b="Semantic Router")
+    query_texts = [query["query"] for query in test_queries]
+    if not query_texts:
+        raise RuntimeError("No benchmark queries were loaded")
 
-    await router.stop()
+    print(
+        f"Dataset version={dataset_version} routes={len(routes_data)} "
+        f"queries={len(query_texts)} max_concurrency={max_concurrency}"
+    )
+    router = init_synaptoroute(routes_data, model_name)
+    layer = init_semantic_router(routes_data, model_name)
+    await router.start()
+
+    async def baseline_predict(query: str) -> Any:
+        return await asyncio.to_thread(layer, query)
+
+    try:
+        print(f"Warming up with {warmup_count} queries per system...")
+        warmup_queries = (query_texts * (warmup_count // len(query_texts) + 1))[:warmup_count]
+        for query in warmup_queries:
+            await router.aquery(query)
+            await baseline_predict(query)
+
+        for count in load_profiles:
+            if count < 1:
+                raise ValueError("load profiles must be positive")
+            print(f"\n--- Burst Load: {count} Queries ---")
+            workload = (query_texts * (count // len(query_texts) + 1))[:count]
+            offered_concurrency = min(count, max_concurrency)
+
+            baseline = await measure_latency(
+                baseline_predict,
+                workload,
+                max_concurrency=offered_concurrency,
+            )
+            synaptoroute = await measure_latency(
+                router.aquery,
+                workload,
+                max_concurrency=offered_concurrency,
+            )
+
+            print_measurement("Semantic Router", baseline)
+            print_measurement("SynaptoRoute", synaptoroute)
+
+            statistics = calculate_statistics(
+                synaptoroute.latencies_seconds,
+                baseline.latencies_seconds,
+            )
+            print_statistics_report(
+                statistics,
+                name_a="SynaptoRoute",
+                name_b="Semantic Router",
+            )
+    finally:
+        await router.stop()
+
+
+def parse_load_profiles(value: str) -> list[int]:
+    profiles = [int(item.strip()) for item in value.split(",") if item.strip()]
+    if not profiles:
+        raise argparse.ArgumentTypeError("at least one load profile is required")
+    if any(profile < 1 for profile in profiles):
+        raise argparse.ArgumentTypeError("load profiles must be positive")
+    return profiles
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--model", default="BAAI/bge-small-en-v1.5")
+    parser.add_argument("--loads", type=parse_load_profiles, default=[1, 100, 1000])
+    parser.add_argument("--max-concurrency", type=int, default=100)
+    parser.add_argument("--warmup-count", type=int, default=20)
+    args = parser.parse_args()
+
+    asyncio.run(
+        run_latency_evaluation(
+            model_name=args.model,
+            load_profiles=args.loads,
+            max_concurrency=args.max_concurrency,
+            warmup_count=args.warmup_count,
+        )
+    )
+    return 0
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    raise SystemExit(main())

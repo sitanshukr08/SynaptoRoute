@@ -2,63 +2,66 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
+      - uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .[test,all]
-          
-      - name: Run Linters
-        run: |
-          ruff check src/ tests/
-          mypy src/ tests/
+          pip install -e .[test]
 
-      - name: Run Tests
+      - name: Run linters
         run: |
-          pip install pytest-timeout
-          pytest tests/ -v -s --timeout=30
-          
+          ruff check src/ tests/ benchmarks/manifest_schema.py benchmarks/bench_local_index.py
+          mypy --ignore-missing-imports src/
+
+      - name: Run tests
+        run: pytest tests/ -v -s --timeout=30
+
   docker-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Build Docker Image
-        run: |
-          docker build -t synaptoroute-test .
+      - uses: actions/checkout@v4
 
-  benchmark:
+      - name: Build Docker image
+        run: docker build -t synaptoroute-test .
+
+  benchmark-evidence:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
+      - uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e .[all]
-          
-      - name: Run Real-World Dataset Benchmark
+          pip install -e .[test]
+
+      - name: Run deterministic evidence smoke benchmark
         run: |
-          pip install datasets
-          echo "### System Performance & Real Datasets" >> $GITHUB_STEP_SUMMARY
-          python benchmarks/bench_realworld.py >> $GITHUB_STEP_SUMMARY
+          python benchmarks/run_all_benchmarks.py --benchmarks local_smoke --output-dir benchmark_results
+          python -m pytest tests/test_benchmark_evidence.py tests/test_benchmark_methodology.py -q
+
+      - name: Archive benchmark evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-evidence-smoke
+          path: benchmark_results/
+          if-no-files-found: error

@@ -9,7 +9,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+.pytest-tmp*/
 .ruff_cache/
+.test-runtime/
+runtime-pytest-*/
 
 # Build artifacts
 build/
