@@ -1,7 +1,7 @@
 import abc
 import numpy as np
 import numpy.typing as npt
-from typing import List, Optional
+from typing import Any, List, Optional
 
 class BaseEncoder(abc.ABC):
     """
@@ -29,9 +29,10 @@ class FastEmbedEncoder(BaseEncoder):
     """
     Handles local intent embeddings using fastembed ONNX models.
     """
-    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5", providers: List[str] = None, threads: Optional[int] = None):
+    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5", providers: Optional[List[str]] = None, threads: Optional[int] = None):
         import threading
         self._lock = threading.Lock()
+        self.model_name = model_name
         from fastembed import TextEmbedding
         if providers is None:
             providers = ["CPUExecutionProvider"]
@@ -50,7 +51,7 @@ class FastEmbedEncoder(BaseEncoder):
     def encode(self, text: str) -> npt.NDArray[np.float32]:
         with self._lock:
             embeddings = list(self.model.embed([text]))
-            return embeddings[0]
+            return np.asarray(embeddings[0], dtype=np.float32)
         
     def encode_batch(self, texts: List[str]) -> npt.NDArray[np.float32]:
         if not texts:
@@ -72,15 +73,16 @@ class OpenAIEncoder(BaseEncoder):
     Handles remote intent embeddings using OpenAI models.
     """
     def __init__(self, model_name: str = "text-embedding-3-small", dim: Optional[int] = None, dimensions: Optional[int] = None, client=None):
+        openai_module: Any
         try:
-            import openai
+            import openai as openai_module
         except ImportError as e:
             if client is None:
                 raise RuntimeError("Please install synaptoroute[openai] to use the OpenAIEncoder. Run `pip install synaptoroute[openai]`.") from e
-            openai = None
+            openai_module = None
         self.model_name = model_name
-        self._openai_error = openai.OpenAIError if openai is not None else Exception
-        self.client = client or openai.OpenAI()
+        self._openai_error = openai_module.OpenAIError if openai_module is not None else Exception
+        self.client = client or openai_module.OpenAI()
         
         self.dimensions = dimensions
         if dimensions is not None:
@@ -109,7 +111,7 @@ class OpenAIEncoder(BaseEncoder):
     def encode(self, text: str) -> npt.NDArray[np.float32]:
         from synaptoroute.exceptions import SynaptoRouteError
         try:
-            kwargs = {"input": [text], "model": self.model_name}
+            kwargs: dict[str, Any] = {"input": [text], "model": self.model_name}
             if self.dimensions is not None:
                 kwargs["dimensions"] = self.dimensions
             response = self.client.embeddings.create(**kwargs)
@@ -127,7 +129,7 @@ class OpenAIEncoder(BaseEncoder):
             all_embeddings = []
             for i in range(0, len(texts), chunk_size):
                 chunk = texts[i:i + chunk_size]
-                kwargs = {"input": chunk, "model": self.model_name}
+                kwargs: dict[str, Any] = {"input": chunk, "model": self.model_name}
                 if self.dimensions is not None:
                     kwargs["dimensions"] = self.dimensions
                 response = self.client.embeddings.create(**kwargs)

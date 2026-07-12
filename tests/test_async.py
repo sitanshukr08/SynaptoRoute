@@ -1,5 +1,7 @@
 import pytest
 import asyncio
+import threading
+import time
 from synaptoroute.router import AdaptiveRouter
 from synaptoroute.models import Route
 from synaptoroute.storage import SQLiteStorage
@@ -64,6 +66,57 @@ async def test_batch_worker_shutdown(storage, encoder):
         await task
     except (RuntimeError, asyncio.CancelledError):
         pass
+
+
+@pytest.mark.asyncio
+async def test_real_backpressure_bounds_inflight_batches(storage, fake_encoder, monkeypatch):
+    router = AdaptiveRouter(
+        fake_encoder,
+        storage,
+        max_queue_size=2,
+        max_in_flight_batches=1,
+    )
+    router.batch_size = 1
+    router.add_route(Route(name="greeting", utterances=["hello"], threshold=0.5))
+
+    original_encode_batch = fake_encoder.encode_batch
+    lock = threading.Lock()
+    active = 0
+    max_active = 0
+
+    def slow_encode_batch(texts):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        time.sleep(0.05)
+        try:
+            return original_encode_batch(texts)
+        finally:
+            with lock:
+                active -= 1
+
+    monkeypatch.setattr(fake_encoder, "encode_batch", slow_encode_batch)
+    await router.start()
+    try:
+        results = await asyncio.gather(
+            *(router.amatch("hello") for _ in range(30)),
+            return_exceptions=True,
+        )
+    finally:
+        await router.stop()
+
+    overloaded = [result for result in results if isinstance(result, RouterOverloadedError)]
+    successful = [result for result in results if not isinstance(result, Exception)]
+    unexpected = [
+        result
+        for result in results
+        if isinstance(result, Exception) and not isinstance(result, RouterOverloadedError)
+    ]
+    assert overloaded
+    assert successful
+    assert unexpected == []
+    assert max_active == 1
 
 @pytest.mark.asyncio
 async def test_aquery_without_start(storage, encoder):

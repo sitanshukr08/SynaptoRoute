@@ -17,10 +17,10 @@ class NumpyIndex:
         self.dim = dim
         self.lock = threading.Lock()
         self.embeddings = np.zeros((max_capacity, dim), dtype=np.float32)
-        self.tombstones = set()
+        self.tombstones: set[int] = set()
         self._tombstone_array = np.array([], dtype=int)
-        self._id_to_route = {}
-        self._route_to_ids = {}
+        self._id_to_route: dict[int, str] = {}
+        self._route_to_ids: dict[str, list[int]] = {}
         self._next_id = 0
         self.max_capacity = max_capacity
         self.ntotal = 0
@@ -84,7 +84,7 @@ class NumpyIndex:
                 
             scores = np.dot(query_embeddings, self.embeddings[:self._next_id].T)
             
-            results = []
+            results: List[List[Tuple[float, str]]] = []
             for i in range(scores.shape[0]):
                 valid_scores = scores[i][valid_mask]
                 valid_indices = np.arange(self._next_id)[valid_mask]
@@ -157,11 +157,11 @@ class FaissIndex:
         base_index = faiss.IndexHNSWFlat(self.dim, 32, faiss.METRIC_INNER_PRODUCT)
         self.index = faiss.IndexIDMap(base_index)
         
-        self.tombstones = set()
+        self.tombstones: set[int] = set()
         
         # Bidirectional mapping
-        self._id_to_route = {}
-        self._route_to_ids = {}
+        self._id_to_route: dict[int, str] = {}
+        self._route_to_ids: dict[str, list[int]] = {}
         self._next_id = 0
 
     def add(self, embeddings: np.ndarray, route_name: str):

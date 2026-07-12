@@ -5,7 +5,7 @@ import threading
 import contextlib
 import queue
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
 
 from synaptoroute.models import Route
 
@@ -36,7 +36,7 @@ class BaseStorage(ABC):
 class SQLiteStorage(BaseStorage):
     def __init__(self, db_path: str):
         self.db_path = db_path
-        self._memory_conn = None
+        self._memory_conn: Optional[sqlite3.Connection] = None
         if self.db_path == ':memory:':
             self._memory_conn = sqlite3.connect(self.db_path, timeout=15.0, check_same_thread=False)
             self._configure_connection(self._memory_conn)
@@ -45,7 +45,7 @@ class SQLiteStorage(BaseStorage):
             if dirname:
                 os.makedirs(dirname, exist_ok=True)
                 
-        self._pool = queue.Queue(maxsize=10)
+        self._pool: queue.Queue[sqlite3.Connection] = queue.Queue(maxsize=10)
         self._pool_sema = threading.Semaphore(10)
         
         self._init_db()
@@ -176,8 +176,8 @@ class SQLiteStorage(BaseStorage):
             raise RuntimeError(f"Failed to add utterance: {e}") from e
 
     def load_all_routes(self) -> tuple[List[Route], dict]:
-        routes = []
-        embeddings_map = {}
+        routes: list[Route] = []
+        embeddings_map: dict[str, list[bytes | None]] = {}
         try:
             with self._get_connection() as conn:
                 original_isolation = conn.isolation_level
@@ -199,8 +199,8 @@ class SQLiteStorage(BaseStorage):
                 finally:
                     conn.isolation_level = original_isolation
                 
-                utt_dict = {}
-                emb_dict = {}
+                utt_dict: dict[str, list[str]] = {}
+                emb_dict: dict[str, list[bytes | None]] = {}
                 for route_name, utt, emb in utterance_rows:
                     if route_name not in utt_dict:
                         utt_dict[route_name] = []
