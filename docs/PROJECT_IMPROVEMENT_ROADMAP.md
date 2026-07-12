@@ -288,9 +288,9 @@ Already mostly in progress:
 
 ### PR 2: Public API And Examples
 
-* Add `RouterResult`.
+* Add `RouterResult`. (Implemented on the research branch.)
 * Keep `router("query")` compatibility.
-* Add `router.match("query") -> RouterResult`.
+* Add `router.match("query") -> RouterResult`. (Implemented.)
 * Add examples and README quickstart.
 
 ### PR 3: First Verified Local Benchmark
@@ -309,17 +309,17 @@ Already mostly in progress:
 
 ### PR 5: OOD And Calibration
 
-* Top-k result object.
-* Margin/threshold calibration.
-* OOD benchmark.
-* Reliability diagram data.
+* Top-k result object. (Implemented.)
+* Global and route-specific margin/threshold calibration. (Implemented.)
+* OOD benchmark and matched-coverage statistics. (Implemented diagnostically.)
+* Reliability diagram data. (Pending.)
 
 ### PR 6: Persistence And Mutation Paper Section
 
-* Storage writer abstraction.
-* Durability barrier tests.
-* restart recovery tests.
-* mutation latency benchmark.
+* Observable mutation receipts and a durability barrier. (Implemented.)
+* Restart, failed-write, abrupt-exit, and overload tests. (Implemented.)
+* Mutation and mixed-workload diagnostic benchmarks. (Implemented.)
+* Route versions and controlled-hardware repetitions. (Pending.)
 
 ### PR 7: Open-Source Release Polish
 
@@ -337,8 +337,8 @@ Already mostly in progress:
 
 ## Immediate Next Actions
 
-1. Finish and merge the current stabilization branch.
-2. Add `RouterResult` without breaking existing `Optional[Route]` behavior.
+1. Review and merge the research evidence and durability branch.
+2. Archive the clean candidate artifacts and complete independent reproduction.
 3. Add quickstart and persistence examples.
-4. Build the first CI-safe verified benchmark.
-5. Only then start drafting the results section of the paper.
+4. Add reliability diagrams, route versions, and controlled-hardware sweeps.
+5. Draft the results section only from promoted, claim-specific evidence.

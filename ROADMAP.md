@@ -44,7 +44,8 @@ Evidence limitations:
 
 ## Phase 0: Evidence Integrity
 
-**Status:** implementation complete; clean evidence rerun pending
+**Status:** implementation complete; clean candidate rerun complete; independent
+review and evidence promotion pending
 
 Deliverables:
 
@@ -93,8 +94,8 @@ Implemented so far:
 * OOD ranking and selective risk-coverage metrics;
 * unit and integration tests that prevent fitting on the test split.
 
-Still required: reliability diagrams, multi-seed confidence intervals, and
-matched-coverage statistical comparisons.
+Still required: reliability diagrams and independent review of the multi-seed
+confidence intervals and matched-coverage implementation.
 
 ## Phase 2: Static Quality Baselines
 
@@ -135,8 +136,10 @@ Implemented so far:
   quality metrics.
 
 The pilots are intentionally marked `unverified` and are not paper evidence.
-Diagnostic five-seed runs and paired statistics are implemented. Clean
-immutable reruns, independent review, and evidence promotion remain open.
+Diagnostic five-seed runs and paired statistics are implemented. The full
+studies were repeated from clean commit `df94df3` with exactly equal aggregate
+and paired statistical sections. Artifact archival, independent reproduction,
+and evidence promotion remain open.
 
 Pilot interpretation is recorded in
 [`docs/DEVELOPMENT_PILOT_RESULTS.md`](docs/DEVELOPMENT_PILOT_RESULTS.md). The
@@ -176,8 +179,8 @@ Implemented so far:
 * a bounded in-flight async batch executor and offered-load shedding sweep.
 
 Still required: route versions, a cross-process ordering model, repeated
-controlled-hardware runs, queue-backpressure sweeps, and broader crash timing
-windows.
+controlled-hardware runs, broader queue/backpressure parameter sweeps, and
+broader crash timing windows.
 
 ## Phase 4: Scale And Ablation Study
 

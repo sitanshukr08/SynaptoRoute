@@ -8,9 +8,12 @@ These studies execute the fixed seeds `13`, `29`, `42`, `71`, and `101` with
 full official test splits. Exact-text embedding memoization is used only to
 avoid recomputing deterministic vectors; latency is excluded.
 
-The runs occurred from a dirty working tree while implementation continued.
-They are useful for research decisions but must be repeated from an immutable
-clean commit before any number is used externally.
+The original runs occurred from a dirty working tree while implementation
+continued. The complete study was subsequently repeated from clean commit
+`df94df3`, producing exactly equal aggregate and paired statistical sections.
+That provenance is recorded in `CLEAN_REPLICATION_RESULTS.md`. The artifacts
+remain unverified and must not be used externally until they are archived and
+independently reproduced.
 
 ## Banking77
 

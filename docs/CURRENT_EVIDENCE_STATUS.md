@@ -19,7 +19,14 @@ SynaptoRoute has a coherent engineering direction, but its historical benchmark 
   manifests keep them ineligible for paper claims.
 * Full-test five-seed diagnostic studies and paired bootstrap analyses now
   exist for Banking77 and CLINC150/OOS. Their interpretation is recorded in
-  `MULTISEED_DIAGNOSTIC_RESULTS.md`; the runs remain unverified.
+  `MULTISEED_DIAGNOSTIC_RESULTS.md`.
+* Both five-seed studies were reproduced from clean commit `df94df3`; their
+  aggregate and paired statistical sections exactly match the dirty-tree
+  diagnostics. Clean systems smokes also completed without invariant
+  failures. Digests and commands are recorded in
+  `CLEAN_REPLICATION_RESULTS.md`.
+* The clean artifacts remain local and unverified. They are candidate evidence,
+  not paper evidence, until archived and independently reproduced.
 
 ## Research Claims
 
@@ -32,6 +39,8 @@ SynaptoRoute has a coherent engineering direction, but its historical benchmark 
 * The diagnostic multi-seed result rejects a general static-accuracy claim:
   per-route calibration helps CLINC open-set behavior but harms Banking77, and
   logistic regression remains stronger on overall CLINC quality.
+* Clean replication strengthens confidence in that negative result but does
+  not change its publication status.
 
 ## Publication Gate
 

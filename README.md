@@ -23,9 +23,10 @@ It is designed to sit at the edge of your infrastructure, intercepting user inte
 
 ### [IN PROGRESS] Out-of-Distribution (OOD) Resilience
 * **Cross-Encoder Fallbacks:** Intelligent deferral to dense reasoning models when a query falls between semantic boundaries.
-* **Validation-Only Calibration:** The research harness fits a global score
-  threshold and ambiguity margin on held-out data, then freezes the policy
-  before test evaluation. Per-route calibration remains planned.
+* **Validation-Only Calibration:** The research harness fits global and
+  route-specific score thresholds plus an ambiguity margin on held-out data,
+  then freezes the policy before test evaluation. These policies are research
+  features, not a guarantee of OOD safety.
 
 ## Architecture Design
 
@@ -37,7 +38,7 @@ graph TD
     
     subgraph Core Engine
         Router -- "1. Vectorizes text" --> Encoder["FastEmbedEncoder"]
-        Router -- "2. Semantic distance search" --> Index["FaissIndex"]
+        Router -- "2. Semantic distance search" --> Index["NumPy / optional FAISS index"]
     end
     
     subgraph Data & Sync
@@ -57,6 +58,9 @@ SynaptoRoute now treats historical benchmark numbers as audit targets until they
 
 * **Accuracy:** Banking77 and CLINC150 numbers are currently unverified historical claims.
 * **Latency:** The old `0.003ms` claim is retracted. The corrected interpretation is about `3ms`, but it still requires a clean rerun before publication.
+* **Research candidates:** Five-seed quality and structural systems runs now
+  have clean local replications, but remain unverified until artifacts are
+  archived and independently reproduced.
 
 For a deep dive into the methodology, datasets, and hardware used for these measurements, consult [BENCHMARKS.md](BENCHMARKS.md).
 
@@ -91,6 +95,7 @@ SynaptoRoute v0.4.0 should be treated as an active engineering project, not a fi
 * **[RESEARCH_PROTOCOL.md](docs/RESEARCH_PROTOCOL.md):** Research questions, datasets, baselines, metrics, statistics, and evidence gates.
 * **[DEVELOPMENT_PILOT_RESULTS.md](docs/DEVELOPMENT_PILOT_RESULTS.md):** Explicitly unverified Banking77 and CLINC150 pilot results, including negative findings.
 * **[MULTISEED_DIAGNOSTIC_RESULTS.md](docs/MULTISEED_DIAGNOSTIC_RESULTS.md):** Five-seed full-test diagnostics, paired intervals, and the static-quality decision.
+* **[CLEAN_REPLICATION_RESULTS.md](docs/CLEAN_REPLICATION_RESULTS.md):** Clean-commit commands, outcomes, artifact digests, and the remaining promotion gate.
 * **[BENCHMARKS.md](BENCHMARKS.md):** Methodology and deep-dive telemetry.
 * **[LIMITATIONS.md](LIMITATIONS.md):** A brutally honest assessment of where the framework falls short.
 * **[COMPARISON.md](COMPARISON.md):** Objective, measured reviews of alternatives like Semantic Router.

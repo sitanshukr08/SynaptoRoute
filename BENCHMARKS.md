@@ -80,3 +80,6 @@ Experimental definitions and statistical requirements are fixed in
 [`docs/RESEARCH_PROTOCOL.md`](docs/RESEARCH_PROTOCOL.md).
 The latest explicitly unverified diagnostic results and their interpretation
 are in [`docs/DEVELOPMENT_PILOT_RESULTS.md`](docs/DEVELOPMENT_PILOT_RESULTS.md).
+The clean-commit replication commands, invariant outcomes, and artifact
+digests are in
+[`docs/CLEAN_REPLICATION_RESULTS.md`](docs/CLEAN_REPLICATION_RESULTS.md).
