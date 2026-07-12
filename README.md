@@ -1,103 +1,172 @@
-# SynaptoRoute
+<div align="center">
+  <h1>SynaptoRoute</h1>
+  <p><strong>A local, persistent semantic router for AI agents and LLM applications.</strong></p>
 
-SynaptoRoute is an adaptive, high-throughput semantic router. It is **not** a large language model (LLM), an embedding model, or a conversational agent. It is a highly optimized control plane that ingests natural language queries and deterministically routes them to predefined system actions ("routes") based on semantic similarity.
+  [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![PyPI Version](https://img.shields.io/pypi/v/synaptoroute.svg)](https://pypi.org/project/synaptoroute/)
+  [![CI Build](https://github.com/sitanshukr08/SynaptoRoute/actions/workflows/ci.yml/badge.svg)](https://github.com/sitanshukr08/SynaptoRoute/actions)
+</div>
 
-It is designed to sit at the edge of your infrastructure, intercepting user intents in milliseconds to bypass heavy LLM generation where predefined workflows (e.g., billing, password resets, API lookups) exist.
+---
 
-## Features
+## What Is SynaptoRoute?
 
-### Core Routing Engine
-* **Local Encoding:** Utilizes `FastEmbedEncoder` for local vector generation.
-* **Deterministic Matching:** Supports NumPy exact retrieval and optional
-  FAISS HNSW retrieval behind the same routing contract.
-* **Dynamic Mutation:** Routes can be added, updated, and deleted in memory without restarting the router, safely executing under heavy load.
-* **Persistent Storage:** Backed by SQLite storage with explicit in-memory and
-  durable mutation acknowledgements, observable receipts, and restart recovery.
-* **Observable Decisions:** `AdaptiveRouter.match()` returns the selected
-  route, score, margin, ranked candidates, and an explicit decision reason;
-  the callable API remains backward compatible.
+SynaptoRoute maps natural-language queries to predefined routes such as tools,
+APIs, or workflows. It performs embedding and retrieval locally by default, so
+applications can handle known intents without invoking an LLM for every
+request.
 
-### [EXPERIMENTAL] Distributed Synchronization
-* **Redis PubSub Topology:** Nodes share semantic state mutations across a Redis cluster using event broadcasting. 
-* *Constraint:* Fully eventual consistency. O(N*M) network bottlenecks during cold-boot limits safe scaling to smaller multi-node enterprise deployments.
+It is not an LLM, an embedding model, or a security boundary. It is an active
+engineering and research project focused on observable decisions, explicit
+abstention, dynamic mutation, and local persistence.
 
-### [IN PROGRESS] Out-of-Distribution (OOD) Resilience
-* **Cross-Encoder Fallbacks:** Intelligent deferral to dense reasoning models when a query falls between semantic boundaries.
-* **Validation-Only Calibration:** The research harness fits global and
-  route-specific score thresholds plus an ambiguity margin on held-out data,
-  then freezes the policy before test evaluation. These policies are research
-  features, not a guarantee of OOD safety.
+## Current Capabilities
 
-## Architecture Design
+* **Local encoding:** `FastEmbedEncoder` is the default CPU encoder.
+* **Exact or approximate retrieval:** NumPy exact search is available by
+  default; FAISS HNSW is optional.
+* **Observable decisions:** `AdaptiveRouter.match()` and `amatch()` return the
+  selected route, score, margin, ranked candidates, and decision reason.
+* **Backward-compatible routing:** `router(query)` and `aquery(query)` still
+  return `Route | None`.
+* **Dynamic mutation:** routes and utterances can be added, updated, and
+  deleted without restarting the process.
+* **Explicit durability:** mutation receipts distinguish memory acceptance,
+  durable commit, and failed persistence.
+* **Bounded async load:** queue and in-flight batch limits shed excess work
+  with an explicit overload error.
+* **Experimental distributed sync:** Redis Pub/Sub can broadcast mutations,
+  but it does not provide durable replay or strong consistency.
 
-SynaptoRoute separates concerns across strict boundary layers to guarantee stability under concurrent loads:
+## Quickstart
+
+### Installation
+
+```bash
+pip install synaptoroute
+```
+
+### Synchronous Routing
+
+```python
+from synaptoroute import AdaptiveRouter, Route
+
+router = AdaptiveRouter()
+router.add_route(
+    Route(
+        name="billing_inquiry",
+        utterances=["view my invoice", "payment history", "charged twice"],
+        threshold=0.80,
+    )
+)
+
+result = router.match("Where is my latest bill?")
+if result.matched:
+    print(result.route_name, result.score, result.decision_reason)
+
+router.close()
+```
+
+### Asynchronous Routing
+
+```python
+import asyncio
+
+from synaptoroute import AdaptiveRouter, Route
+
+
+async def main():
+    router = AdaptiveRouter(max_queue_size=1_000, max_in_flight_batches=4)
+    router.add_route(
+        Route(
+            name="password_reset",
+            utterances=["forgot my password", "reset password", "cannot log in"],
+            threshold=0.80,
+        )
+    )
+
+    await router.start()
+    try:
+        result = await router.amatch("I cannot sign in")
+        print(result.route_name, result.score, result.margin)
+    finally:
+        await router.stop()
+
+
+asyncio.run(main())
+```
+
+## Architecture
 
 ```mermaid
 graph TD
-    Client["Incoming Query / Mutation"] --> Router["AdaptiveRouter"]
-    
-    subgraph Core Engine
-        Router -- "1. Vectorizes text" --> Encoder["FastEmbedEncoder"]
-        Router -- "2. Semantic distance search" --> Index["NumPy / optional FAISS index"]
+    Client["Query or mutation"] --> Router["AdaptiveRouter"]
+
+    subgraph Routing
+        Router --> Encoder["Local or hosted encoder"]
+        Encoder --> Index["NumPy or optional FAISS index"]
+        Index --> Policy["Threshold, margin, optional reranker"]
+        Policy --> Decision["RouterResult"]
     end
-    
-    subgraph Data & Sync
-        Router -- "3. Durable WAL persistence" --> Storage[("SQLiteStorage")]
-        Router -- "4. Incremental broadcast" --> Sync["RedisSyncManager"]
-        Sync -.-> Cluster["Peer Nodes"]
+
+    subgraph State
+        Router --> Memory["In-memory route state"]
+        Router --> Writer["FIFO storage writer"]
+        Writer --> SQLite[("SQLite WAL")]
+        Router -. "experimental" .-> Redis["Redis Pub/Sub"]
+    end
+
+    subgraph Async execution
+        Router --> Queue["Bounded request queue"]
+        Queue --> Batches["Bounded in-flight batches"]
     end
 ```
 
-For a detailed breakdown of subsystem ownership, dependencies, and failure modes, refer to the [Architecture Documentation](docs/ARCHITECTURE.md).
+See [Architecture Documentation](docs/ARCHITECTURE.md) and the
+[Durability Contract](docs/DURABILITY_CONTRACT.md) for ownership, ordering,
+and failure semantics.
 
----
+## Evidence Status
 
-## Performance Claims
+Historical accuracy, OOD, throughput, GPU, and scale claims remain
+`unverified` unless a claim-specific evidence manifest says otherwise. The old
+`0.003ms` one-million-vector latency claim is retracted because its unit
+conversion was wrong.
 
-SynaptoRoute now treats historical benchmark numbers as audit targets until they are rerun with schema-valid manifests and raw logs.
-
-* **Accuracy:** Banking77 and CLINC150 numbers are currently unverified historical claims.
-* **Latency:** The old `0.003ms` claim is retracted. The corrected interpretation is about `3ms`, but it still requires a clean rerun before publication.
-* **Research candidates:** Five-seed quality and structural systems runs now
-  have clean local replications, but remain unverified until artifacts are
-  archived and independently reproduced.
-
-For a deep dive into the methodology, datasets, and hardware used for these measurements, consult [BENCHMARKS.md](BENCHMARKS.md).
-
----
-
-## Engineering Integrity (Trust & Verification)
-
-SynaptoRoute follows a philosophy of uncompromising engineering rigor. During the v0.3.0 architectural transition, independent benchmark audits uncovered invalid concurrency artifacts and a devastating telemetry unit conversion bug regarding latency claims.
-
-As a result:
-* Historical benchmark claims are now marked `unverified` or `retracted` unless the evidence is complete.
-* A schema-validated benchmark runner records commands, environment metadata, and raw log paths.
-* A strict [BENCHMARK_REGISTRY.md](docs/BENCHMARK_REGISTRY.md) tracks what can and cannot be claimed.
-
-Mistakes in open source are inevitable, but hiding them is unacceptable. We preserve our retracted mistakes historically to demonstrate the mathematical rigor required to build a trusted distributed router.
-
----
+Five-seed Banking77 and CLINC150/OOS quality studies and structural systems
+smokes now have clean local replications. They remain candidate evidence, not
+paper evidence, until raw artifacts are archived and independently reproduced.
+The static study does not support a broad superior-accuracy claim: per-route
+calibration helps CLINC open-set behavior, harms Banking77, and trails logistic
+regression on overall CLINC quality.
 
 ## Production Readiness
 
-SynaptoRoute v0.4.0 should be treated as an active engineering project, not a finished research artifact.
+Treat v0.4.1 as an active project rather than a validated production system.
 
-* **Single-Node Deployments:** plausible target, but release claims require passing tests and verified benchmark evidence.
-* **Multi-Node Deployments:** Redis sync is experimental and should be used only for staged validation.
-* **Enterprise-Scale Deployments (>5 nodes, >100k routes):** **NOT SUPPORTED**. Redis Pub/Sub bootstrap behavior is not validated for massive cluster state transfer.
+* **Single process:** the primary engineering target; tests cover concurrent
+  reads, mutation receipts, restart recovery, and bounded async overload.
+* **Multiple processes or nodes:** process-local queues and caches do not
+  coordinate across workers.
+* **Redis synchronization:** experimental; missed-message replay, ordering,
+  and bootstrap behavior are not yet a durable protocol.
+* **OOD rejection:** calibrated abstention is available in the research
+  harness, but it is not a guarantee against incorrect routing.
 
 ## Developer Resources
 
-* **[CONTRIBUTING.md](CONTRIBUTING.md):** Rules for merging code, tests, and benchmark verifications.
-* **[ROADMAP.md](ROADMAP.md):** Current status of our research, infrastructure, and engineering goals.
-* **[PROJECT_IMPROVEMENT_ROADMAP.md](docs/PROJECT_IMPROVEMENT_ROADMAP.md):** Competitive analysis and next PR sequence.
-* **[RESEARCH_PROTOCOL.md](docs/RESEARCH_PROTOCOL.md):** Research questions, datasets, baselines, metrics, statistics, and evidence gates.
-* **[DEVELOPMENT_PILOT_RESULTS.md](docs/DEVELOPMENT_PILOT_RESULTS.md):** Explicitly unverified Banking77 and CLINC150 pilot results, including negative findings.
-* **[MULTISEED_DIAGNOSTIC_RESULTS.md](docs/MULTISEED_DIAGNOSTIC_RESULTS.md):** Five-seed full-test diagnostics, paired intervals, and the static-quality decision.
-* **[CLEAN_REPLICATION_RESULTS.md](docs/CLEAN_REPLICATION_RESULTS.md):** Clean-commit commands, outcomes, artifact digests, and the remaining promotion gate.
-* **[BENCHMARKS.md](BENCHMARKS.md):** Methodology and deep-dive telemetry.
-* **[LIMITATIONS.md](LIMITATIONS.md):** A brutally honest assessment of where the framework falls short.
-* **[COMPARISON.md](COMPARISON.md):** Objective, measured reviews of alternatives like Semantic Router.
-* **[ARCHITECTURE.md](docs/ARCHITECTURE.md):** Subsystem ownership and failure domains.
-* **[DURABILITY_CONTRACT.md](docs/DURABILITY_CONTRACT.md):** Exact mutation acknowledgement, ordering, failure, and restart guarantees.
+* [CONTRIBUTING.md](CONTRIBUTING.md): setup, review, and evidence rules.
+* [ROADMAP.md](ROADMAP.md): research phases and decision gates.
+* [BENCHMARKS.md](BENCHMARKS.md): benchmark commands and metric policy.
+* [RESEARCH_PROTOCOL.md](docs/RESEARCH_PROTOCOL.md): fixed questions,
+  datasets, baselines, metrics, and statistics.
+* [MULTISEED_DIAGNOSTIC_RESULTS.md](docs/MULTISEED_DIAGNOSTIC_RESULTS.md):
+  five-seed static results and negative findings.
+* [CLEAN_REPLICATION_RESULTS.md](docs/CLEAN_REPLICATION_RESULTS.md): clean-run
+  provenance, artifact digests, and the remaining promotion gate.
+* [BENCHMARK_REGISTRY.md](docs/BENCHMARK_REGISTRY.md): claim and evidence
+  status.
+* [LIMITATIONS.md](LIMITATIONS.md): known technical limitations.
+* [PROJECT_IMPROVEMENT_ROADMAP.md](docs/PROJECT_IMPROVEMENT_ROADMAP.md):
+  competitive context and the longer product backlog.

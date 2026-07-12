@@ -516,9 +516,17 @@ class AdaptiveRouter:
                 decision_reason=DecisionReason.AMBIGUOUS_MARGIN,
             )
 
+        selected_score, selected_route = eligible[0]
+        matched_route = selected_route.model_copy()
+        matched_route.metadata = dict(selected_route.metadata or {})
+        matched_route.metadata["match_score"] = float(selected_score)
+        matched_route.metadata["match_margin"] = float(
+            decision_margin if decision_margin is not None else selected_score
+        )
+
         return RouterResult(
-            route=eligible[0][1],
-            score=eligible[0][0],
+            route=matched_route,
+            score=selected_score,
             margin=decision_margin,
             candidates=result_candidates,
             decision_reason=DecisionReason.MATCHED,

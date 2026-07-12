@@ -255,3 +255,10 @@ negative-results framing.
 At day 90, stop the full conference-paper plan if the team cannot reproduce
 the experiment artifact from a clean machine. A technical report or JOSS
 software paper remains a valid fallback.
+
+## Product Release Context
+
+The research phases govern evidence quality; release versions govern
+user-facing features. The current package release is v0.4.1. Distributed
+bootstrapping, multi-tenant indexes, and multimodal encoders remain product
+backlog items and must not bypass the research validation gates above.

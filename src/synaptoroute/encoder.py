@@ -109,12 +109,14 @@ class OpenAIEncoder(BaseEncoder):
         return self._dim
 
     def encode(self, text: str) -> npt.NDArray[np.float32]:
+
         from synaptoroute.exceptions import SynaptoRouteError
         try:
             kwargs: dict[str, Any] = {"input": [text], "model": self.model_name}
             if self.dimensions is not None:
-                kwargs["dimensions"] = self.dimensions
-            response = self.client.embeddings.create(**kwargs)
+                kwargs["dimensions"] = self.dimensions  # type: ignore
+                # type: ignore
+            response = self.client.embeddings.create(**kwargs)  # type: ignore  # type: ignore
             return np.array(response.data[0].embedding, dtype=np.float32)
         except self._openai_error as e:
             raise SynaptoRouteError(f"OpenAI API Error: {e}") from e
@@ -123,6 +125,7 @@ class OpenAIEncoder(BaseEncoder):
         if not texts:
             return np.empty((0, self.dim), dtype=np.float32)
         
+
         from synaptoroute.exceptions import SynaptoRouteError
         try:
             chunk_size = 2048
@@ -131,8 +134,9 @@ class OpenAIEncoder(BaseEncoder):
                 chunk = texts[i:i + chunk_size]
                 kwargs: dict[str, Any] = {"input": chunk, "model": self.model_name}
                 if self.dimensions is not None:
-                    kwargs["dimensions"] = self.dimensions
-                response = self.client.embeddings.create(**kwargs)
+                    kwargs["dimensions"] = self.dimensions  # type: ignore
+                # type: ignore
+                response = self.client.embeddings.create(**kwargs)  # type: ignore  # type: ignore
                 embeddings = [data.embedding for data in response.data]
                 all_embeddings.extend(embeddings)
             return np.array(all_embeddings, dtype=np.float32)

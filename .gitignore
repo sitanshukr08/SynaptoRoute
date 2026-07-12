@@ -11,6 +11,7 @@ __pycache__/
 .pytest_cache/
 .pytest-tmp*/
 .ruff_cache/
+.mypy_cache/
 .test-runtime/
 runtime-pytest-*/
 
@@ -35,6 +36,11 @@ benchmark_manifest.json
 benchmark_results/
 *.log
 *.log.utf8.txt
+audit_reports/
+*_data_full.json
+analyze_repo2.py
+generate_reports.py
+mypy_output.txt
 
 # Environment
 .env

@@ -1,4 +1,5 @@
 import pytest
+from typing import Any
 import asyncio
 import numpy as np
 from unittest.mock import AsyncMock, patch, MagicMock
@@ -10,10 +11,10 @@ from synaptoroute.profile import get_profile, ProfileType
 from synaptoroute.trainer import SyntheticTuner
 
 class DummyStorage(BaseStorage):
-    def save_route(self, route: Route, embeddings: bytes): pass
+    def save_route(self, route: Route, embeddings: Any = None): pass
     def load_all_routes(self): return [], {}
     def delete_route(self, route_name: str): pass
-    def add_utterance(self, route_name: str, utterance: str, embedding: bytes): pass
+    def add_utterance(self, route_name: str, utterance: str, embedding: Any = None): pass
     def update_threshold(self, route_name: str, threshold: float): pass
 
 @pytest.mark.asyncio

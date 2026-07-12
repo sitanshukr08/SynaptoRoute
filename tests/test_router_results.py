@@ -97,3 +97,33 @@ def test_router_result_serializes_for_prediction_artifacts(fake_encoder):
     assert payload["decision_reason"] == "matched"
     assert payload["candidates"][0]["route_name"] == "greeting"
     router.close()
+
+
+@pytest.mark.asyncio
+async def test_sync_and_async_matches_preserve_score_metadata_compatibility(fake_encoder):
+    source_route = Route(
+        name="greeting",
+        utterances=["hello"],
+        threshold=0.5,
+        metadata={"owner": "support"},
+    )
+    router = AdaptiveRouter(fake_encoder, SQLiteStorage(":memory:"))
+    router.add_route(source_route)
+
+    sync_result = router.match("hello")
+    assert sync_result.route is not None
+    assert sync_result.route.metadata == {
+        "owner": "support",
+        "match_score": pytest.approx(sync_result.score),
+        "match_margin": pytest.approx(sync_result.score),
+    }
+
+    await router.start()
+    try:
+        async_result = await router.amatch("hello")
+    finally:
+        await router.stop()
+
+    assert async_result.route is not None
+    assert async_result.route.metadata == sync_result.route.metadata
+    assert source_route.metadata == {"owner": "support"}

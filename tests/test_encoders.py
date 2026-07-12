@@ -1,3 +1,4 @@
+from typing import Any
 import numpy as np
 from unittest.mock import MagicMock
 
@@ -17,10 +18,10 @@ def test_fastembed_encoder(encoder):
     assert embeddings.shape == (2, encoder.dim)
 
 class DummyStorage(BaseStorage):
-    def save_route(self, route: Route, embeddings: np.ndarray): pass
+    def save_route(self, route: Route, embeddings: Any = None): pass
     def load_all_routes(self): return [], {}
     def delete_route(self, name: str): pass
-    def add_utterance(self, name: str, utterance: str, embedding: np.ndarray): pass
+    def add_utterance(self, route_name: str, utterance: str, embedding: Any = None): pass
     def update_threshold(self, name: str, threshold: float): pass
     def clear(self): pass
 
