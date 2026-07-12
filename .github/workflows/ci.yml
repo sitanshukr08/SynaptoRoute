@@ -24,7 +24,7 @@ jobs:
 
       - name: Run linters
         run: |
-          ruff check src/ tests/ benchmarks/manifest_schema.py benchmarks/bench_local_index.py
+          ruff check src/ tests/ benchmarks/
           mypy --ignore-missing-imports src/
 
       - name: Run tests

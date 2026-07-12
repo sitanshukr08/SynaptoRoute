@@ -13,8 +13,10 @@ from synaptoroute.sync import RedisSyncManager
 async def run_test():
     db_path = 'chaos_v0.4.0.db'
     if os.path.exists(db_path):
-        try: os.remove(db_path)
-        except: pass
+        try:
+            os.remove(db_path)
+        except OSError:
+            pass
 
     storage = SQLiteStorage(db_path)
     # Extremely small capacity to force constant rebuilds (GC) while chaos happens

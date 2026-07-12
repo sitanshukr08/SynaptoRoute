@@ -10,8 +10,10 @@ from synaptoroute.storage import SQLiteStorage
 
 async def run_test():
     if os.path.exists('test_wal.db'):
-        try: os.remove('test_wal.db')
-        except: pass
+        try:
+            os.remove('test_wal.db')
+        except OSError:
+            pass
     storage = SQLiteStorage('test_wal.db')
     router = AdaptiveRouter(storage=storage, max_capacity=10)
     await router.start()
@@ -66,7 +68,7 @@ async def run_test():
     if os.path.exists('test_wal.db'):
         try:
             os.remove('test_wal.db')
-        except:
+        except OSError:
             pass
 
 if __name__ == "__main__":

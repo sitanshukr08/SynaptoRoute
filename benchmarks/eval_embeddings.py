@@ -45,11 +45,8 @@ def run_embedding_evaluations():
         ood_total = 0
         ood_false_positives = 0
         
-        # Warmup
-        try:
-            router("warmup")
-        except:
-            pass
+        # Warmup failures should invalidate the benchmark rather than be hidden.
+        router("warmup")
             
         for q, exp in zip(queries, expected):
             start = time.perf_counter()
