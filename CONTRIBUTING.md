@@ -1,6 +1,7 @@
 # Contributing to SynaptoRoute
 
-SynaptoRoute operates under an extremely rigid set of engineering principles. To maintain the project's reliability and architectural honesty, all contributors must strictly adhere to the following workflows.
+SynaptoRoute uses explicit architecture, verification, and evidence gates so
+changes remain reviewable and published claims remain reproducible.
 
 ## 1. Development Flow
 
@@ -8,7 +9,8 @@ Before writing any code, your feature must pass through three explicit gates:
 
 1. **Architecture First:** Propose your architectural design, explicitly listing what boundaries are impacted, which subsystems handle the data, and potential concurrency hazards. Do not write code until the architecture is accepted.
 2. **Implementation Second:** Write the feature. The codebase enforces strict separation of concerns. Do not mix background worker execution code with API routing code.
-3. **Verification Third:** Your code is not considered complete until it is empirically verified by both benchmark tests and regression suites.
+3. **Verification Third:** A change is not complete until the relevant tests
+   pass. Performance claims additionally require benchmark evidence.
 
 ## 2. System Architecture Context
 
@@ -34,34 +36,53 @@ For detailed ownership and failure modes of these components, you **must** read 
 
 ## 3. Benchmark Standards
 
+Research experiments must also follow
+[`docs/RESEARCH_PROTOCOL.md`](docs/RESEARCH_PROTOCOL.md).
+
 Any pull request that attempts to alter the performance profile of the system (latency, throughput, or accuracy) must provide empirical proof.
 
 * **Reproducible Benchmarks:** Your PR must include the python script located in `scratch/` or `benchmarks/` used to verify your claims.
-* **Benchmark Manifests (MANDATORY):** All future benchmarks must natively generate and commit a raw output `.json` manifest into the `benchmarks/manifests/` directory. Without this manifest, the claim cannot reach `[VERIFIED]` status.
+* **Benchmark Manifests (MANDATORY):** All future benchmarks must generate a schema-valid manifest plus raw logs. Without this evidence, the claim cannot reach `verified` status.
   
   **Required Schema:**
   ```json
   {
-    "benchmark": "Banking77",
-    "date": "2026-06-04",
-    "commit": "a1b2c3d4",
-    "cpu": "AMD Ryzen 9 7950X",
+    "schema_version": 1,
+    "benchmark": "banking77_accuracy",
+    "status": "verified",
+    "timestamp_utc": "2026-06-04T00:00:00Z",
+    "git_commit": "a1b2c3d4",
+    "command": ["python", "benchmarks/run_banking77.py"],
+    "environment": {
+      "python_version": "3.12.10",
+      "platform": "Windows 11",
+      "cpu": "AMD Ryzen 9 7950X",
+      "gpu": "none"
+    },
     "dataset": "Banking77 Test Split",
-    "accuracy": 91.16
+    "metrics": {"accuracy": 91.16},
+    "evidence": {
+      "script_path": "benchmarks/run_banking77.py",
+      "raw_output_path": "benchmarks/raw/banking77.log",
+      "timing_unit": "not applicable",
+      "notes": "Full split and seed documented in raw output."
+    }
   }
   ```
 * **Hardware Disclosure:** You must document the exact CPU, GPU, OS, and RAM profile used during the run (included in the manifest above).
 * **Dataset Disclosure:** You must cite the dataset used. Random vectors are acceptable for structural latency tests, but are strictly forbidden for accuracy measurements.
 
-## 3. Regression Testing
+## 4. Regression Testing
 
-SynaptoRoute has survived devastating concurrency and sync loop bugs. We ensure they stay dead.
+Concurrency, persistence, and synchronization defects require focused
+regression coverage.
 
-**Rule:** Every bug fix must include an automated regression test added to `scratch/run_regression_suite.py`.
+**Rule:** Every bug fix must include an automated regression test under
+`tests/` that reproduces the original failure mode.
 
 * **Why?** A distributed, multi-threaded routing engine is highly susceptible to race conditions. Without regression testing, a well-meaning refactor in a downstream release could silently resurrect a broadcast storm or a FAISS memory leak. Your test must assert that the failure *does not* happen on the current code path.
 
-## 4. Documentation Standards
+## 5. Documentation Standards
 
 Documentation in SynaptoRoute is not marketing copy. It is an engineering ledger.
 

@@ -15,14 +15,23 @@ The central orchestrator of the system, handling API ingestion, workload dispatc
   * **Queue Saturation:** If the `Encoder` processes slower than incoming HTTP traffic, `_batch_queue` will hit its `maxsize`, rejecting traffic with a fast-fail Exception.
   * **Deadlocks:** Improper acquisition of `_route_map_lock` and `rwlock` across `fit_thresholds` and `_dispatch` can freeze the API.
 
+The async worker bounds both queued requests and in-flight batches. Executor
+work is awaited before an in-flight permit is released, so draining the queue
+cannot create an unbounded hidden executor backlog.
+
 ## Subsystem 2: Storage (`SQLiteStorage`)
-The durable state boundary ensuring the router can cold-boot instantly.
+The single-process durable state boundary. Runtime mutations are visible before
+they are committed; callers use mutation receipts or a durable barrier when
+SQLite acknowledgement is required. See
+[`DURABILITY_CONTRACT.md`](DURABILITY_CONTRACT.md).
 
 * **Owner:** SQLite Disk I/O, Write-Ahead-Log (WAL) mode connections, Database Schemas (`routes`, `utterances`).
 * **Depends On:** Local Filesystem.
 * **Failure Modes:**
   * **Concurrency Locked:** If thread-pool executors exceed SQLite's internal isolation level limits, writes will queue and timeout.
   * **Disk Full:** Aborts application state tracking on write failures.
+  * **Pre-Commit Exit:** Mutations acknowledged only in memory can be lost if
+    the process exits before the storage worker commits them.
 
 ## Subsystem 3: Index (`FaissIndex`)
 The mathematical vector execution plane.
@@ -33,6 +42,7 @@ The mathematical vector execution plane.
   * **Memory Leaks:** If vectors are appended without explicit tombstoning (`index.delete()`) during route updates, RAM grows unboundedly and top-K calculations skew.
 
 ## Subsystem 4: Sync (`RedisSyncManager`)
+Redis sync is optional and experimental in the current release line. It is suitable for Pub/Sub experiments, not for claims of guaranteed distributed consistency.
 The distributed consistency fabric for multi-node deployments.
 
 * **Owner:** Redis PubSub Channels (`synaptoroute:sync`), Background Worker Threads (`sync_worker_count`).

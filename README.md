@@ -6,19 +6,26 @@ It is designed to sit at the edge of your infrastructure, intercepting user inte
 
 ## Features
 
-### [VERIFIED] Core Routing Engine
-* **High-Throughput Encoding:** Utilizes `FastEmbedEncoder` for zero-overhead vector generation (~130 RPS limit on single core CPU).
-* **Deterministic Matching:** Leverages localized FAISS (IndexFlatIP) indices for strictly mathematical distance measurements.
+### Core Routing Engine
+* **Local Encoding:** Utilizes `FastEmbedEncoder` for local vector generation.
+* **Deterministic Matching:** Supports NumPy exact retrieval and optional
+  FAISS HNSW retrieval behind the same routing contract.
 * **Dynamic Mutation:** Routes can be added, updated, and deleted in memory without restarting the router, safely executing under heavy load.
-* **Persistent Storage:** Backed by SQLite WAL indexing, providing instantaneous state recovery.
+* **Persistent Storage:** Backed by SQLite storage with explicit in-memory and
+  durable mutation acknowledgements, observable receipts, and restart recovery.
+* **Observable Decisions:** `AdaptiveRouter.match()` returns the selected
+  route, score, margin, ranked candidates, and an explicit decision reason;
+  the callable API remains backward compatible.
 
 ### [EXPERIMENTAL] Distributed Synchronization
 * **Redis PubSub Topology:** Nodes share semantic state mutations across a Redis cluster using event broadcasting. 
-* *Constraint:* Fully eventual consistency. O(N×M) network bottlenecks during cold-boot limits safe scaling to smaller multi-node enterprise deployments.
+* *Constraint:* Fully eventual consistency. O(N*M) network bottlenecks during cold-boot limits safe scaling to smaller multi-node enterprise deployments.
 
-### [PLANNED] Out-of-Distribution (OOD) Resilience
+### [IN PROGRESS] Out-of-Distribution (OOD) Resilience
 * **Cross-Encoder Fallbacks:** Intelligent deferral to dense reasoning models when a query falls between semantic boundaries.
-* **Dynamic Threshold Fitting:** Auto-calibrating confidence margins based on active false-positive rates.
+* **Validation-Only Calibration:** The research harness fits a global score
+  threshold and ambiguity margin on held-out data, then freezes the policy
+  before test evaluation. Per-route calibration remains planned.
 
 ## Architecture Design
 
@@ -46,10 +53,10 @@ For a detailed breakdown of subsystem ownership, dependencies, and failure modes
 
 ## Performance Claims
 
-SynaptoRoute bases its claims strictly on automated, reproducible telemetry located in [BENCHMARK_REGISTRY.md](docs/BENCHMARK_REGISTRY.md) and benchmark manifests.
+SynaptoRoute now treats historical benchmark numbers as audit targets until they are rerun with schema-valid manifests and raw logs.
 
-* **Accuracy:** ~91.16% on Banking77, ~92.0% on CLINC150 (Top-1 Accuracy).
-* **Latency:** 3.0ms median retrieval latency on 100,000 route indices. *(Note: Early v0.3.0 claims of 0.003ms have been fully retracted due to a telemetry unit conversion bug).*
+* **Accuracy:** Banking77 and CLINC150 numbers are currently unverified historical claims.
+* **Latency:** The old `0.003ms` claim is retracted. The corrected interpretation is about `3ms`, but it still requires a clean rerun before publication.
 
 For a deep dive into the methodology, datasets, and hardware used for these measurements, consult [BENCHMARKS.md](BENCHMARKS.md).
 
@@ -60,10 +67,9 @@ For a deep dive into the methodology, datasets, and hardware used for these meas
 SynaptoRoute follows a philosophy of uncompromising engineering rigor. During the v0.3.0 architectural transition, independent benchmark audits uncovered invalid concurrency artifacts and a devastating telemetry unit conversion bug regarding latency claims.
 
 As a result:
-* The prior benchmark numbers were formally retracted.
-* The benchmarking scripts were heavily audited and corrected.
-* An exhaustive suite of regression tests was introduced (`scratch/run_regression_suite.py`) to prevent concurrent map mutations, broadcast loops, and FAISS overwriting leaks from ever returning.
-* A strict [BENCHMARK_REGISTRY.md](docs/BENCHMARK_REGISTRY.md) was created to hold the unalterable truth of our telemetry.
+* Historical benchmark claims are now marked `unverified` or `retracted` unless the evidence is complete.
+* A schema-validated benchmark runner records commands, environment metadata, and raw log paths.
+* A strict [BENCHMARK_REGISTRY.md](docs/BENCHMARK_REGISTRY.md) tracks what can and cannot be claimed.
 
 Mistakes in open source are inevitable, but hiding them is unacceptable. We preserve our retracted mistakes historically to demonstrate the mathematical rigor required to build a trusted distributed router.
 
@@ -71,17 +77,22 @@ Mistakes in open source are inevitable, but hiding them is unacceptable. We pres
 
 ## Production Readiness
 
-SynaptoRoute v0.4.0 is structurally sound and mathematically honest. 
+SynaptoRoute v0.4.0 should be treated as an active engineering project, not a finished research artifact.
 
-* **Single-Node Deployments:** **SAFE FOR PRODUCTION**. Local SQLite and FAISS memory boundaries are fully concurrent-safe, handling unbounded queue bursts with graceful fail-fast logic.
-* **Multi-Node Deployments (Small Scale):** **SAFE FOR STAGING**. Redis sync operates properly for incremental live updates without broadcast loops.
-* **Enterprise-Scale Deployments (>5 nodes, >100k routes):** **NOT SUPPORTED**. The Redis PubSub architecture initiates `O(N×M)` broadcast storms during cluster bootstrapping. This will be replaced by Litestream/durable external storage in a future release.
+* **Single-Node Deployments:** plausible target, but release claims require passing tests and verified benchmark evidence.
+* **Multi-Node Deployments:** Redis sync is experimental and should be used only for staged validation.
+* **Enterprise-Scale Deployments (>5 nodes, >100k routes):** **NOT SUPPORTED**. Redis Pub/Sub bootstrap behavior is not validated for massive cluster state transfer.
 
 ## Developer Resources
 
 * **[CONTRIBUTING.md](CONTRIBUTING.md):** Rules for merging code, tests, and benchmark verifications.
 * **[ROADMAP.md](ROADMAP.md):** Current status of our research, infrastructure, and engineering goals.
+* **[PROJECT_IMPROVEMENT_ROADMAP.md](docs/PROJECT_IMPROVEMENT_ROADMAP.md):** Competitive analysis and next PR sequence.
+* **[RESEARCH_PROTOCOL.md](docs/RESEARCH_PROTOCOL.md):** Research questions, datasets, baselines, metrics, statistics, and evidence gates.
+* **[DEVELOPMENT_PILOT_RESULTS.md](docs/DEVELOPMENT_PILOT_RESULTS.md):** Explicitly unverified Banking77 and CLINC150 pilot results, including negative findings.
+* **[MULTISEED_DIAGNOSTIC_RESULTS.md](docs/MULTISEED_DIAGNOSTIC_RESULTS.md):** Five-seed full-test diagnostics, paired intervals, and the static-quality decision.
 * **[BENCHMARKS.md](BENCHMARKS.md):** Methodology and deep-dive telemetry.
 * **[LIMITATIONS.md](LIMITATIONS.md):** A brutally honest assessment of where the framework falls short.
 * **[COMPARISON.md](COMPARISON.md):** Objective, measured reviews of alternatives like Semantic Router.
 * **[ARCHITECTURE.md](docs/ARCHITECTURE.md):** Subsystem ownership and failure domains.
+* **[DURABILITY_CONTRACT.md](docs/DURABILITY_CONTRACT.md):** Exact mutation acknowledgement, ordering, failure, and restart guarantees.
