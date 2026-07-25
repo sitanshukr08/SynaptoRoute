@@ -210,6 +210,7 @@ def test_delete_route_index_failure_rolls_back_in_memory_state(fake_encoder):
     storage = SQLiteStorage(":memory:")
     router = AdaptiveRouter(fake_encoder, storage)
     router.add_route(Route(name="support", utterances=["help"], threshold=0.5))
+    router._flush_storage_batch()
 
     with patch.object(router.index, "delete", side_effect=RuntimeError("forced index delete error")):
         with pytest.raises(RuntimeError, match="forced index delete error"):

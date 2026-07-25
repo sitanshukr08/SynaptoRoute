@@ -212,6 +212,22 @@ class AdaptiveRouter:
             self.sync_manager.broadcast("delete_route", {"route_name": route_name})
         return receipt
 
+    def _rollback_mutation_in_memory(self, action: str, args: tuple[Any, ...]):
+        try:
+            if action == "add_route":
+                route = args[0]
+                with self._route_map_lock:
+                    self._route_map.pop(route.name, None)
+                with self.rwlock.write_lock():
+                    self.index.delete(route.name)
+            elif action == "add_utterance":
+                route_name, utterance, _ = args
+                with self._route_map_lock:
+                    if route_name in self._route_map and utterance in self._route_map[route_name].utterances:
+                        self._route_map[route_name].utterances.remove(utterance)
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"In-memory mutation rollback failed: {e}")
+
     def _flush_storage_batch(self):
         batch: list[QueuedStorageMutation] = []
         try:
@@ -255,6 +271,7 @@ class AdaptiveRouter:
                         mutation.action,
                         failure_error,
                     )
+                    self._rollback_mutation_in_memory(mutation.action, mutation.args)
                 try:
                     self._resync_from_storage()
                 except Exception as resync_error:
