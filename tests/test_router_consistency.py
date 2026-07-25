@@ -123,3 +123,102 @@ async def test_sync_and_async_paths_apply_the_same_margin_policy(fake_encoder):
     await router.start()
     assert await router.aquery("hello") is None
     await router.stop()
+
+
+@pytest.mark.asyncio
+async def test_rebuild_failure_clears_pending_mutations(fake_encoder):
+    from unittest.mock import patch
+    storage = SQLiteStorage(":memory:")
+    router = AdaptiveRouter(fake_encoder, storage)
+    router.add_route(Route(name="r1", utterances=["utterance1"], threshold=0.5))
+
+    router._rebuild_pending = True
+    router._pending_rebuild_mutations.append(("add_route", "r2", None, None))
+
+    with patch("synaptoroute.index.NumpyIndex.rebuild", side_effect=RuntimeError("rebuild failed")):
+        await router._rebuild_index()
+
+    assert router._rebuild_pending is False
+    assert len(router._pending_rebuild_mutations) == 0
+    router.close()
+
+
+def test_resync_from_storage_clears_pending_rebuild_mutations(fake_encoder):
+    storage = SQLiteStorage(":memory:")
+    router = AdaptiveRouter(fake_encoder, storage)
+    router.add_route(Route(name="r1", utterances=["utterance1"], threshold=0.5))
+
+    router._rebuild_pending = True
+    router._pending_rebuild_mutations.append(("add_route", "r2", None, None))
+
+    router._resync_from_storage()
+
+    assert router._rebuild_pending is False
+    assert len(router._pending_rebuild_mutations) == 0
+    router.close()
+
+
+def test_durable_barrier_accumulates_multiple_storage_failures(failable_storage, fake_encoder):
+    from synaptoroute.exceptions import StorageFlushError
+    router = AdaptiveRouter(fake_encoder, failable_storage)
+    router.add_route(Route(name="r1", utterances=["hello"], threshold=0.5))
+    router._flush_storage_batch()
+
+    failable_storage.fail_add_utterance = True
+    router.add_utterance("r1", "u1")
+    router.add_utterance("r1", "u2")
+
+    router._flush_storage_batch()
+
+    with pytest.raises(StorageFlushError) as exc_info:
+        router.durable_barrier()
+
+    assert len(exc_info.value.failures) == 2
+    assert "2 storage mutation(s) failed" in str(exc_info.value)
+    router.close()
+
+
+def test_numpy_index_tombstone_compaction_reclaims_capacity():
+    import numpy as np
+    from synaptoroute.index import NumpyIndex
+
+    # Capacity 5, add 5 vectors
+    idx = NumpyIndex(dim=2, max_capacity=5)
+    embs = np.ones((5, 2), dtype=np.float32)
+    idx.add(embs[:3], "route1")
+    idx.add(embs[3:], "route2")
+
+    assert idx._next_id == 5
+    assert idx.total_vectors == 5
+
+    # Delete route1 (tombstoning 3 vectors)
+    idx.delete("route1")
+    assert idx.total_vectors == 2
+    assert len(idx.tombstones) == 3
+
+    # Add 2 new vectors for route3: should compact tombstones instead of throwing ID_OVERFLOW
+    new_embs = np.ones((2, 2), dtype=np.float32)
+    idx.add(new_embs, "route3")
+
+    assert idx.total_vectors == 4
+    assert len(idx.tombstones) == 0
+    assert idx._next_id == 4
+
+
+def test_delete_route_index_failure_rolls_back_in_memory_state(fake_encoder):
+    from unittest.mock import patch
+    storage = SQLiteStorage(":memory:")
+    router = AdaptiveRouter(fake_encoder, storage)
+    router.add_route(Route(name="support", utterances=["help"], threshold=0.5))
+
+    with patch.object(router.index, "delete", side_effect=RuntimeError("forced index delete error")):
+        with pytest.raises(RuntimeError, match="forced index delete error"):
+            router.delete_route("support")
+
+    # Assert route was restored in memory map after index deletion failure
+    assert "support" in router._route_map
+    assert router._route_map["support"].utterances == ["help"]
+    router.close()
+
+
+

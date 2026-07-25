@@ -169,6 +169,9 @@ class AdaptiveRouter:
             self._route_map = new_route_map
         with self.rwlock.write_lock():
             self.index = new_index
+            if hasattr(self, '_pending_rebuild_mutations'):
+                self._pending_rebuild_mutations.clear()
+            self._rebuild_pending = False
         self.metrics.capacity_usage.set(self.index.total_vectors)
 
     def _resync_from_storage(self):
@@ -188,14 +191,20 @@ class AdaptiveRouter:
             if route_name not in self._route_map:
                 return
             
-            self._route_map.pop(route_name)
+            deleted_route = self._route_map.pop(route_name)
             self._mutation_count += 1
 
-        with self.rwlock.write_lock():
-            self.index.delete(route_name)
-            if self._rebuild_pending:
-                self._pending_rebuild_mutations.append(("delete_route", route_name, None, None))
-            self.metrics.capacity_usage.set(self.index.total_vectors)
+        try:
+            with self.rwlock.write_lock():
+                self.index.delete(route_name)
+                if self._rebuild_pending:
+                    self._pending_rebuild_mutations.append(("delete_route", route_name, None, None))
+                self.metrics.capacity_usage.set(self.index.total_vectors)
+        except Exception:
+            with self._route_map_lock:
+                self._route_map[route_name] = deleted_route
+            self._resync_from_storage()
+            raise
 
         receipt = self._enqueue_storage("delete_route", (route_name,))
 
@@ -421,7 +430,10 @@ class AdaptiveRouter:
             logging.getLogger(__name__).error(f"Rebuild failed: {e}")
             self.metrics.gc_errors.inc()
         finally:
-            self._rebuild_pending = False
+            with self.rwlock.write_lock():
+                if hasattr(self, '_pending_rebuild_mutations'):
+                    self._pending_rebuild_mutations.clear()
+                self._rebuild_pending = False
 
     async def aadd_route(self, route: Route, _broadcast: bool = True, _precomputed_embeddings=None):
         return await asyncio.to_thread(
