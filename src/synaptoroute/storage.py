@@ -94,6 +94,7 @@ class SQLiteStorage(BaseStorage):
                     CREATE TABLE IF NOT EXISTS routes (
                         name TEXT PRIMARY KEY,
                         threshold REAL,
+                        version INTEGER NOT NULL DEFAULT 1,
                         metadata TEXT
                     )
                 ''')
@@ -112,6 +113,11 @@ class SQLiteStorage(BaseStorage):
             
         with self._get_connection() as conn:
             cursor = conn.cursor()
+            cursor.execute('PRAGMA table_info(routes)')
+            r_columns = [info[1] for info in cursor.fetchall()]
+            if 'version' not in r_columns:
+                conn.execute('ALTER TABLE routes ADD COLUMN version INTEGER NOT NULL DEFAULT 1')
+
             cursor.execute('PRAGMA table_info(utterances)')
             columns = [info[1] for info in cursor.fetchall()]
             if 'embedding' not in columns:
@@ -131,9 +137,9 @@ class SQLiteStorage(BaseStorage):
                 
                 # Insert or replace route
                 cursor.execute('''
-                    INSERT OR REPLACE INTO routes (name, threshold, metadata)
-                    VALUES (?, ?, ?)
-                ''', (route.name, route.threshold, metadata_str))
+                    INSERT OR REPLACE INTO routes (name, threshold, version, metadata)
+                    VALUES (?, ?, ?, ?)
+                ''', (route.name, route.threshold, getattr(route, 'version', 1), metadata_str))
                 
                 # Insert utterances
                 if route.utterances:
@@ -186,7 +192,7 @@ class SQLiteStorage(BaseStorage):
                     cursor = conn.cursor()
                     cursor.execute('BEGIN IMMEDIATE')
                     
-                    cursor.execute('SELECT name, threshold, metadata FROM routes')
+                    cursor.execute('SELECT name, threshold, version, metadata FROM routes')
                     route_rows = cursor.fetchall()
                     
                     cursor.execute('SELECT route_name, utterance, embedding FROM utterances')
@@ -209,7 +215,7 @@ class SQLiteStorage(BaseStorage):
                     emb_dict[route_name].append(emb)
                 
                 for row in route_rows:
-                    name, threshold, metadata_str = row
+                    name, threshold, version, metadata_str = row
                     try:
                         metadata = json.loads(metadata_str) if metadata_str else None
                     except json.JSONDecodeError:
@@ -221,6 +227,7 @@ class SQLiteStorage(BaseStorage):
                     routes.append(Route(
                         name=name,
                         threshold=threshold,
+                        version=version,
                         metadata=metadata,
                         utterances=utterances
                     ))

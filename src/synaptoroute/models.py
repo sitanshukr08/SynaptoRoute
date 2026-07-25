@@ -16,6 +16,7 @@ class Route(BaseModel):
     name: str = Field(..., min_length=1, pattern=r"^[a-zA-Z0-9_-]+$")
     utterances: List[NonEmptyString] = Field(..., min_length=1)
     threshold: float = Field(0.5, ge=-1.0, le=1.0)
+    version: int = Field(1, ge=1)
     metadata: Optional[Dict[str, Any]] = None
 
     @field_validator('metadata')

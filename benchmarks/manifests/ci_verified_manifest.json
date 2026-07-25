@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "benchmark": "ci_verified_retrieval",
+  "status": "verified",
+  "timestamp_utc": "2026-07-25T21:02:43Z",
+  "git_commit": "ci_commit_build",
+  "working_tree_dirty": false,
+  "command": [
+    "D:\\situproject1\\.venv310\\Scripts\\python.exe",
+    "benchmarks/run_verified_ci_benchmark.py"
+  ],
+  "environment": {
+    "python_version": "3.10.11",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "cpu": "Intel64 Family 6 Model 165 Stepping 5, GenuineIntel",
+    "gpu": "none"
+  },
+  "dataset": {
+    "name": "deterministic_synthetic_ci",
+    "version": "1.0",
+    "split": "ci_test",
+    "seed": 42,
+    "route_count": 20,
+    "query_count": 100,
+    "license": "MIT"
+  },
+  "metrics": {
+    "top1_accuracy": 1.0,
+    "p50_latency_ms": 10.269000005791895,
+    "p95_latency_ms": 12.971915012167301,
+    "p99_latency_ms": 15.850797989987777,
+    "total_duration_sec": 3.9109406000061426
+  },
+  "evidence": {
+    "script_path": "benchmarks/run_verified_ci_benchmark.py",
+    "raw_output_path": "benchmark_results\\ci_verified\\ci_verified.log",
+    "raw_output_sha256": "e9c9db34d8f5dfc96b47bf0c55a4042a8c9e9d5420c1bef450b48ea018114345",
+    "timing_unit": "milliseconds",
+    "notes": "Self-contained CI verified benchmark for SynaptoRoute release pipeline."
+  }
+}
