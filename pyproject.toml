@@ -32,6 +32,9 @@ dependencies = [
 Repository = "https://github.com/sitanshukr08/SynaptoRoute"
 Issues = "https://github.com/sitanshukr08/SynaptoRoute/issues"
 
+[project.scripts]
+synaptoroute = "synaptoroute.cli:main"
+
 [project.optional-dependencies]
 test = [
     "pytest>=7.0.0",

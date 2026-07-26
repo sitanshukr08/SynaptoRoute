@@ -1,19 +1,15 @@
-## Description
-<!-- Please include a summary of the change and which issue is fixed. -->
+## Summary of Changes
+- Concise description of changes and rationale.
 
-Fixes # (issue)
+## Subsystems Modified
+- [ ] Core Router (`src/synaptoroute/router.py`)
+- [ ] Persistence & Storage (`src/synaptoroute/storage.py`)
+- [ ] Vector Index (`src/synaptoroute/index.py`)
+- [ ] Adaptive Memory Engine (`src/synaptoroute/adaptive_weights.py`)
+- [ ] Framework Adapters / Examples (`examples/`)
+- [ ] Benchmarks & Manifests (`benchmarks/`)
 
-## Type of change
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] This change requires a documentation update
-
-## Checklist:
-- [ ] My code follows the architectural guidelines of this project (e.g. preserves $O(1)$ updates).
-- [ ] My code and commits strictly adhere to the professional linguistic guidelines (no hyperbolic or "AI" terminology).
-- [ ] I have performed a self-review of my own code.
-- [ ] I have commented my code, particularly in hard-to-understand areas.
-- [ ] I have made corresponding changes to the documentation (`README.md`, `BENCHMARKS.md`).
-- [ ] I have added tests that validate my fix or feature under concurrent load.
-- [ ] New and existing unit tests pass locally with my changes.
+## Verification Strategy
+- [ ] `python -m pytest tests -q` passed cleanly.
+- [ ] `ruff check` passed cleanly.
+- [ ] Verified benchmark script executed (if applicable).
