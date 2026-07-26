@@ -24,7 +24,7 @@ from synaptoroute.profile import OptimizationProfile, get_profile, ProfileType
 from synaptoroute.index import get_index
 
 class AdaptiveRouter:
-    def __init__(self, encoder: Optional[BaseEncoder] = None, storage: Optional[BaseStorage] = None, profile: Optional[OptimizationProfile] = None, max_capacity: int = 50000, max_queue_size: int = 10000, metrics: Optional[MetricsRegistry] = None, sync_manager: Optional[BaseSyncManager] = None, margin: float = 0.0, reranker: Any = None, max_in_flight_batches: int = 4):
+    def __init__(self, encoder: Optional[BaseEncoder] = None, storage: Optional[BaseStorage] = None, profile: Optional[OptimizationProfile] = None, max_capacity: int = 50000, max_queue_size: int = 10000, metrics: Optional[MetricsRegistry] = None, sync_manager: Optional[BaseSyncManager] = None, margin: float = 0.0, reranker: Any = None, max_in_flight_batches: int = 4, enable_adaptive_memory: bool = False, adaptive_weigher: Any = None):
         if profile is None:
             profile = get_profile(ProfileType.THROUGHPUT)
             
@@ -51,6 +51,16 @@ class AdaptiveRouter:
         self.max_in_flight_batches = max_in_flight_batches
         self.margin = margin
         self.reranker = reranker
+        self.enable_adaptive_memory = enable_adaptive_memory
+        if self.enable_adaptive_memory:
+            from synaptoroute.adaptive_weights import BoundedBayesianWeigher, LockFreeStatsCollector, ContextMetadata
+            self.adaptive_weigher = adaptive_weigher or BoundedBayesianWeigher()
+            self.stats_collector = LockFreeStatsCollector()
+            self._route_metadata_context: dict[str, ContextMetadata] = {}
+        else:
+            self.adaptive_weigher = None
+            self.stats_collector = None
+            self._route_metadata_context = {}
         
         self.index = get_index(dim=self.encoder.dim, max_capacity=self.max_capacity)
         self._route_map: dict[str, Route] = {}
@@ -495,6 +505,19 @@ class AdaptiveRouter:
         if not ranked:
             return RouterResult(decision_reason=DecisionReason.NO_CANDIDATES)
 
+        if self.enable_adaptive_memory and self.adaptive_weigher is not None:
+            from synaptoroute.adaptive_weights import ContextMetadata
+            now_t = time.time()
+            evaluated_ranked = []
+            for score, route in ranked:
+                meta = self._route_metadata_context.get(route.name)
+                if meta is None:
+                    meta = ContextMetadata(key=route.name, route_name=route.name, embedding=np.zeros(1), last_accessed=now_t)
+                    self._route_metadata_context[route.name] = meta
+                adj_score = self.adaptive_weigher.evaluate_score(score, meta, now=now_t)
+                evaluated_ranked.append((adj_score, route))
+            ranked = sorted(evaluated_ranked, key=lambda candidate: candidate[0], reverse=True)
+
         result_candidates = [
             RouteCandidate(
                 route_name=route.name,
@@ -546,6 +569,13 @@ class AdaptiveRouter:
             )
 
         selected_score, selected_route = eligible[0]
+        if self.enable_adaptive_memory and self.stats_collector is not None:
+            self.stats_collector.record_hit(selected_route.name)
+            meta = self._route_metadata_context.get(selected_route.name)
+            if meta is not None:
+                meta.frequency_count += 1
+                meta.last_accessed = time.time()
+
         matched_route = selected_route.model_copy()
         matched_route.metadata = dict(selected_route.metadata or {})
         matched_route.metadata["match_score"] = float(selected_score)

@@ -69,3 +69,29 @@ def test_vector_arc_cache_tuning():
     assert cache.get("k1") is not None
     assert cache.get("k3") is not None
     assert cache.get("k2") is None
+
+
+def test_adaptive_router_integration(fake_encoder):
+    from synaptoroute import AdaptiveRouter, Route, SQLiteStorage
+
+    storage = SQLiteStorage(":memory:")
+    router = AdaptiveRouter(fake_encoder, storage, enable_adaptive_memory=True)
+
+    r1 = Route(name="route1", utterances=["help"], threshold=0.5)
+    router.add_route(r1)
+
+    # Initial match
+    res1 = router.match("help")
+    assert res1.matched
+    assert res1.route_name == "route1"
+
+    # Verify hit was recorded in stats collector and route context
+    assert router.stats_collector is not None
+    drained = router.stats_collector.flush()
+    assert len(drained) == 1
+    assert drained[0][0] == "route1"
+
+    meta = router._route_metadata_context["route1"]
+    assert meta.frequency_count == 1
+    router.close()
+
