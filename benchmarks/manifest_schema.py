@@ -44,12 +44,12 @@ def _as_path(repo_root: Path, value: Any) -> Path | None:
 
 
 def sha256_file(path: Path | str) -> str:
-    """Return the SHA-256 digest for an evidence file."""
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    """Return the SHA-256 digest for an evidence file, normalized for cross-platform line endings."""
+    p = Path(path)
+    content = p.read_bytes()
+    if p.suffix.lower() in (".log", ".json", ".txt", ".csv", ".py", ".md"):
+        content = content.replace(b"\r\n", b"\n")
+    return hashlib.sha256(content).hexdigest()
 
 
 def validate_manifest(manifest: dict[str, Any], repo_root: Path | str = ".") -> list[str]:

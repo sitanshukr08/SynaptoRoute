@@ -2,7 +2,7 @@
   "schema_version": 1,
   "benchmark": "ci_verified_retrieval",
   "status": "verified",
-  "timestamp_utc": "2026-07-27T02:04:03Z",
+  "timestamp_utc": "2026-07-27T12:32:33Z",
   "git_commit": "ci_commit_build",
   "working_tree_dirty": false,
   "command": [
@@ -26,15 +26,15 @@
   },
   "metrics": {
     "top1_accuracy": 1.0,
-    "p50_latency_ms": 10.202400000707712,
-    "p95_latency_ms": 13.19790000015928,
-    "p99_latency_ms": 14.481271001459392,
-    "total_duration_sec": 2.422099299998081
+    "p50_latency_ms": 8.28165000007175,
+    "p95_latency_ms": 9.049890000073901,
+    "p99_latency_ms": 10.065036999988031,
+    "total_duration_sec": 4.418520400000034
   },
   "evidence": {
     "script_path": "benchmarks/run_verified_ci_benchmark.py",
     "raw_output_path": "benchmark_results/ci_verified/ci_verified.log",
-    "raw_output_sha256": "92ecf9752c0cbb6b60d66eeabe1321156cb0696321f78f8cad520853bd602f63",
+    "raw_output_sha256": "1905d721d5c06e12552e55ca716f03c92d58eb573a66b80a4d8650b43511511e",
     "timing_unit": "milliseconds",
     "notes": "Self-contained CI verified benchmark for SynaptoRoute release pipeline."
   }

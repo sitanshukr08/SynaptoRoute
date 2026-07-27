@@ -50,7 +50,8 @@ def command_match(query: str, db_path: str = ":memory:"):
     print(f"  Matched Route  : {res.route_name}")
     print(f"  Matched        : {res.matched}")
     print(f"  Confidence     : {res.score:.4f}" if res.score is not None else "  Confidence     : N/A")
-    print(f"  Decision Reason: {res.decision_reason}")
+    reason_str = res.decision_reason.value if hasattr(res.decision_reason, "value") else str(res.decision_reason)
+    print(f"  Decision Reason: {reason_str}")
     if res.candidates:
         print("\n  Top Candidates:")
         for c in res.candidates[:3]:

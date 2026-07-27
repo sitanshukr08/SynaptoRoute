@@ -1,0 +1,10 @@
+# Set default behavior for all files in repository to use LF line endings
+* text=auto eol=lf
+
+# Force specific binary or text files
+*.log text eol=lf
+*.json text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.png binary
+*.jpg binary
