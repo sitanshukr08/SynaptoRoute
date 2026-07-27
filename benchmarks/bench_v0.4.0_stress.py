@@ -50,8 +50,10 @@ class MockEncoder:
 async def run_proper_benchmark():
     db_path = 'proper_stress.db'
     if os.path.exists(db_path):
-        try: os.remove(db_path)
-        except: pass
+        try:
+            os.remove(db_path)
+        except OSError:
+            pass
 
     storage = SQLiteStorage(db_path)
     router = AdaptiveRouter(encoder=MockEncoder(), storage=storage, max_capacity=15000)

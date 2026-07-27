@@ -17,25 +17,20 @@ pip install -e ".[dev]"
 ```
 
 ## 3. Running Benchmarks
-All authoritative benchmarks are located in the `scratch/` directory. To reproduce the metrics documented in the `BENCHMARK_REGISTRY.md`:
+Benchmarks must run through the repo benchmark runner so raw logs and environment metadata are captured:
 
 ```bash
-# Test OOD Rejection (AUROC, FPR)
-python scratch/bench_ood_metrics.py
+# Write a schema-valid run manifest without executing benchmark scripts
+python benchmarks/run_all_benchmarks.py --benchmarks latency --dry-run
 
-# Test CPU vs GPU Acceleration
-python scratch/bench_gpu_acceleration.py
-
-# Test 1,000,000 Vector Scaling
-python scratch/bench_large_scale_retrieval.py
-
-# Test System Bottlenecks
-python scratch/bench_bottleneck_analysis.py
+# Execute selected benchmarks and store raw logs under benchmark_results/
+python benchmarks/run_all_benchmarks.py --benchmarks accuracy latency
 ```
-*Note: Benchmarks output raw JSON manifests to the `scratch/` folder upon completion.*
+
+Historical manifests in `benchmarks/manifests/` are audit records. They are not release-grade until their status is `verified` and they pass `benchmarks.manifest_schema.validate_manifest`.
 
 ## 4. How to Contribute
 1. Read the `SYNAPTOROUTE_TECHNICAL_REFERENCE.md` to understand the current architectural limits.
 2. Ensure you do not re-introduce bloated metadata into the `FaissIndex` class (this causes known memory leaks).
 3. Ensure any new benchmarking scripts utilize `time.perf_counter()` and correctly label units as seconds vs milliseconds.
-4. Submit your PR with a benchmark manifest attached if you modify the Encoder, Storage, or FAISS routing layers.
+4. Submit your PR with a schema-valid benchmark manifest and raw logs if you modify the Encoder, Storage, or FAISS routing layers.

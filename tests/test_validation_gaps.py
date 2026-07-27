@@ -1,6 +1,7 @@
 import pytest
 from typing import Any
 import asyncio
+import numpy as np
 from unittest.mock import AsyncMock, patch, MagicMock
 
 from synaptoroute import AdaptiveRouter, Route
@@ -66,6 +67,9 @@ async def test_fit_thresholds_async_loop_safety():
     # Verify that fit_thresholds is offloaded to a thread and doesn't block
     with patch("synaptoroute.encoder.FastEmbedEncoder") as mock_encoder_class:
         mock_encoder_class.return_value.dim = 384
+        mock_encoder_class.return_value.encode_batch.side_effect = (
+            lambda texts: np.ones((len(texts), 384), dtype=np.float32)
+        )
         router = AdaptiveRouter(storage=DummyStorage())
         router.add_route(Route(name="test", utterances=["a", "b", "c"]))
         

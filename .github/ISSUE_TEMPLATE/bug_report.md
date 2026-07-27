@@ -1,25 +1,30 @@
----
-name: Bug report
-about: Create a report to help us improve SynaptoRoute
-title: '[BUG] '
-labels: bug
-assignees: ''
-
----
-
-**Describe the bug**
-A clear and concise description of what the bug is.
-
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Initialize router with '...'
-2. Call router.add_route(...)
-3. See error
-
-**Expected behavior**
-A clear and concise description of what you expected to happen.
-
-**Environment (please complete the following information):**
- - OS: [e.g. Ubuntu 22.04, Windows 11]
- - Python Version: [e.g. 3.9, 3.12]
- - SynaptoRoute Version: [e.g. 0.3.0]
+name: Bug Report
+description: Create a report to help us reproduce and fix a bug
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction Code
+      description: Provide a minimal code snippet or script to reproduce the issue.
+      placeholder: |
+        from synaptoroute import AdaptiveRouter, Route
+        router = AdaptiveRouter()
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Metadata
+      description: Output of `synaptoroute info` or Python/OS details.
+    validations:
+      required: false

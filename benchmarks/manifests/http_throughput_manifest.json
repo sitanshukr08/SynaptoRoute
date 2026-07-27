@@ -1,67 +1,89 @@
 {
-  "synaptoroute_version": "0.4.0",
+  "schema_version": 1,
+  "benchmark": "http_throughput",
+  "status": "unverified",
+  "timestamp_utc": "2026-06-04T11:11:04Z",
   "git_commit": "f2937d2",
-  "cpu": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
-  "os": "Windows 11",
-  "python": "3.12.10",
+  "command": null,
+  "environment": {
+    "python_version": "3.12.10",
+    "platform": "Windows 11",
+    "cpu": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "gpu": "unknown"
+  },
   "dataset": "synthetic (1000 baseline routes)",
   "encoder": "FastEmbedEncoder",
   "route_count": 1000,
-  "metrics_by_worker": [
-    {
-      "workers": 1,
-      "scenario": "Read-Only",
-      "rps": 175.24472970312738,
-      "errors": 0,
-      "p50": 270.90799999996307,
-      "p95": 359.37346000018806,
-      "p99": 395.486706999709
-    },
-    {
-      "workers": 1,
-      "scenario": "Heavy Mutation",
-      "rps": 126.99635572527072,
-      "errors": 0,
-      "p50": 363.13925000013114,
-      "p95": 461.436049999565,
-      "p99": 636.4189359994634
-    },
-    {
-      "workers": 2,
-      "scenario": "Read-Only",
-      "rps": 181.31502274018007,
-      "errors": 0,
-      "p50": 273.71015000016996,
-      "p95": 320.8813199998531,
-      "p99": 333.7353270000767
-    },
-    {
-      "workers": 2,
-      "scenario": "Heavy Mutation",
-      "rps": 74.92118684480225,
-      "errors": 0,
-      "p50": 662.9485499997827,
-      "p95": 820.7960250005726,
-      "p99": 870.2754890003234
-    },
-    {
-      "workers": 4,
-      "scenario": "Read-Only",
-      "rps": 145.27829066260767,
-      "errors": 0,
-      "p50": 339.2412000002878,
-      "p95": 454.5806499997525,
-      "p99": 507.803515999467
-    },
-    {
-      "workers": 4,
-      "scenario": "Heavy Mutation",
-      "rps": 81.4056860341231,
-      "errors": 0,
-      "p50": 585.9490500001812,
-      "p95": 743.2911999996121,
-      "p99": 765.6373859999985
-    }
-  ],
-  "timestamp": "2026-06-04T11:11:04Z"
+  "query_count": null,
+  "metrics": {
+    "metrics_by_worker": [
+      {
+        "workers": 1,
+        "scenario": "Read-Only",
+        "rps": 175.24472970312738,
+        "errors": 0,
+        "p50_ms": 270.90799999996307,
+        "p95_ms": 359.37346000018806,
+        "p99_ms": 395.486706999709
+      },
+      {
+        "workers": 1,
+        "scenario": "Heavy Mutation",
+        "rps": 126.99635572527072,
+        "errors": 0,
+        "p50_ms": 363.13925000013114,
+        "p95_ms": 461.436049999565,
+        "p99_ms": 636.4189359994634
+      },
+      {
+        "workers": 2,
+        "scenario": "Read-Only",
+        "rps": 181.31502274018007,
+        "errors": 0,
+        "p50_ms": 273.71015000016996,
+        "p95_ms": 320.8813199998531,
+        "p99_ms": 333.7353270000767
+      },
+      {
+        "workers": 2,
+        "scenario": "Heavy Mutation",
+        "rps": 74.92118684480225,
+        "errors": 0,
+        "p50_ms": 662.9485499997827,
+        "p95_ms": 820.7960250005726,
+        "p99_ms": 870.2754890003234
+      },
+      {
+        "workers": 4,
+        "scenario": "Read-Only",
+        "rps": 145.27829066260767,
+        "errors": 0,
+        "p50_ms": 339.2412000002878,
+        "p95_ms": 454.5806499997525,
+        "p99_ms": 507.803515999467
+      },
+      {
+        "workers": 4,
+        "scenario": "Heavy Mutation",
+        "rps": 81.4056860341231,
+        "errors": 0,
+        "p50_ms": 585.9490500001812,
+        "p95_ms": 743.2911999996121,
+        "p99_ms": 765.6373859999985
+      }
+    ]
+  },
+  "evidence": {
+    "script_path": null,
+    "raw_output_path": null,
+    "timing_unit": "milliseconds for latency fields; requests per second for rps",
+    "notes": "Historical claim retained for audit only. Raw logs and exact benchmark command were not preserved."
+  },
+  "missing_evidence": [
+    "runnable benchmark script",
+    "raw benchmark output",
+    "exact command",
+    "seed",
+    "HTTP server configuration"
+  ]
 }

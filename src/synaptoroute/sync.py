@@ -28,8 +28,11 @@ class RedisSyncManager(BaseSyncManager):
         self.sync_queue_size = sync_queue_size
         if not HAS_REDIS:
             raise ImportError("redis is not installed. Please install it using 'pip install synaptoroute[redis]'.")
+        import threading
         self.redis_url = redis_url
         self.sender_id = str(uuid.uuid4())
+        self._sequence_counter = 0
+        self._sequence_lock = threading.Lock()
         self.router = None
         self._pubsub = None
         self._redis_client = None
@@ -141,7 +144,13 @@ class RedisSyncManager(BaseSyncManager):
         except asyncio.CancelledError:
             pass
 
-    def broadcast(self, action: str, payload: dict, embeddings: Optional[bytes] = None, target_id: Optional[str] = None):
+    def broadcast(
+        self,
+        action: str,
+        payload: dict,
+        embeddings: Optional[bytes] = None,
+        target_id: Optional[str] = None,
+    ):
         if self._outbound_queue is None or self._loop is None:
             return
             
@@ -149,9 +158,14 @@ class RedisSyncManager(BaseSyncManager):
         if embeddings is not None:
             payload["_embeddings_b64"] = base64.b64encode(embeddings).decode('ascii')
             
+        with self._sequence_lock:
+            self._sequence_counter += 1
+            seq_id = self._sequence_counter
+
         msg = {
             "sender_id": self.sender_id,
             "target_id": target_id,
+            "sequence_id": seq_id,
             "action": action,
             "payload": payload,
             "encoder_model": getattr(

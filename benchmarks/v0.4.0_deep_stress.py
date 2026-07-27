@@ -13,8 +13,10 @@ from synaptoroute.sync import RedisSyncManager
 async def run_stress_test():
     db_path = 'deep_stress.db'
     if os.path.exists(db_path):
-        try: os.remove(db_path)
-        except: pass
+        try:
+            os.remove(db_path)
+        except OSError:
+            pass
 
     storage = SQLiteStorage(db_path)
     # 5,000 capacity. We will push around 3,000 total vectors with high tombstone churn to force multiple GC cycles.
@@ -123,7 +125,8 @@ async def run_stress_test():
     print("[INFO] Load complete, allowing WAL buffers and background workers to flush (2s)...")
     await asyncio.sleep(2.0)
     
-    for w in workers: w.cancel()
+    for worker in workers:
+        worker.cancel()
     await router.stop()
     
     duration = time.perf_counter() - start_time

@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import Mock, AsyncMock, MagicMock
 
-pytest.importorskip("llama_index")
+pytest.importorskip("llama_index.core")
 
 from llama_index.core.schema import QueryBundle
 from llama_index.core.tools.types import ToolMetadata

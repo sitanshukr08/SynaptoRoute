@@ -11,8 +11,10 @@ from synaptoroute.sync import RedisSyncManager
 
 async def run_test():
     if os.path.exists('final_proof.db'):
-        try: os.remove('final_proof.db')
-        except: pass
+        try:
+            os.remove('final_proof.db')
+        except OSError:
+            pass
 
     storage = SQLiteStorage('final_proof.db')
     # Use max_capacity=200 so rebuild triggers but we don't hit max capacity

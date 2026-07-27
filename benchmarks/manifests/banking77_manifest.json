@@ -1,8 +1,37 @@
 {
-  "benchmark": "Banking77",
-  "date": "2026-06-04",
-  "commit": "v0.4.0",
-  "cpu": "Standard",
+  "schema_version": 1,
+  "benchmark": "banking77_accuracy",
+  "status": "unverified",
+  "timestamp_utc": "2026-06-04T00:00:00Z",
+  "git_commit": "v0.4.0",
+  "command": [
+    "python",
+    "benchmarks/bench_realworld.py"
+  ],
+  "environment": {
+    "python_version": "unknown",
+    "platform": "unknown",
+    "cpu": "Standard",
+    "gpu": "unknown"
+  },
   "dataset": "mteb/banking77",
-  "accuracy": 91.16
+  "encoder": "unknown",
+  "route_count": null,
+  "query_count": null,
+  "metrics": {
+    "accuracy_percent": 91.16
+  },
+  "evidence": {
+    "script_path": "benchmarks/bench_realworld.py",
+    "raw_output_path": null,
+    "timing_unit": "not applicable",
+    "notes": "Historical claim retained for audit only. The raw log, exact split, seed, and full environment were not archived."
+  },
+  "missing_evidence": [
+    "raw benchmark output",
+    "exact command output",
+    "dataset split and sample count",
+    "seed",
+    "full environment metadata"
+  ]
 }

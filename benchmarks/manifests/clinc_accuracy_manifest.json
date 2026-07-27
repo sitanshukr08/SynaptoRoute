@@ -1,16 +1,36 @@
 {
-  "synaptoroute_version": "0.4.0",
+  "schema_version": 1,
+  "benchmark": "clinc150_accuracy",
+  "status": "unverified",
+  "timestamp_utc": "2026-06-04T11:16:02Z",
   "git_commit": "f2937d2",
-  "cpu": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
-  "os": "Windows 11",
-  "python": "3.12.10",
+  "command": null,
+  "environment": {
+    "python_version": "3.12.10",
+    "platform": "Windows 11",
+    "cpu": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "gpu": "unknown"
+  },
   "dataset": "clinc150 (train/test)",
   "encoder": "FastEmbedEncoder (all-MiniLM-L6-v2)",
   "route_count": 150,
-  "test_queries": 250,
-  "top1_acc": 0.92,
-  "top3_acc": 0.96,
-  "top5_acc": 0.976,
-  "f1_score": 0.9316328307707618,
-  "timestamp": "2026-06-04T11:16:02Z"
+  "query_count": 250,
+  "metrics": {
+    "top1_accuracy": 0.92,
+    "top3_accuracy": 0.96,
+    "top5_accuracy": 0.976,
+    "f1_score": 0.9316328307707618
+  },
+  "evidence": {
+    "script_path": null,
+    "raw_output_path": null,
+    "timing_unit": "not applicable",
+    "notes": "Historical claim retained for audit only. The runnable script and raw output were not preserved in the repo."
+  },
+  "missing_evidence": [
+    "runnable benchmark script",
+    "raw benchmark output",
+    "exact command",
+    "seed"
+  ]
 }

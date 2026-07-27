@@ -17,18 +17,51 @@ class NumpyIndex:
         self.dim = dim
         self.lock = threading.Lock()
         self.embeddings = np.zeros((max_capacity, dim), dtype=np.float32)
-        self.tombstones: set = set()
+        self.tombstones: set[int] = set()
         self._tombstone_array = np.array([], dtype=int)
-        self._id_to_route: dict = {}
-        self._route_to_ids: dict = {}
+        self._id_to_route: dict[int, str] = {}
+        self._route_to_ids: dict[str, list[int]] = {}
         self._next_id = 0
         self.max_capacity = max_capacity
         self.ntotal = 0
         
+    def _compact_unlocked(self):
+        if not self.tombstones:
+            return
+        valid_mask = np.ones(self._next_id, dtype=bool)
+        valid_mask[list(self.tombstones)] = False
+        valid_indices = np.where(valid_mask)[0]
+        
+        num_valid = len(valid_indices)
+        if num_valid > 0:
+            self.embeddings[:num_valid] = self.embeddings[valid_indices]
+            self.embeddings[num_valid:] = 0.0
+        else:
+            self.embeddings[:] = 0.0
+            
+        new_id_to_route = {}
+        new_route_to_ids = {}
+        for new_i, old_i in enumerate(valid_indices):
+            route_name = self._id_to_route[old_i]
+            new_id_to_route[new_i] = route_name
+            if route_name not in new_route_to_ids:
+                new_route_to_ids[route_name] = []
+            new_route_to_ids[route_name].append(new_i)
+            
+        self._id_to_route = new_id_to_route
+        self._route_to_ids = new_route_to_ids
+        self._next_id = num_valid
+        self.ntotal = num_valid
+        self.tombstones.clear()
+        self._tombstone_array = np.array([], dtype=int)
+
     def _add_unlocked(self, embeddings: np.ndarray, route_name: str):
         num_embs = embeddings.shape[0]
         if self._next_id + num_embs > self.max_capacity:
-            raise ValueError("ID_OVERFLOW")
+            if self.tombstones:
+                self._compact_unlocked()
+            if self._next_id + num_embs > self.max_capacity:
+                raise ValueError("ID_OVERFLOW")
         
         if embeddings.dtype != np.float32:
             embeddings = embeddings.astype(np.float32)
@@ -157,11 +190,11 @@ class FaissIndex:
         base_index = faiss.IndexHNSWFlat(self.dim, 32, faiss.METRIC_INNER_PRODUCT)
         self.index = faiss.IndexIDMap(base_index)
         
-        self.tombstones: set = set()
+        self.tombstones: set[int] = set()
         
         # Bidirectional mapping
-        self._id_to_route: dict = {}
-        self._route_to_ids: dict = {}
+        self._id_to_route: dict[int, str] = {}
+        self._route_to_ids: dict[str, list[int]] = {}
         self._next_id = 0
 
     def add(self, embeddings: np.ndarray, route_name: str):

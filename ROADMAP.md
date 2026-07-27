@@ -1,79 +1,264 @@
-# SynaptoRoute Roadmap
+# SynaptoRoute Research Roadmap
 
-This document serves as the historical and future architectural trajectory for SynaptoRoute. It outlines our foundational milestones, recent accomplishments, and target objectives through version 0.6.0.
+This roadmap converts SynaptoRoute from an engineering prototype into a
+reproducible systems research artifact. It is deliberately ordered so that no
+accuracy or latency result is promoted before the benchmark that produced it
+is reviewable.
 
----
+The detailed experimental contract is in
+[`docs/RESEARCH_PROTOCOL.md`](docs/RESEARCH_PROTOCOL.md). Competitive context
+and the longer product backlog are in
+[`docs/PROJECT_IMPROVEMENT_ROADMAP.md`](docs/PROJECT_IMPROVEMENT_ROADMAP.md).
 
-## Historical Milestones
+## Target Contribution
 
-### v0.1.0 (Proof of Concept)
-* **Core Engine Design:** Established the initial `AdaptiveRouter` architecture for intercepting natural language queries.
-* **Dense Vector Routing:** Prototyped routing mechanics using basic local embeddings and exact mathematical distance thresholds.
-* **In-Memory State:** Implemented the baseline dynamic mutation API allowing routes to be added or removed without restarting the Python process.
+Working thesis:
 
-### v0.2.0 (High-Performance Vectorization)
-* **FAISS Integration:** Replaced brute-force distance calculations with Facebook's FAISS (Hierarchical Navigable Small World graphs) to achieve sub-linear search latency.
-* **Tombstone Architecture:** Developed an O(1) instantaneous deletion array to mask dead vectors, bypassing the severe latency penalties of standard FAISS deletions.
-* **FastEmbed Optimization:** Transitioned to ONNX-based `FastEmbedEncoder` for zero-overhead, sub-millisecond local vector generation.
+> A local semantic router can provide calibrated selective routing with
+> predictable tail latency and explicit durability behavior while routes are
+> updated concurrently.
 
-### v0.3.0 (Distributed Synchronization & Tuning)
-* **Redis PubSub Topology:** Introduced `RedisSyncManager` to enable live multi-pod state synchronization and horizontal scaling via event broadcasting.
-* **Pluggable Encoders:** Abstracted the encoder layer to support external remote execution endpoints (e.g., `OpenAIEncoder`).
-* **Automated Tuning:** Deployed `SyntheticTuner` for automated out-of-domain margin boundary analysis using LLMs to generate adversarial data.
-* **Telemetry & Observability:** Formalized hardware `OptimizationProfile` presets and established initial Banking77 accuracy baselines.
+This is a systems claim, not a claim that embeddings, HNSW, SQLite, or
+thresholding are individually novel.
 
----
+## Current State
 
-## Completed (v0.4.1)
+Implemented engineering capabilities:
 
-* **SQLite WAL Persistence:** Replaced brittle JSON snapshotting with a robust embedded SQLite database using Write-Ahead Logging (WAL) and `IMMEDIATE` transaction isolation.
-* **Asynchronous Micro-Batching:** Re-architected the `AdaptiveRouter` inference pipeline to use an `asyncio.Queue` worker that dynamically micro-batches incoming queries, drastically lifting throughput limits.
-* **Two-Stage Retrieval (Cross-Encoder Fallback):** Implemented `CrossEncoderReranker` to allow intelligent deferral to dense reasoning models when initial bi-encoder matches fall within uncertain semantic boundaries.
-* **Phase 3 Baseline Validation:** Mathematical telemetry proven on 1M vector indices, achieving ~91.16% Banking77 accuracy and 3.0ms large-scale P95 latency.
+* local embedding-based route retrieval;
+* NumPy and FAISS HNSW indexes;
+* per-route thresholds, margin gating, and optional reranking;
+* asynchronous batching and bounded request queues;
+* SQLite WAL persistence with queued writes;
+* experimental Redis Pub/Sub synchronization.
 
----
+Evidence limitations:
 
-## v0.5.0 (Upcoming: Enterprise Stability & OOD Rejection)
+* historical accuracy, OOD, throughput, GPU, and scale results are unverified;
+* the former `0.003ms` one-million-vector result is retracted;
+* bundled semantic datasets are development fixtures, not a publishable
+  dataset contribution;
+* external dataset pilots are diagnostic and remain unverified until rerun
+  from a clean commit;
+* Redis synchronization has no durable replay or consistency guarantee.
 
-### Goal: Automated Distributed Regression Suite
-* **Why It Matters:** While standard unit tests ensure single-node validity, multi-node deployments are prone to race conditions and eventual consistency failures over long uptimes.
-* **Success Criteria:**
-  * Implement an exhaustive `run_regression_suite.py` specifically simulating long-running cyclic synchronization failures.
-  * Ensure FAISS memory leak and Redis broadcast loop regressions are algorithmically prevented in CI/CD.
+## Phase 0: Evidence Integrity
 
-### Goal: Out-of-Distribution (OOD) Rejection Improvement
-* **Why It Matters:** Currently, SynaptoRoute can sometimes force matches onto dense boundaries, leading to false positives when a user query does not belong to any defined route.
-* **Success Criteria:**
-  * Implement advanced outlier detection or thresholding algorithms to confidently reject unrelated queries.
-  * Area Under the Receiver Operating Characteristic (AUROC) > 0.90.
-  * False Positive Rate at 95% True Positive Rate (FPR@95) < 10%.
-  * The benchmark is fully reproducible in the `scratch/` directory.
+**Status:** implementation complete; clean candidate rerun complete; independent
+review and evidence promotion pending
 
----
+Deliverables:
 
-## v0.6.0 (Upcoming: Distributed Scaling)
+* schema-validated benchmark manifests and archived raw logs;
+* a dirty-worktree gate for verified evidence;
+* one reproducible development and benchmark installation command;
+* corrected Top-K, latency, split, seed, and timing-unit definitions;
+* a deterministic local structural benchmark suitable for CI;
+* documentation that maps every public claim to evidence.
 
-### Goal: Distributed Bootstrapping Overhaul
-* **Why It Matters:** The current `request_full_sync` Redis PubSub implementation requires `O(N×M)` full-state broadcasting when a new node boots. This causes immediate network saturation and OOM faults above 100,000 routes in enterprise-scale environments.
-* **Success Criteria:**
-  * Integration of a central durable ledger (e.g., Litestream-backed SQLite or an external PostgreSQL adapter).
-  * Redis PubSub is exclusively restricted to broadcasting lightweight incremental deltas (`add_route`, `delete_route`).
-  * Bootstrapping a 1M route node completes in under 5 seconds without triggering a broadcast storm on existing nodes.
+Exit criteria:
 
-### Goal: Multi-tenant Semantic Indexing
-* **Why It Matters:** Enterprise SaaS users require logical isolation of their vector databases within a single running instance to prevent cross-tenant data leakage.
-* **Success Criteria:**
-  * Enable the dynamic creation and routing of isolated `FaissIndex` instances on a per-tenant API key basis.
-  * Negligible overhead impact on concurrent memory utilization.
+* `pytest` discovers only the supported test suite and passes from a clean
+  editable installation;
+* every historical manifest is valid and remains `unverified` or `retracted`;
+* the local smoke benchmark runs through the benchmark runner and emits raw
+  output plus a valid run manifest;
+* no public document calls historical numbers verified.
 
+## Phase 1: Observable Decisions And Calibration
 
----
+**Status:** in progress
 
-## v0.7.0 (Upcoming: Next-Generation Capabilities)
+Deliverables:
 
-### Goal: Multimodal Semantic Routing
-* **Why It Matters:** As agentic frameworks evolve to handle vision and audio inputs (Vision-Language Models, Speech-to-Text pipelines), semantic routing must natively understand multi-modal objects. This allows a user to pass an image of a receipt directly to the router, and have the router instantly trigger the 'Billing API' without requiring an expensive LLM to analyze the image first.
-* **Success Criteria:**
-  * Implement a pluggable MultimodalEncoder (e.g., utilizing OpenAI CLIP or SentenceTransformers).
-  * Expand Route ingestion definitions to accept image bytes, file paths, and audio snippets seamlessly alongside traditional text strings.
-  * Ensure the underlying FaissIndex and margin gating logic remains completely unimpacted by the data source.
+* `RouterResult` containing route, score, margin, ranked candidates, and
+  decision reason;
+* identical decision semantics in synchronous and asynchronous paths;
+* validation-only fitting of global and per-route thresholds;
+* calibrated abstention policy with held-out calibration data;
+* reliability, risk-coverage, and failure-bucket reporting.
+
+Exit criteria:
+
+* existing `Optional[Route]` APIs remain backward compatible;
+* no test or calibration example is used as a route utterance;
+* calibration behavior is covered by deterministic unit tests;
+* the chosen policy is fixed before final test-set evaluation.
+
+Implemented so far:
+
+* backward-compatible `RouterResult` output for sync and async routing;
+* ranked candidates, score, margin, and explicit decision reasons;
+* validation-only global threshold and margin fitting with hashed artifacts;
+* validation-only per-route threshold fitting with a shared margin;
+* OOD ranking and selective risk-coverage metrics;
+* unit and integration tests that prevent fitting on the test split.
+
+Still required: reliability diagrams and independent review of the multi-seed
+confidence intervals and matched-coverage implementation.
+
+## Phase 2: Static Quality Baselines
+
+**Status:** in progress
+
+Datasets:
+
+* Banking77 official train/test split;
+* CLINC150/OOS official train, validation, and test splits;
+* selected BOLT open-set text-classification tasks;
+* optional MASSIVE multilingual subset after the English protocol is stable.
+
+Required baselines:
+
+* exact string/rule matching;
+* logistic regression over the same embeddings;
+* exact cosine retrieval over the same embeddings;
+* SynaptoRoute NumPy and FAISS HNSW indexes;
+* Aurelio Semantic Router `>=0.1.15` with the same encoder and route examples;
+* at least one published open-intent baseline when licenses and code permit.
+
+Exit criteria:
+
+* five predetermined seeds where sampling is involved;
+* top-1/macro-F1, AUROC, AUPRC, FPR@95, coverage, and selective-risk results;
+* paired confidence intervals and effect sizes;
+* all raw predictions, configurations, and manifests archived.
+
+Implemented so far:
+
+* immutable-revision Banking77 and CLINC150/OOS loaders;
+* deterministic stratified pilot subsets and explicit cross-split
+  decontamination counts;
+* exact string, exact cosine, logistic-regression, and Semantic Router
+  baselines;
+* 500-query development pilots for both primary datasets.
+* a fixed five-seed driver that retains per-seed artifacts and aggregates only
+  quality metrics.
+
+The pilots are intentionally marked `unverified` and are not paper evidence.
+Diagnostic five-seed runs and paired statistics are implemented. The full
+studies were repeated from clean commit `df94df3` with exactly equal aggregate
+and paired statistical sections. Artifact archival, independent reproduction,
+and evidence promotion remain open.
+
+Pilot interpretation is recorded in
+[`docs/DEVELOPMENT_PILOT_RESULTS.md`](docs/DEVELOPMENT_PILOT_RESULTS.md). The
+external comparator and OOD ranking metrics are now implemented; multi-seed
+statistics are diagnostic only, and clean evidence promotion remains open.
+
+## Phase 3: Dynamic Routing And Durability
+
+**Status:** in progress
+
+Deliverables:
+
+* a written acknowledgement and durability contract;
+* route versions and deterministic mutation ordering;
+* read/write workload generator with controlled mutation rates;
+* crash, restart, failed-write, and queue-backpressure fault injection;
+* mutation visibility, durable-commit latency, recovery time, and lost-update
+  measurements.
+
+Exit criteria:
+
+* every acknowledged durability level has a testable definition;
+* recovery tests distinguish acknowledged, queued, and committed mutations;
+* no correctness claim depends only on a successful happy-path run.
+
+Implemented so far:
+
+* process-local mutation receipts with explicit queued, durable, and failed
+  states;
+* a failure-reporting durable barrier while preserving nonblocking mutation
+  calls;
+* normal-restart and injected storage-failure tests;
+* abrupt child-process exit experiments at memory and durable acknowledgement
+  boundaries;
+* a controlled concurrent read/write workload with visibility, durable
+  latency, query latency, correctness, and restart checks.
+* a bounded in-flight async batch executor and offered-load shedding sweep.
+
+Still required: route versions, a cross-process ordering model, repeated
+controlled-hardware runs, broader queue/backpressure parameter sweeps, and
+broader crash timing windows.
+
+## Phase 4: Scale And Ablation Study
+
+**Target:** weeks 14-18
+
+Experiments:
+
+* route and utterance scale sweeps;
+* query-only and mixed read/write loads;
+* exact versus HNSW retrieval;
+* encoder, threshold, margin, reranker, batch size, queue size, persistence, and
+  HNSW-parameter ablations;
+* at least two CPU hardware profiles and an optional GPU profile;
+* p50/p95/p99 latency, throughput, memory, cold-start, and recovery metrics.
+
+Exit criteria:
+
+* workloads are identical across systems where comparison is claimed;
+* warmup, concurrency, repetitions, and timing boundaries are documented;
+* conclusions include negative results and practical operating limits.
+
+## Phase 5: Artifact And Paper
+
+**Target:** weeks 18-24
+
+Deliverables:
+
+* clean tagged release and immutable commit;
+* lockfile or containerized reproduction environment;
+* archived artifact and DOI;
+* paper tables generated from validated result files;
+* limitations, ethics, and threat-to-validity sections;
+* independent reproduction by a contributor who did not write the benchmark.
+
+Preferred submission direction:
+
+1. SIGMETRICS/POMACS for a strong dynamic systems and measurement result.
+2. Expert Systems with Applications for a comprehensive applied study.
+3. ACM SAC for a narrower applied systems paper.
+4. JOSS as a separate software citation after the project is feature-complete
+   and has sufficient public development history.
+
+## First 90 Days
+
+### Days 1-30
+
+* complete Phase 0;
+* freeze research questions, hypotheses, datasets, metrics, and exclusions;
+* reconcile public documentation with the evidence registry;
+* implement scored decision results without breaking compatibility.
+
+### Days 31-60
+
+* finish calibration and abstention policies;
+* implement exact, logistic-regression, and Semantic Router baselines;
+* run pilots on Banking77 and CLINC150;
+* finalize dynamic workload and fault-injection specifications.
+
+### Days 61-90
+
+* run the fixed multi-seed static experiments;
+* run initial mutation, durability, and recovery experiments;
+* produce the first statistical tables and figures;
+* complete a paper skeleton containing only verified results.
+
+## Decision Gates
+
+At day 60, stop the algorithmic paper direction if calibrated routing does not
+beat simple baselines at matched coverage. Continue only with a systems or
+negative-results framing.
+
+At day 90, stop the full conference-paper plan if the team cannot reproduce
+the experiment artifact from a clean machine. A technical report or JOSS
+software paper remains a valid fallback.
+
+## Product Release Context
+
+The research phases govern evidence quality; release versions govern
+user-facing features. The current package release is v0.4.1. Distributed
+bootstrapping, multi-tenant indexes, and multimodal encoders remain product
+backlog items and must not bypass the research validation gates above.

@@ -1,78 +1,85 @@
 # SynaptoRoute Benchmarks
 
-This file summarizes the benchmark performance of SynaptoRoute. All claims are backed by empirical telemetry found in the [BENCHMARK_REGISTRY.md](docs/BENCHMARK_REGISTRY.md).
+This file summarizes benchmark policy and current evidence status. Historical numbers are audit targets, not verified release claims.
 
 ## Metric Definitions
 
-To ensure transparency, all benchmarks are evaluated against the following strict definitions:
+* **Top-1 Accuracy:** percentage of queries where the highest-scoring route matches the labeled target.
+* **Top-3 Accuracy:** percentage of queries where the target route is in the top three.
+* **AUROC / AUPRC / FPR@95:** OOD rejection metrics that must be computed from a documented in-distribution/OOD split.
+* **P50 / P95 / P99:** latency percentiles with explicit timing units.
+* **Throughput:** completed requests per second for a documented workload.
 
-### Accuracy Metrics
-* **Top-1 Accuracy:** The percentage of queries where the highest-scoring FAISS route correctly matches the labeled ground truth.
-* **Top-3 Accuracy:** The percentage of queries where the correct route is within the top 3 highest-scoring routes.
-* **Precision:** True Positives / (True Positives + False Positives).
-* **Recall:** True Positives / (True Positives + False Negatives).
-* **F1:** The harmonic mean of Precision and Recall.
+## Current Status
 
-### OOD Metrics (Out-Of-Distribution)
-* **AUROC (Area Under the Receiver Operating Characteristic):** Measures the classifier's ability to distinguish between in-distribution queries and out-of-distribution (fallback) queries across all threshold values.
-* **AUPRC (Area Under the Precision-Recall Curve):** Evaluates the tradeoff between precision and recall for rare/OOD data.
-* **FPR@95:** The False Positive Rate calculated when the True Positive Rate is strictly anchored at 95%.
+| Area | Historical Result | Current Status |
+|---|---:|---|
+| Banking77 accuracy | 91.16% | unverified |
+| CLINC150 top-1 accuracy | 92.0% | unverified |
+| OOD rejection | AUROC 0.908, FPR@95 36.5% | unverified |
+| Warm bottleneck attribution | total 7.80ms | unverified |
+| 1M vector latency | historical `0.003ms` | retracted |
 
-### Performance Metrics
-* **P50:** The median latency; 50% of requests complete faster than this.
-* **P95 / P99:** The tail latency bounds; 95% or 99% of requests complete faster than this.
-* **Throughput:** Total queries fully processed (including encoding and FAISS retrieval) per second (RPS).
-* **Startup Time:** The wall-clock time required to reconstruct the FAISS index from SQLite WAL storage.
-* **Memory Usage:** The peak RAM allocated to the python process during sustained loads.
+The `0.003ms` latency claim was caused by treating `time.perf_counter()` seconds as milliseconds. The corrected interpretation is roughly `3ms`, but the result still needs a clean rerun before it can be cited.
 
----
+## Reproducing Benchmarks
 
-## 1. Accuracy (Verified)
+Use the benchmark runner so commands, environment metadata, and raw log paths are captured:
 
-* **Date:** 2026-05-31
-* **Version:** v0.4.0
-* **Dataset:** Banking77 (Test Split)
-* **Hardware:** Standard CPU Pipeline
-* **Methodology:** Verified via `benchmarks/run_banking77.py`. Embeddings processed by `FastEmbedEncoder` using `bge-small-en-v1.5`.
+```bash
+python benchmarks/run_all_benchmarks.py --benchmarks local_smoke
+```
 
-**Results:**
-* **Top-1 Accuracy:** ~91.16%
-* **Top-3 Accuracy:** ~98.40%
-* **Status:** `[VERIFIED]`
+The local smoke benchmark uses deterministic synthetic vectors to validate
+index correctness and the evidence pipeline. It is not eligible for semantic
+accuracy claims. Install `.[benchmark]` before running external datasets or
+the Semantic Router comparison:
 
-* **Date:** 2026-05-31
-* **Version:** v0.4.0
-* **Dataset:** CLINC150 (Test Split)
+```bash
+pip install -e ".[benchmark]"
+python benchmarks/run_all_benchmarks.py --benchmarks accuracy latency
+```
 
-**Results:**
-* **Top-1 Accuracy:** ~92.00%
-* **Status:** `[VERIFIED]`
+Pinned external development pilots use validation-only policy fitting and
+write per-example prediction records without raw query text:
 
----
+```bash
+python benchmarks/run_all_benchmarks.py --benchmarks banking77_pilot --output-dir benchmark_results/banking77-pilot
+python benchmarks/run_all_benchmarks.py --benchmarks clinc150_pilot --output-dir benchmark_results/clinc150-pilot
+```
 
-## 2. Large Scale Latency (Verified)
+These pilot commands evaluate 500 stratified test examples. They are intended
+to find protocol and integration defects before multi-seed runs; their output
+is always marked `unverified` and `paper_evidence_eligible=false`.
 
-* **Date:** 2026-06-04
-* **Version:** v0.4.0
-* **Dataset:** 100,000 Mock Routes (Random uniform vectors anchored to hypersphere)
-* **Hardware:** Local CPU / Memory limits enabled
-* **Methodology:** Verified via `scratch/bench_large_scale_retrieval.py`. Encoder bypassed to test FAISS + Router lookup overhead.
+The fixed five-seed quality studies use the full official test split and the
+seeds declared in the research protocol:
 
-**Results:**
-* **P50:** 3.01 ms
-* **P95:** 3.42 ms
-* **P99:** 3.81 ms
-* **Status:** `[VERIFIED]`
+```bash
+python benchmarks/run_all_benchmarks.py --benchmarks banking77_multiseed --output-dir benchmark_results/banking77-multiseed
+python benchmarks/run_all_benchmarks.py --benchmarks clinc150_multiseed --output-dir benchmark_results/clinc150-multiseed
+```
 
----
+These are long-running experiments. The study summary aggregates quality
+metrics only; latency requires the separate counterbalanced systems protocol.
 
-## Historical Retractions
+Structural durability and mixed-load smoke runs are available through the same
+evidence runner:
 
-SynaptoRoute values engineering honesty. The following historical claims were determined to be mathematically invalid and are preserved here for transparency.
+```bash
+python benchmarks/run_all_benchmarks.py --benchmarks durability_smoke crash_recovery_smoke dynamic_workload_smoke backpressure_smoke
+```
 
-### > [!WARNING]
-### <RETRACTED> 0.003ms Ultra-Low Latency Claim
+They use a deterministic non-semantic encoder and always emit unverified
+diagnostic results. The crash smoke terminates child processes with
+`os._exit`; it never terminates the benchmark coordinator.
 
-* **Original Claim:** In v0.3.0, documentation widely claimed P50 latency of 0.003ms for 100,000 routes.
-* **Why it was wrong:** During Phase 4 architecture audits, a severe unit conversion bug was discovered in `bench_large_scale_retrieval.py`. The `time.perf_counter()` output was measured in seconds, but was improperly labeled as milliseconds without the necessary `* 1000` conversion.
-* **Corrected Evidence:** The true latency is 3.01ms (1000x higher than claimed). This has been confirmed and corrected via the v0.4.0 Critical Regression suite.
+The generated run manifest remains `unverified` until the raw logs are reviewed and promoted into a claim manifest that passes `benchmarks.manifest_schema.validate_manifest` with status `verified`.
+
+Experimental definitions and statistical requirements are fixed in
+[`docs/RESEARCH_PROTOCOL.md`](docs/RESEARCH_PROTOCOL.md).
+The latest explicitly unverified diagnostic results and their interpretation
+are in [`docs/DEVELOPMENT_PILOT_RESULTS.md`](docs/DEVELOPMENT_PILOT_RESULTS.md).
+The clean-commit replication commands, invariant outcomes, and artifact
+digests are in
+[`docs/CLEAN_REPLICATION_RESULTS.md`](docs/CLEAN_REPLICATION_RESULTS.md).

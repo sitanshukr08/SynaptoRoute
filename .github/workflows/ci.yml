@@ -1,64 +1,42 @@
-name: CI
+name: SynaptoRoute CI Pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main, "codex/**" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-          
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .[test,all]
-          
-      - name: Run Linters
-        run: |
-          ruff check src/ tests/
-          mypy src/ tests/
+    name: Test (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12"]
 
-      - name: Run Tests
-        run: |
-          pip install pytest-timeout
-          pytest tests/ -v -s --timeout=30
-          
-  docker-build:
-    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Build Docker Image
-        run: |
-          docker build -t synaptoroute-test .
+    - uses: actions/checkout@v4
 
-  benchmark:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-          
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .[all]
-          
-      - name: Run Real-World Dataset Benchmark
-        run: |
-          pip install datasets
-          echo "### System Performance & Real Datasets" >> $GITHUB_STEP_SUMMARY
-          python benchmarks/bench_realworld.py >> $GITHUB_STEP_SUMMARY
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev,test]"
+
+    - name: Run Ruff Linter
+      run: |
+        ruff check src/ tests/ benchmarks/
+
+    - name: Run Pytest Suite
+      run: |
+        python -m pytest tests -q
+
+    - name: Run Verified CI Benchmark
+      run: |
+        python benchmarks/run_verified_ci_benchmark.py

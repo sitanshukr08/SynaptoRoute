@@ -1,43 +1,24 @@
-# Verified and Unknown Boundaries
+# Known And Unknown Boundaries
 
-To maintain engineering trust, SynaptoRoute explicitly separates verified system limits from theoretical or unknown boundaries. This document outlines the absolute edge of our confidence in the current v0.4.0 architecture.
+SynaptoRoute separates implemented behavior from verified evidence. A working implementation is not the same thing as a release-grade performance or research claim.
 
----
+## Known Engineering Boundaries
 
-## 1. Verified Boundaries
+* **Encoder bottleneck:** local embedding inference is expected to dominate end-to-end latency, but exact throughput claims must be rerun.
+* **Dynamic mutation at scale:** tombstones and index rebuilds can become expensive for very large route sets.
+* **Redis sync:** Redis Pub/Sub sync is experimental. Bootstrap, replay, and missed-window behavior are not validated well enough for distributed consistency claims.
+* **Retracted latency metric:** the old `0.003ms` claim was invalid because seconds were labeled as milliseconds. Treat the corrected `~3ms` interpretation as unverified until rerun.
 
-These limitations have been empirically observed, tested, and confirmed.
+## Unknown Boundaries
 
-### Scale Limitations (Verified)
-* **Single-Core Encoding Bottleneck:** While the FAISS router resolves queries in ~3ms, the upstream `FastEmbedEncoder` processing string inputs caps throughput at **~130 RPS (Requests Per Second)** per CPU core. Exceeding this rate will trigger the `QueueFull` fail-fast backpressure mechanism.
-* **100,000 Route Capacity:** The system has been validated to hold 100,000 routes in memory safely using ~530MB of RAM.
+* Multi-million route deployments.
+* Multi-region Redis sync behavior.
+* Sustained GPU encoder throughput in production.
+* Non-English semantic matching.
+* OOD rejection reliability under adversarial or noisy text.
 
-### Distributed Limitations (Verified)
-* **O(N×M) Redis Bootstrapping:** When a new node joins the cluster, `request_full_sync` triggers the existing nodes to broadcast their entire route map across the PubSub channel. For 100,000 routes and 4 nodes, this floods the Redis client buffer with 400,000 JSON payloads. This architectural limitation effectively prohibits massive-scale cluster bootstrapping via Redis.
+## Research Gaps
 
-### Benchmark Limitations (Verified)
-* **Retracted Latency Metrics:** The legacy v0.3.0 claim of 0.003ms latency was mathematically false due to a unit conversion bug in the telemetry script (`seconds` reported directly as `ms`). The true, verified latency is **3.0ms**.
+SynaptoRoute is a software system under active development, not a research-validated method yet.
 
----
-
-## 2. Unknown Boundaries
-
-These scenarios have never been empirically tested. Any claims regarding performance in these areas are speculative.
-
-* **Multi-Million Route Deployments:** It is unknown at what scale FAISS `IndexFlatIP` search times become unacceptably slow without quantization or HNSW hierarchies.
-* **Multi-Region Deployments:** The impact of intercontinental network latency on the Redis Sync Manager's locking and drift heuristics is unknown.
-* **GPU Cluster Deployments:** While ONNX DirectML execution was mocked for batching during Phase 4, sustained high-throughput GPU inference for the encoder remains unverified in a production web server environment.
-* **Multilingual Benchmarks:** Accuracy is only verified on English datasets (Banking77, CLINC150). Non-English semantic matching remains unproven.
-
----
-
-## 3. Research Gaps
-
-SynaptoRoute is a well-engineered software tool, but it currently lacks the academic validation required for "Research Readiness." Future readers must not confuse engineering reliability with empirical AI validation.
-
-**Missing Validations:**
-* **Ablation Studies:** There is no documented proof isolating how much the threshold fitting algorithm impacts end-to-end accuracy compared to a flat threshold.
-* **Statistical Significance Testing:** 91.16% accuracy on Banking77 lacks p-value bounds or variance intervals across multiple random seed initializations.
-* **Cross-Encoder Baselines:** There is no benchmark establishing the maximum possible accuracy ceiling a cross-encoder could achieve on these datasets to serve as an upper-bound comparison.
-* **Calibration Analysis:** It is unknown if the confidence scores emitted by the `FastEmbedEncoder` are well-calibrated (i.e., does a 0.90 similarity score genuinely reflect a 90% probability of being correct?).
-* **Out-of-Distribution (OOD) Rejection:** Currently, we lack any reproducible benchmarks (AUROC, FPR@95) proving the system can reliably reject queries that do not belong to any defined route.
+Missing validation includes ablations, statistical significance, cross-encoder baselines, calibration analysis, multilingual evaluation, and reproducible OOD benchmarks.

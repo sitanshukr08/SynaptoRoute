@@ -50,13 +50,15 @@ Benchmarks are executed via isolated Python scripts in the `scratch/` directory.
 
 ---
 
-## 6. Verified Benchmark Results
+## 6. Historical Benchmark Claims
 
-* **Banking77 Accuracy:** 91.16%
-* **CLINC150 Accuracy:** 92.0% (Top-1)
-* **OOD Handling:** AUROC 0.908 | AUPRC 0.898 | FPR@95 = 36.5%
-* **Retrieval Latency (Warm):** FAISS search (~0.09ms) + SQLite fetch (~0.08ms) + Encoder (~7.60ms) = **~7.80ms total inference time.**
-* **Retrieval Scale:** 1,000,000 vectors load into ~2GB of RAM. FAISS search time at 1M routes is **3.0ms**.
+These numbers are retained as audit targets, not verified publication claims. See `BENCHMARK_REGISTRY.md` and `CURRENT_EVIDENCE_STATUS.md` for the current status.
+
+* **Banking77 Accuracy:** historical 91.16%, currently unverified.
+* **CLINC150 Accuracy:** historical 92.0% Top-1, currently unverified.
+* **OOD Handling:** historical AUROC 0.908 | AUPRC 0.898 | FPR@95 = 36.5%, currently unverified and must be rerun.
+* **Retrieval Latency (Warm):** historical total ~7.80ms, currently unverified.
+* **Retrieval Scale:** historical 1,000,000-vector run retained only as a retracted/unit-bug audit artifact until rerun.
 
 ---
 
@@ -70,7 +72,7 @@ Benchmarks are executed via isolated Python scripts in the `scratch/` directory.
   * *Fix:* System was rebuilt to fully reconstruct the FAISS index from SQLite upon deletion.
 * **Unit Conversion Bug:**
   * *Problem:* Phase 3 telemetry reported `0.003ms` latency for 1M routes.
-  * *Fix:* Audit discovered `time.perf_counter()` returns seconds. The true latency is `0.003 seconds` (3.0ms). The 0.003ms claim was retracted.
+  * *Fix:* Audit discovered `time.perf_counter()` returns seconds. The corrected interpretation is about `0.003 seconds` (3.0ms), but the benchmark still needs a clean rerun before publication.
 * **Encoder Bottleneck:**
   * *Problem:* Assumed FAISS was the bottleneck.
   * *Fix:* Bottleneck attribution proved the Encoder takes 97% of inference time (~7.6ms). FAISS takes <3%.
@@ -80,7 +82,7 @@ Benchmarks are executed via isolated Python scripts in the `scratch/` directory.
 ## 8. Known Limitations
 
 * **Mutation Lock at Scale:** Rebuilding the FAISS index for 1,000,000 vectors takes ~290 seconds. SynaptoRoute cannot handle high-frequency dynamic writes at massive scale.
-* **Distributed Synchronization:** While Redis Pub/Sub exists, guaranteed consistency across multiple SynaptoRoute nodes is not natively guaranteed.
+* **Distributed Synchronization:** While Redis Pub/Sub exists, guaranteed consistency across multiple SynaptoRoute nodes is not natively guaranteed. Treat Redis sync as experimental until bootstrap, replay, and missed-window behavior are validated.
 * **OOD Vulnerability:** A 36.5% False Positive Rate means adversarial "junk" text will frequently match a valid route if thresholds are tuned for 95% TPR.
 * **GPU Utilization:** DirectML provides a 1.4x speedup on batch encoding (N=300), but single-user queries (N=1) do not experience significant acceleration due to tensor transfer overheads.
 
@@ -100,7 +102,7 @@ Benchmarks are executed via isolated Python scripts in the `scratch/` directory.
 
 ## 10. Research Gaps
 
-SynaptoRoute is an incredibly robust piece of open-source engineering, but it is **not yet ready** for rigorous academic publication (e.g., a formal whitepaper or thesis). This prevents future readers from confusing "well engineered" with "research validated".
+SynaptoRoute has a coherent engineering direction, but it is **not yet ready** for rigorous academic publication (e.g., a formal whitepaper or thesis). This prevents future readers from confusing "implemented" with "research validated".
 
 **Missing Evidence Required for Publication:**
 * **Ablation Studies:** Isolating how much the threshold fitting algorithm impacts end-to-end accuracy.
