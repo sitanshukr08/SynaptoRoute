@@ -2,11 +2,11 @@
   "schema_version": 1,
   "benchmark": "ci_verified_retrieval",
   "status": "verified",
-  "timestamp_utc": "2026-07-25T21:02:43Z",
+  "timestamp_utc": "2026-07-27T02:04:03Z",
   "git_commit": "ci_commit_build",
   "working_tree_dirty": false,
   "command": [
-    "D:\\situproject1\\.venv310\\Scripts\\python.exe",
+    "python",
     "benchmarks/run_verified_ci_benchmark.py"
   ],
   "environment": {
@@ -26,15 +26,15 @@
   },
   "metrics": {
     "top1_accuracy": 1.0,
-    "p50_latency_ms": 10.269000005791895,
-    "p95_latency_ms": 12.971915012167301,
-    "p99_latency_ms": 15.850797989987777,
-    "total_duration_sec": 3.9109406000061426
+    "p50_latency_ms": 10.202400000707712,
+    "p95_latency_ms": 13.19790000015928,
+    "p99_latency_ms": 14.481271001459392,
+    "total_duration_sec": 2.422099299998081
   },
   "evidence": {
     "script_path": "benchmarks/run_verified_ci_benchmark.py",
-    "raw_output_path": "benchmark_results\\ci_verified\\ci_verified.log",
-    "raw_output_sha256": "e9c9db34d8f5dfc96b47bf0c55a4042a8c9e9d5420c1bef450b48ea018114345",
+    "raw_output_path": "benchmark_results/ci_verified/ci_verified.log",
+    "raw_output_sha256": "92ecf9752c0cbb6b60d66eeabe1321156cb0696321f78f8cad520853bd602f63",
     "timing_unit": "milliseconds",
     "notes": "Self-contained CI verified benchmark for SynaptoRoute release pipeline."
   }

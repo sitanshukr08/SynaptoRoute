@@ -1,0 +1,21 @@
+{
+  "benchmark": "ci_verified_retrieval",
+  "status": "verified",
+  "timestamp_utc": "2026-07-27T02:04:03Z",
+  "dataset": {
+    "name": "deterministic_synthetic_ci",
+    "version": "1.0",
+    "split": "ci_test",
+    "seed": 42,
+    "route_count": 20,
+    "query_count": 100,
+    "license": "MIT"
+  },
+  "metrics": {
+    "top1_accuracy": 1.0,
+    "p50_latency_ms": 10.202400000707712,
+    "p95_latency_ms": 13.19790000015928,
+    "p99_latency_ms": 14.481271001459392,
+    "total_duration_sec": 2.422099299998081
+  }
+}

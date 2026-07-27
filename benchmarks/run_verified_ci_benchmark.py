@@ -97,7 +97,7 @@ def run_ci_benchmark() -> dict:
         "timestamp_utc": log_data["timestamp_utc"],
         "git_commit": "ci_commit_build",
         "working_tree_dirty": False,
-        "command": [sys.executable, "benchmarks/run_verified_ci_benchmark.py"],
+        "command": ["python", "benchmarks/run_verified_ci_benchmark.py"],
         "environment": {
             "python_version": platform.python_version(),
             "platform": platform.platform(),
@@ -108,7 +108,7 @@ def run_ci_benchmark() -> dict:
         "metrics": log_data["metrics"],
         "evidence": {
             "script_path": "benchmarks/run_verified_ci_benchmark.py",
-            "raw_output_path": str(raw_output_path.relative_to(REPO_ROOT)),
+            "raw_output_path": raw_output_path.relative_to(REPO_ROOT).as_posix(),
             "raw_output_sha256": raw_sha256,
             "timing_unit": "milliseconds",
             "notes": "Self-contained CI verified benchmark for SynaptoRoute release pipeline.",
