@@ -24,7 +24,7 @@ from synaptoroute.profile import OptimizationProfile, get_profile, ProfileType
 from synaptoroute.index import get_index
 
 class AdaptiveRouter:
-    def __init__(self, encoder: Optional[BaseEncoder] = None, storage: Optional[BaseStorage] = None, profile: Optional[OptimizationProfile] = None, max_capacity: int = 50000, max_queue_size: int = 10000, metrics: Optional[MetricsRegistry] = None, sync_manager: Optional[BaseSyncManager] = None, margin: float = 0.0, reranker: Any = None, max_in_flight_batches: int = 4, enable_adaptive_memory: bool = False, adaptive_weigher: Any = None):
+    def __init__(self, encoder: Optional[BaseEncoder] = None, storage: Optional[BaseStorage] = None, profile: Optional[OptimizationProfile] = None, max_capacity: int = 50000, max_queue_size: int = 10000, metrics: Optional[MetricsRegistry] = None, sync_manager: Optional[BaseSyncManager] = None, margin: float = 0.0, reranker: Any = None, max_in_flight_batches: int = 4, enable_adaptive_memory: bool = False, adaptive_weigher: Any = None, enable_hybrid_lexicon: bool = False, hybrid_alpha: float = 0.3, enable_slot_matching: bool = False):
         if profile is None:
             profile = get_profile(ProfileType.THROUGHPUT)
             
@@ -62,6 +62,23 @@ class AdaptiveRouter:
             self.stats_collector = None
             self._route_metadata_context = {}
         
+        # Hybrid lexicographic index (BM25)
+        self.enable_hybrid_lexicon = enable_hybrid_lexicon
+        self.hybrid_alpha = float(max(0.0, min(1.0, hybrid_alpha)))  # clamp to [0, 1]
+        if self.enable_hybrid_lexicon:
+            from synaptoroute.lexicon import BM25LexiconIndex
+            self._lexicon: Any = BM25LexiconIndex()
+        else:
+            self._lexicon = None
+
+        # Compiler-style slot matching
+        self.enable_slot_matching = enable_slot_matching
+        if self.enable_slot_matching:
+            from synaptoroute.slots import SlotValidator
+            self._slot_validator: Any = SlotValidator()
+        else:
+            self._slot_validator = None
+
         self.index = get_index(dim=self.encoder.dim, max_capacity=self.max_capacity)
         self._route_map: dict[str, Route] = {}
         self._route_map_lock = threading.Lock()
@@ -184,6 +201,13 @@ class AdaptiveRouter:
             self._rebuild_pending = False
         self.metrics.capacity_usage.set(self.index.total_vectors)
 
+        # Rebuild lexicon index from all loaded routes
+        if self._lexicon is not None:
+            self._lexicon.clear()
+            with self._route_map_lock:
+                for r_name, r_obj in self._route_map.items():
+                    self._lexicon.add_route(r_name, r_obj.utterances)
+
     def _resync_from_storage(self):
         routes, embeddings_map = self.storage.load_all_routes()
         self._replace_runtime_state(routes, embeddings_map)
@@ -210,6 +234,8 @@ class AdaptiveRouter:
                 if self._rebuild_pending:
                     self._pending_rebuild_mutations.append(("delete_route", route_name, None, None))
                 self.metrics.capacity_usage.set(self.index.total_vectors)
+            if self._lexicon is not None:
+                self._lexicon.remove_route(route_name)
         except Exception:
             with self._route_map_lock:
                 self._route_map[route_name] = deleted_route
@@ -362,6 +388,9 @@ class AdaptiveRouter:
                     self.index.delete(route.name)
                 if embeddings is not None:
                     self.index.add(embeddings, route.name)
+            # Keep the lexicon index in sync with the vector index
+            if self._lexicon is not None:
+                self._lexicon.add_route(route.name, route.utterances)
                 self.metrics.capacity_usage.set(self.index.total_vectors)
                 if self._rebuild_pending:
                     self._pending_rebuild_mutations.append(("add_route", route.name, embeddings, route))
@@ -490,16 +519,23 @@ class AdaptiveRouter:
             _broadcast,
         )
 
-    def _result_from_candidates(self, query: str, candidates: list[tuple[float, str]]) -> RouterResult:
+    def _result_from_candidates(self, query: str, candidates: list[tuple[float, str]], bm25_scores: Optional[dict[str, float]] = None) -> RouterResult:
         """Collapse utterance hits and apply one observable decision policy."""
         best_by_route: dict[str, tuple[float, Route]] = {}
+        _using_hybrid = bm25_scores is not None and len(bm25_scores) > 0
         for score, route_name in candidates:
             route = self._route_map.get(route_name)
             if route is None:
                 continue
+            # Fuse cosine score with BM25 lexicographic score when available
+            if _using_hybrid:
+                bm25 = bm25_scores.get(route_name, 0.0)
+                fused = self.hybrid_alpha * score + (1.0 - self.hybrid_alpha) * bm25
+            else:
+                fused = score
             current = best_by_route.get(route_name)
-            if current is None or score > current[0]:
-                best_by_route[route_name] = (score, route)
+            if current is None or fused > current[0]:
+                best_by_route[route_name] = (fused, route)
 
         ranked = sorted(best_by_route.values(), key=lambda candidate: candidate[0], reverse=True)
         if not ranked:
@@ -569,6 +605,17 @@ class AdaptiveRouter:
             )
 
         selected_score, selected_route = eligible[0]
+
+        # Compiler-style slot validation: verify all required typed slots are present
+        if self.enable_slot_matching and self._slot_validator is not None and selected_route.slots:
+            if not self._slot_validator.is_satisfied(query, selected_route.name, selected_route.slots):
+                return RouterResult(
+                    score=selected_score,
+                    margin=decision_margin,
+                    candidates=result_candidates,
+                    decision_reason=DecisionReason.SLOT_MISMATCH,
+                )
+
         if self.enable_adaptive_memory and self.stats_collector is not None:
             self.stats_collector.record_hit(selected_route.name)
             meta = self._route_metadata_context.get(selected_route.name)
@@ -582,13 +629,16 @@ class AdaptiveRouter:
         matched_route.metadata["match_margin"] = float(
             decision_margin if decision_margin is not None else selected_score
         )
+        if _using_hybrid:
+            matched_route.metadata["hybrid_bm25_score"] = float(bm25_scores.get(selected_route.name, 0.0))
 
+        final_reason = DecisionReason.MATCHED_HYBRID if _using_hybrid else DecisionReason.MATCHED
         return RouterResult(
             route=matched_route,
             score=selected_score,
             margin=decision_margin,
             candidates=result_candidates,
-            decision_reason=DecisionReason.MATCHED,
+            decision_reason=final_reason,
         )
 
     def match(self, query: str) -> RouterResult:
@@ -603,11 +653,17 @@ class AdaptiveRouter:
 
             query_embedding = self._read_pool.submit(_encode).result()
 
+            # Compute lexicographic BM25 scores in parallel with vector search
+            bm25_scores: dict[str, float] = {}
+            if self._lexicon is not None and self._lexicon.is_ready:
+                for bm25_norm, r_name in self._lexicon.search(query, top_k=10):
+                    bm25_scores[r_name] = bm25_norm
+
             with self.rwlock.read_lock():
                 if self.index.total_vectors == 0:
                     return RouterResult(decision_reason=DecisionReason.EMPTY_INDEX)
                 results = self.index.search(np.array([query_embedding]), top_k=5)
-                return self._result_from_candidates(query, results[0])
+                return self._result_from_candidates(query, results[0], bm25_scores=bm25_scores)
         finally:
             self.metrics.inference_latency_seconds.observe(time.perf_counter() - start_time)
 

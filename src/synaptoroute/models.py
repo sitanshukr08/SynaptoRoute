@@ -18,6 +18,14 @@ class Route(BaseModel):
     threshold: float = Field(0.5, ge=-1.0, le=1.0)
     version: int = Field(1, ge=1)
     metadata: Optional[Dict[str, Any]] = None
+    slots: Optional[Dict[str, str]] = Field(
+        default=None,
+        description=(
+            "Optional compiler-style slot constraints. Keys are slot names, "
+            "values are regex patterns. When enable_slot_matching=True on the "
+            "router, a route is only selected if all declared slots match the query."
+        ),
+    )
 
     @field_validator('metadata')
     @classmethod
@@ -46,11 +54,13 @@ class Route(BaseModel):
 class DecisionReason(str, Enum):
     MATCHED = "matched"
     MATCHED_RERANKER = "matched_reranker"
+    MATCHED_HYBRID = "matched_hybrid"       # matched via hybrid BM25 + cosine score
     EMPTY_INDEX = "empty_index"
     NO_CANDIDATES = "no_candidates"
     BELOW_THRESHOLD = "below_threshold"
     AMBIGUOUS_MARGIN = "ambiguous_margin"
     RERANKER_REJECTED = "reranker_rejected"
+    SLOT_MISMATCH = "slot_mismatch"          # vector matched but required slots absent
 
 
 class RouteCandidate(BaseModel):

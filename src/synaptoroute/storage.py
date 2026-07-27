@@ -191,16 +191,23 @@ class SQLiteStorage(BaseStorage):
                     conn.isolation_level = None
                     cursor = conn.cursor()
                     cursor.execute('BEGIN IMMEDIATE')
-                    
+
                     cursor.execute('SELECT name, threshold, version, metadata FROM routes')
                     route_rows = cursor.fetchall()
-                    
+
                     cursor.execute('SELECT route_name, utterance, embedding FROM utterances')
                     utterance_rows = cursor.fetchall()
-                    
-                    conn.commit()
+
+                    # Use cursor.execute('COMMIT') rather than conn.commit() because
+                    # isolation_level=None puts the connection in autocommit mode and
+                    # conn.commit() raises OperationalError when no Python-managed
+                    # transaction is active.
+                    cursor.execute('COMMIT')
                 except Exception:
-                    conn.rollback()
+                    try:
+                        cursor.execute('ROLLBACK')
+                    except Exception:
+                        pass
                     raise
                 finally:
                     conn.isolation_level = original_isolation
