@@ -13,7 +13,7 @@ import platform
 def command_info():
     """Print system environment, Python runtime, and SynaptoRoute details."""
     print("\n--- SynaptoRoute System Information ---")
-    print("  SynaptoRoute Version: 0.5.0")
+    print("  SynaptoRoute Version: 0.6.0")
     print(f"  Python Version      : {platform.python_version()}")
     print(f"  Operating System    : {platform.platform()}")
     print(f"  CPU Processor       : {platform.processor() or 'Standard CPU'}")

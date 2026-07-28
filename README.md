@@ -23,6 +23,8 @@
 ## Key Highlights
 
 - **Local FastEmbed ONNX Engine:** Runs lightweight vector embeddings locally on CPU using ONNX Runtime—achieving sub-10ms P50 dispatch latencies.
+- **Hybrid Lexicographic + Vector Routing:** Fuses log-dampened BM25 keyword scoring with dense cosine similarity for exact-token query precision (IDs, names, rare codes).
+- **Compiler Semantics & Slot Constraints:** Declare typed regex slot constraints per route (`order_id`, `amount`). The router validates slots before dispatching—deterministic, zero-ambiguity routing.
 - **Durable SQLite WAL Storage:** Persistent state management with non-blocking `MutationReceipt` acknowledgements and explicit `durable_barrier()` disk flushing.
 - **Adaptive Memory Engine:** Dynamic MFU/LRU prior adjustments via `BoundedBayesianWeigher`, lock-free access stats logging, and Adaptive Replacement Cache (ARC).
 - **Framework Integrations:** Native zero-boilerplate adapters for **LangChain** (`Runnable`) and **LlamaIndex** (`BaseSelector`).
@@ -129,6 +131,34 @@ asyncio.run(main())
 
 ---
 
+### Hybrid BM25 & Compiler-Style Slot Constraints
+
+```python
+from synaptoroute import AdaptiveRouter, Route
+
+# Enable BM25 lexicographic signal fusion and compiler-style slot matching
+router = AdaptiveRouter(
+    enable_hybrid_lexicon=True,  # Fuses log-dampened BM25 with cosine similarity
+    hybrid_alpha=0.3,            # 30% vector weight, 70% BM25 keyword weight
+    enable_slot_matching=True,   # Rejects candidate if required typed slots are missing
+)
+
+router.add_route(
+    Route(
+        name="refund_request",
+        utterances=["I want a refund for my order", "process return"],
+        slots={"order_id": r"#?\b\d{4,}\b"},  # Order ID pattern required
+        threshold=0.70,
+    )
+)
+
+# Query matching both intent and slot constraint -> MATCHED_HYBRID
+res = router.match("Refund order #8821 please")
+print(res.route_name, res.decision_reason)  # refund_request, matched_hybrid
+```
+
+---
+
 ## Architecture
 
 SynaptoRoute decouples query evaluation from storage persistence. In-memory SIMD vector matrices process query evaluations under a writer-priority reader/writer lock (`RWLock`), while a dedicated FIFO background worker streams mutation writes to an SQLite WAL database.
@@ -140,7 +170,11 @@ graph TD
     subgraph Evaluation Pipeline
         Router --> Encoder["Local FastEmbed (ONNX)"]
         Encoder --> Index["SIMD Vector Index (Numpy / FAISS)"]
-        Index --> AdaptiveMemory["Adaptive Memory (Bounded Bayesian Priors)"]
+        Router --> Lexicon["BM25 Lexicographic Engine"]
+        Index --> Hybrid["Non-Suppressive Hybrid Fusion"]
+        Lexicon --> Hybrid
+        Hybrid --> SlotCheck["Slot Validator (Compiler Semantics)"]
+        SlotCheck --> AdaptiveMemory["Adaptive Memory (Bounded Bayesian Priors)"]
         AdaptiveMemory --> Gate["Threshold & Margin Decision Gate"]
         Gate --> Result["RouterResult (Route, Score, Margin, Candidates)"]
     end

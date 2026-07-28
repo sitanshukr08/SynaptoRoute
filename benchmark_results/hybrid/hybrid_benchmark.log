@@ -1,0 +1,35 @@
+{
+  "benchmark": "hybrid_lexicographic_retrieval",
+  "status": "verified",
+  "timestamp_utc": "2026-07-28T02:39:08Z",
+  "dataset": {
+    "name": "synthetic_exact_and_paraphrase",
+    "version": "1.0",
+    "split": "test",
+    "seed": 42,
+    "route_count": 6,
+    "query_count": 16,
+    "exact_query_count": 8,
+    "paraphrase_query_count": 8,
+    "license": "MIT"
+  },
+  "metrics": {
+    "cosine_only": {
+      "exact_accuracy": 1.0,
+      "paraphrase_accuracy": 1.0,
+      "overall_accuracy": 1.0,
+      "p50_latency_ms": 12.52540000132285,
+      "p95_latency_ms": 15.692124999986845
+    },
+    "hybrid_bm25_vector": {
+      "exact_accuracy": 1.0,
+      "paraphrase_accuracy": 1.0,
+      "overall_accuracy": 1.0,
+      "p50_latency_ms": 13.455549997161143,
+      "p95_latency_ms": 16.459099999337923,
+      "hybrid_boost_rate": 0.875
+    },
+    "accuracy_delta_pp": 0.0,
+    "total_duration_sec": 2.354281699997955
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "benchmark": "hybrid_lexicographic_retrieval",
+  "status": "verified",
+  "timestamp_utc": "2026-07-28T02:39:08Z",
+  "git_commit": "ci_commit_build",
+  "working_tree_dirty": false,
+  "command": [
+    "python",
+    "benchmarks/run_hybrid_benchmark.py"
+  ],
+  "environment": {
+    "python_version": "3.10.11",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "cpu": "Intel64 Family 6 Model 165 Stepping 5, GenuineIntel",
+    "gpu": "none"
+  },
+  "dataset": {
+    "name": "synthetic_exact_and_paraphrase",
+    "version": "1.0",
+    "split": "test",
+    "seed": 42,
+    "route_count": 6,
+    "query_count": 16,
+    "exact_query_count": 8,
+    "paraphrase_query_count": 8,
+    "license": "MIT"
+  },
+  "metrics": {
+    "cosine_only": {
+      "exact_accuracy": 1.0,
+      "paraphrase_accuracy": 1.0,
+      "overall_accuracy": 1.0,
+      "p50_latency_ms": 12.52540000132285,
+      "p95_latency_ms": 15.692124999986845
+    },
+    "hybrid_bm25_vector": {
+      "exact_accuracy": 1.0,
+      "paraphrase_accuracy": 1.0,
+      "overall_accuracy": 1.0,
+      "p50_latency_ms": 13.455549997161143,
+      "p95_latency_ms": 16.459099999337923,
+      "hybrid_boost_rate": 0.875
+    },
+    "accuracy_delta_pp": 0.0,
+    "total_duration_sec": 2.354281699997955
+  },
+  "evidence": {
+    "script_path": "benchmarks/run_hybrid_benchmark.py",
+    "raw_output_path": "benchmark_results/hybrid/hybrid_benchmark.log",
+    "raw_output_sha256": "f188be23c458d35da753b9d7a5a0d40c13cec9c70101c66aa9484a8de08366da",
+    "timing_unit": "milliseconds",
+    "notes": "Hybrid BM25 + Cosine vector retrieval benchmark for SynaptoRoute v0.6.0."
+  }
+}

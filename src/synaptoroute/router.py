@@ -530,7 +530,7 @@ class AdaptiveRouter:
             # Fuse cosine score with BM25 lexicographic score when available
             if _using_hybrid:
                 bm25 = bm25_scores.get(route_name, 0.0)
-                fused = self.hybrid_alpha * score + (1.0 - self.hybrid_alpha) * bm25
+                fused = max(score, self.hybrid_alpha * score + (1.0 - self.hybrid_alpha) * bm25)
             else:
                 fused = score
             current = best_by_route.get(route_name)
