@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "benchmark": "token_reduction",
+  "status": "verified",
+  "timestamp_utc": "2026-07-30T03:03:00Z",
+  "git_commit": "ci_commit_build",
+  "working_tree_dirty": false,
+  "command": [
+    "python",
+    "benchmarks/eval_token_reduction.py"
+  ],
+  "environment": {
+    "python_version": "3.10.11",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "cpu": "Intel64 Family 6 Model 165 Stepping 5, GenuineIntel",
+    "gpu": "none"
+  },
+  "dataset": {
+    "name": "synthetic_customer_support",
+    "version": "1.0",
+    "split": "test",
+    "seed": 42,
+    "route_count": 6,
+    "query_count": 24,
+    "license": "MIT"
+  },
+  "metrics": {
+    "interception_rate": 1.0,
+    "avg_unrouted_tokens": 64.70833333333333,
+    "avg_routed_tokens": 22.083333333333332,
+    "avg_token_savings_per_query": 42.625,
+    "effective_savings_per_query": 42.625,
+    "projected_cost_saved_usd_per_1m_queries": 106.56,
+    "p50_latency_ms": 12.545900000986876,
+    "p95_latency_ms": 15.257769998697768,
+    "total_duration_sec": 0.44004359999962617
+  },
+  "evidence": {
+    "script_path": "benchmarks/eval_token_reduction.py",
+    "raw_output_path": "benchmark_results/token_reduction/token_reduction.log",
+    "raw_output_sha256": "eeab4fa550d70c816d4cea9f4bd7ef13464038714e78bc97a628610ad4ed7f66",
+    "timing_unit": "milliseconds",
+    "notes": "Token reduction benchmark validating Section 6.5 entropy reduction claim."
+  }
+}

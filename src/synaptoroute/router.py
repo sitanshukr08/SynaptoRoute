@@ -24,7 +24,7 @@ from synaptoroute.profile import OptimizationProfile, get_profile, ProfileType
 from synaptoroute.index import get_index
 
 class AdaptiveRouter:
-    def __init__(self, encoder: Optional[BaseEncoder] = None, storage: Optional[BaseStorage] = None, profile: Optional[OptimizationProfile] = None, max_capacity: int = 50000, max_queue_size: int = 10000, metrics: Optional[MetricsRegistry] = None, sync_manager: Optional[BaseSyncManager] = None, margin: float = 0.0, reranker: Any = None, max_in_flight_batches: int = 4, enable_adaptive_memory: bool = False, adaptive_weigher: Any = None, enable_hybrid_lexicon: bool = False, hybrid_alpha: float = 0.3, enable_slot_matching: bool = False):
+    def __init__(self, encoder: Optional[BaseEncoder] = None, storage: Optional[BaseStorage] = None, profile: Optional[OptimizationProfile] = None, max_capacity: int = 50000, max_queue_size: int = 10000, metrics: Optional[MetricsRegistry] = None, sync_manager: Optional[BaseSyncManager] = None, margin: float = 0.0, reranker: Any = None, max_in_flight_batches: int = 4, enable_adaptive_memory: bool = False, adaptive_weigher: Any = None, enable_hybrid_lexicon: bool = False, hybrid_alpha: float = 0.3, enable_slot_matching: bool = False, enable_session_routing: bool = False, session_alpha: float = 0.05, session_window: int = 5, session_ttl: float = 1800.0):
         if profile is None:
             profile = get_profile(ProfileType.THROUGHPUT)
             
@@ -78,6 +78,18 @@ class AdaptiveRouter:
             self._slot_validator: Any = SlotValidator()
         else:
             self._slot_validator = None
+
+        # Session-aware routing
+        self.enable_session_routing = enable_session_routing
+        self.session_alpha = float(max(0.0, min(0.15, session_alpha)))  # clamp to [0, 0.15]
+        if self.enable_session_routing:
+            from synaptoroute.session import SessionStore
+            self._session_store: Any = SessionStore(
+                default_window=session_window,
+                default_ttl=session_ttl,
+            )
+        else:
+            self._session_store = None
 
         self.index = get_index(dim=self.encoder.dim, max_capacity=self.max_capacity)
         self._route_map: dict[str, Route] = {}
@@ -519,10 +531,18 @@ class AdaptiveRouter:
             _broadcast,
         )
 
-    def _result_from_candidates(self, query: str, candidates: list[tuple[float, str]], bm25_scores: Optional[dict[str, float]] = None) -> RouterResult:
+    def _result_from_candidates(
+        self,
+        query: str,
+        candidates: list[tuple[float, str]],
+        bm25_scores: Optional[dict[str, float]] = None,
+        session_weights: Optional[dict[str, float]] = None,
+        caller_permissions: Optional[set[str]] = None,
+    ) -> RouterResult:
         """Collapse utterance hits and apply one observable decision policy."""
         best_by_route: dict[str, tuple[float, Route]] = {}
         _using_hybrid = bm25_scores is not None and len(bm25_scores) > 0
+        _using_session = session_weights is not None and len(session_weights) > 0
         for score, route_name in candidates:
             route = self._route_map.get(route_name)
             if route is None:
@@ -536,6 +556,11 @@ class AdaptiveRouter:
             current = best_by_route.get(route_name)
             if current is None or fused > current[0]:
                 best_by_route[route_name] = (fused, route)
+
+        # Apply session recency boost (bounded additive, max ±session_alpha)
+        if _using_session:
+            from synaptoroute.session import apply_session_boost
+            best_by_route = apply_session_boost(best_by_route, session_weights, self.session_alpha)
 
         ranked = sorted(best_by_route.values(), key=lambda candidate: candidate[0], reverse=True)
         if not ranked:
@@ -606,6 +631,16 @@ class AdaptiveRouter:
 
         selected_score, selected_route = eligible[0]
 
+        # IBAC: check caller permissions before committing to dispatch
+        if caller_permissions is not None and selected_route.required_permissions:
+            if not set(selected_route.required_permissions).issubset(caller_permissions):
+                return RouterResult(
+                    score=selected_score,
+                    margin=decision_margin,
+                    candidates=result_candidates,
+                    decision_reason=DecisionReason.PERMISSION_DENIED,
+                )
+
         # Compiler-style slot validation: verify all required typed slots are present
         if self.enable_slot_matching and self._slot_validator is not None and selected_route.slots:
             if not self._slot_validator.is_satisfied(query, selected_route.name, selected_route.slots):
@@ -631,8 +666,17 @@ class AdaptiveRouter:
         )
         if _using_hybrid:
             matched_route.metadata["hybrid_bm25_score"] = float(bm25_scores.get(selected_route.name, 0.0))
+        if _using_session:
+            matched_route.metadata["session_recency_weight"] = float(
+                session_weights.get(selected_route.name, 0.0) if session_weights else 0.0
+            )
 
-        final_reason = DecisionReason.MATCHED_HYBRID if _using_hybrid else DecisionReason.MATCHED
+        if _using_hybrid:
+            final_reason = DecisionReason.MATCHED_HYBRID
+        elif _using_session and (session_weights or {}).get(selected_route.name, 0.0) > 0:
+            final_reason = DecisionReason.MATCHED_SESSION
+        else:
+            final_reason = DecisionReason.MATCHED
         return RouterResult(
             route=matched_route,
             score=selected_score,
@@ -641,8 +685,23 @@ class AdaptiveRouter:
             decision_reason=final_reason,
         )
 
-    def match(self, query: str) -> RouterResult:
-        """Return a scored decision while preserving ``__call__`` compatibility."""
+    def match(
+        self,
+        query: str,
+        session_id: Optional[str] = None,
+        caller_permissions: Optional[set[str]] = None,
+    ) -> RouterResult:
+        """Return a scored decision.
+
+        Args:
+            query: Natural language query to route.
+            session_id: Optional session identifier for multi-turn continuity.
+                        When provided and enable_session_routing=True, recent
+                        route history boosts consistent candidates.
+            caller_permissions: Optional set of permission strings for IBAC.
+                        Routes with required_permissions that are not a subset
+                        of this set will return PERMISSION_DENIED.
+        """
         start_time = time.perf_counter()
         try:
             def _encode():
@@ -653,17 +712,34 @@ class AdaptiveRouter:
 
             query_embedding = self._read_pool.submit(_encode).result()
 
-            # Compute lexicographic BM25 scores in parallel with vector search
+            # Compute lexicographic BM25 scores
             bm25_scores: dict[str, float] = {}
             if self._lexicon is not None and self._lexicon.is_ready:
                 for bm25_norm, r_name in self._lexicon.search(query, top_k=10):
                     bm25_scores[r_name] = bm25_norm
 
+            # Fetch session context weights
+            session_weights: dict[str, float] = {}
+            if self._session_store is not None and session_id is not None:
+                session_weights = self._session_store.recency_weights(session_id)
+
             with self.rwlock.read_lock():
                 if self.index.total_vectors == 0:
                     return RouterResult(decision_reason=DecisionReason.EMPTY_INDEX)
                 results = self.index.search(np.array([query_embedding]), top_k=5)
-                return self._result_from_candidates(query, results[0], bm25_scores=bm25_scores)
+                result = self._result_from_candidates(
+                    query,
+                    results[0],
+                    bm25_scores=bm25_scores,
+                    session_weights=session_weights or None,
+                    caller_permissions=caller_permissions,
+                )
+
+            # Record matched route in session history
+            if self._session_store is not None and session_id is not None and result.matched:
+                self._session_store.record(session_id, result.route_name, result.score or 0.0)
+
+            return result
         finally:
             self.metrics.inference_latency_seconds.observe(time.perf_counter() - start_time)
 

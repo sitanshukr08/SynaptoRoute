@@ -26,6 +26,14 @@ class Route(BaseModel):
             "router, a route is only selected if all declared slots match the query."
         ),
     )
+    required_permissions: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Optional Intent-Based Access Control (IBAC) permission list. "
+            "When caller_permissions is passed to match(), the route is only "
+            "selected if all required_permissions are present in the caller set."
+        ),
+    )
 
     @field_validator('metadata')
     @classmethod
@@ -54,13 +62,15 @@ class Route(BaseModel):
 class DecisionReason(str, Enum):
     MATCHED = "matched"
     MATCHED_RERANKER = "matched_reranker"
-    MATCHED_HYBRID = "matched_hybrid"       # matched via hybrid BM25 + cosine score
+    MATCHED_HYBRID = "matched_hybrid"        # matched via hybrid BM25 + cosine score
+    MATCHED_SESSION = "matched_session"      # session recency boost influenced selection
     EMPTY_INDEX = "empty_index"
     NO_CANDIDATES = "no_candidates"
     BELOW_THRESHOLD = "below_threshold"
     AMBIGUOUS_MARGIN = "ambiguous_margin"
     RERANKER_REJECTED = "reranker_rejected"
     SLOT_MISMATCH = "slot_mismatch"          # vector matched but required slots absent
+    PERMISSION_DENIED = "permission_denied"  # IBAC: caller lacks required_permissions
 
 
 class RouteCandidate(BaseModel):
