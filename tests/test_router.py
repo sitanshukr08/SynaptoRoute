@@ -121,11 +121,17 @@ def test_max_capacity_load_routes(temp_db, encoder):
     storage1 = SQLiteStorage(temp_db)
     router1 = AdaptiveRouter(encoder, storage1, max_capacity=10)
     route = Route(name="r1", utterances=["u1", "u2", "u3"], threshold=0.5)
-    router1.add_route(route)
-    
+    receipt = router1.add_route(route)
+    receipt.wait_durable(timeout=5.0)
+    router1.close()
+    storage1.close()
+
     storage2 = SQLiteStorage(temp_db)
-    with pytest.raises(RouterCapacityError):
-        AdaptiveRouter(encoder, storage2, max_capacity=2)
+    try:
+        with pytest.raises(RouterCapacityError):
+            AdaptiveRouter(encoder, storage2, max_capacity=2)
+    finally:
+        storage2.close()
 
 def test_overwrite_route_capacity(storage, encoder):
     router = AdaptiveRouter(encoder, storage, max_capacity=2)
