@@ -201,9 +201,12 @@ def run_preflight(
             "paper/PAPER.md",
             "paper/ARTIFACT_EVALUATION.md",
             "paper/QUALITY_PROTOCOL.md",
+            "paper/AFK_RUNBOOK.md",
+            "paper/CLAIM_LEDGER.md",
             "paper/experiment_matrix.json",
             "benchmarks/run_protocol_smoke.py",
             "paper/build_archive.py",
+            "paper/verify_archive.py",
             "docs/RESEARCH_PROTOCOL.md",
             "docs/CURRENT_EVIDENCE_STATUS.md",
         )
@@ -236,6 +239,18 @@ def run_preflight(
         )
         missing = [fragment for fragment in required if fragment not in content]
         detail = "streamed content inventory and evidence integrity gates configured"
+        verifier = (repo_root / "paper" / "verify_archive.py").read_text(encoding="utf-8")
+        verifier_required = (
+            "archive contains duplicate member names",
+            "archive membership differs from inventory",
+            "archive member SHA-256 mismatch",
+            "sidecar_verified",
+        )
+        missing.extend(
+            f"verifier:{fragment}"
+            for fragment in verifier_required
+            if fragment not in verifier
+        )
         return not missing, detail if not missing else f"missing: {missing}"
 
     checks = (

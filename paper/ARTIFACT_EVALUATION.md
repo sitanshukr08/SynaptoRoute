@@ -86,3 +86,10 @@ runs, changed raw-output hashes, changed lock hashes, manifest/commit
 mismatches, duplicate labels, and symlinks. `ARCHIVE_INVENTORY.json` hashes
 every payload entry and a `.sha256` sidecar records the final ZIP digest. Upload
 that immutable ZIP before using its URI and digest in evidence promotion.
+
+Reviewers can independently stream-check the sidecar, inventory membership,
+member sizes, hashes, metadata, duplicate names, and unsafe paths:
+
+```bash
+python paper/verify_archive.py dist/synaptoroute-artifact.zip
+```

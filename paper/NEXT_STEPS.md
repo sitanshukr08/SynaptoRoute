@@ -20,7 +20,9 @@ Implemented:
 * an atomic per-command matrix ledger with candidate-bound resume, hashed-log
   validation, failed-cell retry, and optional fail-fast/timeout controls;
 * a streaming, content-inventoried archive builder that rejects dirty source,
-  mismatched manifests, failed runs, changed hashes, and symlinks.
+  mismatched manifests, failed runs, changed hashes, and symlinks;
+* an independent streaming archive verifier, unattended runbook, paper methods
+  draft, and claim-by-claim evidence ledger.
 
 Not yet complete:
 

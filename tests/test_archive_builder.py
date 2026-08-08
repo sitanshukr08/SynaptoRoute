@@ -1,12 +1,15 @@
 import json
+import shutil
 import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
 import pytest
 
 from benchmarks.manifest_schema import sha256_file
 from paper.build_archive import ArchiveInput, build_archive
+from paper.verify_archive import verify_archive
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -96,14 +99,16 @@ def test_archive_builder_is_deterministic_and_inventoried(tmp_path):
     assert first_report["archive_sha256"] == second_report["archive_sha256"]
     assert first_report["manifest_count"] == 1
     assert first.with_suffix(".zip.sha256").is_file()
-    import zipfile
-
     with zipfile.ZipFile(first) as archive:
         names = set(archive.namelist())
         assert "ARCHIVE_METADATA.json" in names
         assert "ARCHIVE_INVENTORY.json" in names
         assert "source/pyproject.toml" in names
         assert "evidence/original/manifest.json" in names
+
+    verification = verify_archive(first)
+    assert verification["sidecar_verified"] is True
+    assert verification["manifest_count"] == 1
 
 
 def test_archive_builder_rejects_tampered_raw_output(tmp_path):
@@ -116,3 +121,21 @@ def test_archive_builder_rejects_tampered_raw_output(tmp_path):
             inputs=[ArchiveInput("original", evidence)],
             output_path=tmp_path / "artifact.zip",
         )
+
+
+def test_archive_verifier_rejects_duplicate_members(tmp_path):
+    repo, evidence, _ = _archive_fixture(tmp_path)
+    archive_path = tmp_path / "artifact.zip"
+    build_archive(
+        repo_root=repo,
+        inputs=[ArchiveInput("original", evidence)],
+        output_path=archive_path,
+    )
+    tampered = tmp_path / "tampered.zip"
+    shutil.copyfile(archive_path, tampered)
+    with pytest.warns(UserWarning, match="Duplicate name"):
+        with zipfile.ZipFile(tampered, mode="a") as archive:
+            archive.writestr("source/pyproject.toml", "tampered")
+
+    with pytest.raises(RuntimeError, match="duplicate member names"):
+        verify_archive(tampered)
