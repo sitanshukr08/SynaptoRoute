@@ -1,7 +1,8 @@
 # SynaptoRoute Next Steps
 
-Status: artifact foundation and held-out probability-calibration outputs
-implemented on `codex/paper-artifact-foundation`; controlled pilots pending.
+Status: artifact candidate `paper-artifact-v0.5.0-rc1` is frozen at
+`0de734be8427aa3786e29062339a83b2ffb79bdd`; controlled confirmatory runs are
+pending.
 
 ## Current Position
 
@@ -27,9 +28,13 @@ Implemented:
 Not yet complete:
 
 * the paper container has not been rebuilt on a running Linux Docker engine;
-* the bounded native protocol smoke passes, but the Linux paper-container run
-  remains blocked until a Docker daemon is available;
-* controlled matrix runs, second-machine reproduction, archival DOI, and paper results remain pending.
+* Docker execution is intentionally deferred while another local project uses
+  the engine;
+* a manually dispatched, non-Docker GitHub-hosted Linux pilot is available for
+  finding matrix failures, but its variable hardware is not acceptable for
+  confirmatory performance claims;
+* controlled matrix runs, second-machine reproduction, archival DOI, and paper
+  results remain pending.
 
 ## Execution Order
 
@@ -63,6 +68,25 @@ Not yet complete:
 ### 4. Run Confirmatory Experiments
 
 Execute the frozen matrix on controlled hardware. Do not edit outputs manually and do not promote results from a dirty tree. Any correctness change invalidates affected runs.
+
+Before occupying controlled hardware, the `Paper Artifact Pilot Matrix`
+workflow can execute one family or all families from the immutable candidate:
+
+```bash
+gh workflow run paper-pilot.yml \
+  --repo sitanshukr08/SynaptoRoute \
+  --field family=crash_recovery
+```
+
+Every family uploads raw output and environment metadata as a 30-day Actions
+artifact. These runs are diagnostic and remain unverified. Do not combine or
+promote their latency, throughput, recovery-time, or resource-use values.
+
+The hosted workflow deliberately does not expose `--resume`: a retry may land
+on different hardware and would mix machine-specific timings in one manifest.
+Use a new workflow run for a hosted retry. Use the runner's existing
+same-directory `--resume` mode only on the same dedicated machine and exact
+candidate checkout.
 
 ### 5. Reproduce And Archive
 

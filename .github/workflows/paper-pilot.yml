@@ -1,0 +1,151 @@
+name: Paper Artifact Pilot Matrix
+
+run-name: Pilot ${{ inputs.family }} at paper-artifact-v0.5.0-rc1
+
+on:
+  workflow_dispatch:
+    inputs:
+      family:
+        description: Experiment family to execute from the frozen candidate
+        required: true
+        default: crash_recovery
+        type: choice
+        options:
+          - crash_recovery
+          - quality
+          - dynamic
+          - scale
+          - backpressure
+          - all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paper-pilot-${{ inputs.family }}
+  cancel-in-progress: false
+
+env:
+  CANDIDATE_SHA: 0de734be8427aa3786e29062339a83b2ffb79bdd
+  CANDIDATE_TAG: paper-artifact-v0.5.0-rc1
+
+jobs:
+  select-families:
+    name: Select pilot families
+    runs-on: ubuntu-latest
+    outputs:
+      families: ${{ steps.selection.outputs.families }}
+    steps:
+      - id: selection
+        name: Build family matrix
+        shell: bash
+        env:
+          REQUESTED_FAMILY: ${{ inputs.family }}
+        run: |
+          if [[ "$REQUESTED_FAMILY" == "all" ]]; then
+            echo 'families=["quality","dynamic","scale","crash_recovery","backpressure"]' >> "$GITHUB_OUTPUT"
+          else
+            printf 'families=["%s"]\n' "$REQUESTED_FAMILY" >> "$GITHUB_OUTPUT"
+          fi
+
+  pilot:
+    name: Unverified ${{ matrix.family }} pilot
+    needs: select-families
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        family: ${{ fromJSON(needs.select-families.outputs.families) }}
+    env:
+      EVIDENCE_ROOT: benchmark_results/paper-pilot-${{ matrix.family }}
+      MATRIX_OUTPUT: benchmark_results/paper-pilot-${{ matrix.family }}/matrix
+
+    steps:
+      - name: Check out the immutable candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 1
+
+      - name: Set up pinned Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11.9
+          cache: pip
+          cache-dependency-path: paper/requirements-linux-py311.lock
+
+      - name: Install the frozen environment
+        shell: bash
+        run: |
+          python -m pip install --requirement paper/requirements-linux-py311.lock
+          python -m pip install --no-deps -e .
+          python -m pip check
+
+      - name: Record environment and candidate identity
+        shell: bash
+        run: |
+          mkdir -p "$EVIDENCE_ROOT/environment"
+          python -m pip freeze --all > "$EVIDENCE_ROOT/environment/resolved-environment.txt"
+          python --version > "$EVIDENCE_ROOT/environment/python-version.txt" 2>&1
+          uname -a > "$EVIDENCE_ROOT/environment/uname.txt"
+          lscpu > "$EVIDENCE_ROOT/environment/lscpu.txt"
+          git rev-parse HEAD > "$EVIDENCE_ROOT/environment/git-commit.txt"
+          git status --porcelain > "$EVIDENCE_ROOT/environment/git-status.txt"
+          printf 'workflow_run_id=%s\nworkflow_run_attempt=%s\nrunner_name=%s\nrunner_os=%s\ncandidate_tag=%s\n' \
+            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$RUNNER_NAME" "$RUNNER_OS" "$CANDIDATE_TAG" \
+            > "$EVIDENCE_ROOT/environment/github-runner.txt"
+
+      - name: Enforce the candidate gate
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          test -z "$(git status --porcelain)"
+          python paper/preflight.py
+
+      - id: matrix
+        name: Execute unverified family pilot
+        continue-on-error: true
+        shell: bash
+        run: |
+          python benchmarks/run_paper_matrix.py \
+            --execute \
+            --families "${{ matrix.family }}" \
+            --command-timeout-seconds 1800 \
+            --output-dir "$MATRIX_OUTPUT"
+
+      - name: Summarize pilot state
+        if: always()
+        shell: bash
+        run: |
+          echo "## Unverified ${{ matrix.family }} pilot" >> "$GITHUB_STEP_SUMMARY"
+          echo "Candidate: \`$CANDIDATE_SHA\` (\`$CANDIDATE_TAG\`)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Matrix step outcome: \`${{ steps.matrix.outcome }}\`" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -f "$MATRIX_OUTPUT/run_state.json" ]]; then
+            python - "$MATRIX_OUTPUT/run_state.json" "$GITHUB_STEP_SUMMARY" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          state = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          completed = len(state.get("results", []))
+          expected = state.get("command_count", "unknown")
+          with Path(sys.argv[2]).open("a", encoding="utf-8") as summary:
+              summary.write(f"\nState: `{state.get('status', 'unknown')}`; commands: `{completed}/{expected}`.\n")
+          PY
+          fi
+          echo "These hosted-runner results are pilot evidence only and cannot be promoted." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload raw pilot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-pilot-${{ matrix.family }}
+          path: ${{ env.EVIDENCE_ROOT }}/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Propagate matrix failure
+        if: steps.matrix.outcome == 'failure'
+        shell: bash
+        run: exit 1
