@@ -200,6 +200,7 @@ def run_preflight(
         required = (
             "paper/PAPER.md",
             "paper/ARTIFACT_EVALUATION.md",
+            "paper/QUALITY_PROTOCOL.md",
             "paper/experiment_matrix.json",
             "docs/RESEARCH_PROTOCOL.md",
             "docs/CURRENT_EVIDENCE_STATUS.md",

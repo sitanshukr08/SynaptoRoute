@@ -78,7 +78,7 @@ Exit criteria:
 
 ## Phase 1: Observable Decisions And Calibration
 
-**Status:** in progress
+**Status:** implementation complete; bounded pilot and independent review pending
 
 Deliverables:
 
@@ -103,10 +103,13 @@ Implemented so far:
 * validation-only global threshold and margin fitting with hashed artifacts;
 * validation-only per-route threshold fitting with a shared margin;
 * OOD ranking and selective risk-coverage metrics;
+* disjoint held-out correctness-probability calibration with an explicit
+  one-class fallback;
+* ECE, Brier score, reliability-bin JSON, and generated SVG diagrams;
 * unit and integration tests that prevent fitting on the test split.
 
-Still required: reliability diagrams and independent review of the multi-seed
-confidence intervals and matched-coverage implementation.
+Still required: bounded quality pilots and independent review of the multi-seed
+confidence intervals, probability calibration, and matched-coverage implementation.
 
 The ordered execution checklist is maintained in
 [`paper/NEXT_STEPS.md`](paper/NEXT_STEPS.md).

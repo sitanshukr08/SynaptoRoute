@@ -116,6 +116,9 @@ Quality:
   cosine scores and margins are not treated as probabilities;
 * explicit abstention, ambiguity, and high-confidence-error counts.
 
+The frozen probability-calibration split, target, features, fallback, and
+artifact contract are specified in `paper/QUALITY_PROTOCOL.md`.
+
 Systems:
 
 * p50, p95, p99, and maximum end-to-end latency;

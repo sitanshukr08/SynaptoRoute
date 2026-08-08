@@ -1,7 +1,7 @@
 # SynaptoRoute Next Steps
 
-Status: artifact foundation implemented on `codex/paper-artifact-foundation`;
-candidate freeze and controlled runs pending.
+Status: artifact foundation and held-out probability-calibration outputs
+implemented on `codex/paper-artifact-foundation`; controlled pilots pending.
 
 ## Current Position
 
@@ -12,25 +12,26 @@ Implemented:
 * schema-v2 unverified run manifests and independently reviewed evidence promotion;
 * deterministic dynamic, crash-recovery, scale, and sustained-load harnesses;
 * the frozen 208-command paper matrix and pinned CPU-only Python 3.11 environment;
-* network-free unit tests and a separately marked real-model integration test.
+* network-free unit tests and a separately marked real-model integration test;
+* disjoint policy/probability calibration, ECE/Brier output, reliability-bin
+  JSON, and generated SVG reliability diagrams.
 
 Not yet complete:
 
-* the current branch is not a clean immutable artifact candidate;
 * the paper container has not been rebuilt on a running Linux Docker engine;
-* reliability diagrams are implemented as a utility but are not emitted by the multi-seed study;
+* the quality and systems harnesses have not completed bounded protocol pilots;
 * controlled matrix runs, second-machine reproduction, archival DOI, and paper results remain pending.
 
 ## Execution Order
 
-### 1. Freeze The Foundation
+### 1. Freeze The Foundation (Completed)
 
 1. Review and commit the current branch without adding experimental hybrid, session, permission, or Redis work.
 2. Run `python paper/preflight.py` from the clean commit.
 3. Require the full CI matrix, static checks, wheel smoke, and FastEmbed model job to pass.
 4. Tag the resulting commit as an artifact-candidate identifier, not as `v0.5.0`.
 
-### 2. Finish Quality Artifact Outputs
+### 2. Finish Quality Artifact Outputs (Implementation Completed)
 
 1. Freeze a held-out probability-calibration method and split. Raw cosine scores
    and margins must not be relabeled or clamped as probabilities.
@@ -38,7 +39,8 @@ Not yet complete:
    only for systems that produce probabilities under that frozen method.
 3. Add exact-string results to paired analysis and preserve matched-coverage comparisons.
 4. Generate tables and figures only from archived machine-readable outputs.
-5. Run small protocol pilots before freezing a new candidate.
+5. Run small protocol pilots before freezing a new candidate. This is the
+   remaining step in this section.
 
 ### 3. Validate The Systems Harness
 

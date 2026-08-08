@@ -48,7 +48,14 @@ from benchmarks.hf_intent_datasets import (
 )
 from benchmarks.manifest_schema import sha256_file
 from benchmarks.prediction_io import prediction_record, write_prediction_jsonl
+from benchmarks.probability_calibration import (
+    CorrectnessProbabilityCalibrator,
+    correctness_features,
+    fit_correctness_probability,
+    split_calibration_examples,
+)
 from synaptoroute import AdaptiveRouter, Route, RouterResult
+from synaptoroute.calibration import evaluate_calibration, export_reliability_diagram
 from synaptoroute.encoder import BaseEncoder, FastEmbedEncoder
 from synaptoroute.storage import SQLiteStorage
 
@@ -88,7 +95,7 @@ def _collect_raw_predictions(
                 expected_route=example.label,
                 result=result,
                 latency_seconds=latency,
-                metadata={"phase": "calibration", "system": system_name},
+                metadata={"phase": "policy_calibration", "system": system_name},
             )
         )
     return scored_examples, write_prediction_jsonl(output_path, records)
@@ -194,32 +201,119 @@ def _acceptance_confidence(
     return min(score_confidence, result.margin - policy_result.policy.margin)
 
 
-def _evaluate_test(
+def _apply_policy(
+    raw_result: RouterResult,
+    *,
+    routes: Mapping[str, Route],
+    policy_result: PolicyResult | None,
+) -> RouterResult:
+    if policy_result is None:
+        return raw_result
+    if isinstance(policy_result, PerRouteCalibrationResult):
+        return apply_per_route_policy(raw_result, routes=routes, policy=policy_result.policy)
+    return apply_global_policy(raw_result, routes=routes, policy=policy_result.policy)
+
+
+def _fit_probability_calibrator(
     matcher: Any,
     examples: tuple,
     *,
     routes: Mapping[str, Route],
     policy_result: PolicyResult | None,
     system_name: str,
+    output_dir: Path,
+    random_state: int,
+) -> tuple[CorrectnessProbabilityCalibrator, dict[str, Any]]:
+    features: list[tuple[float, ...]] = []
+    labels: list[bool] = []
+    records = []
+    for example in examples:
+        start = time.perf_counter()
+        raw_result: RouterResult = matcher.match(example.text)
+        result = _apply_policy(raw_result, routes=routes, policy_result=policy_result)
+        latency = time.perf_counter() - start
+        acceptance_confidence = _acceptance_confidence(raw_result, policy_result)
+        row = correctness_features(
+            raw_result,
+            result,
+            acceptance_confidence=acceptance_confidence,
+        )
+        raw_route = raw_result.candidates[0].route_name if raw_result.candidates else None
+        final_correct = result.route_name == example.label
+        features.append(row)
+        labels.append(final_correct)
+        records.append(
+            prediction_record(
+                example_id=example.example_id,
+                query=example.text,
+                expected_route=example.label,
+                result=result,
+                latency_seconds=latency,
+                metadata={
+                    "phase": "probability_calibration",
+                    "system": system_name,
+                    "acceptance_confidence": (
+                        acceptance_confidence if np.isfinite(acceptance_confidence) else None
+                    ),
+                    "confidence_features": list(row),
+                    "raw_top_correct": example.label is not None and raw_route == example.label,
+                },
+            )
+        )
+
+    predictions_path = write_prediction_jsonl(
+        output_dir / f"probability_calibration_predictions_{system_name}.jsonl",
+        records,
+    )
+    calibrator, fit_metrics = fit_correctness_probability(
+        features,
+        labels,
+        random_state=random_state,
+    )
+    artifact = calibrator.artifact(
+        fit_count=len(labels),
+        positive_count=sum(labels),
+        fit_metrics=fit_metrics,
+        source_predictions_path=predictions_path.as_posix(),
+        source_predictions_sha256=sha256_file(predictions_path),
+    )
+    artifact_path = output_dir / f"probability_calibration_{system_name}.json"
+    artifact_path.write_text(json.dumps(artifact, indent=2, sort_keys=True), encoding="utf-8")
+    return calibrator, {
+        "method": calibrator.method,
+        "fit_count": len(labels),
+        "positive_count": sum(labels),
+        "artifact_path": artifact_path.as_posix(),
+        "artifact_sha256": sha256_file(artifact_path),
+        "source_predictions_path": predictions_path.as_posix(),
+        "source_predictions_sha256": sha256_file(predictions_path),
+    }
+
+
+def _evaluate_test(
+    matcher: Any,
+    examples: tuple,
+    *,
+    routes: Mapping[str, Route],
+    policy_result: PolicyResult | None,
+    probability_calibrator: CorrectnessProbabilityCalibrator,
+    system_name: str,
     output_path: Path,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], dict[str, Any]]:
     expected: list[str] = []
     predicted: list[str] = []
     latencies: list[float] = []
     reasons: Counter[str] = Counter()
     acceptance_confidences: list[float] = []
     raw_correct: list[bool] = []
+    final_correct: list[bool] = []
+    correctness_probabilities: list[float] = []
     records = []
 
     for example in examples:
         start = time.perf_counter()
         raw_result: RouterResult = matcher.match(example.text)
-        if policy_result is None:
-            result = raw_result
-        elif isinstance(policy_result, PerRouteCalibrationResult):
-            result = apply_per_route_policy(raw_result, routes=routes, policy=policy_result.policy)
-        else:
-            result = apply_global_policy(raw_result, routes=routes, policy=policy_result.policy)
+        result = _apply_policy(raw_result, routes=routes, policy_result=policy_result)
         latency = time.perf_counter() - start
 
         expected_label = example.label if example.label is not None else "OOD"
@@ -232,6 +326,16 @@ def _evaluate_test(
         raw_route = raw_result.candidates[0].route_name if raw_result.candidates else None
         raw_top_correct = example.label is not None and raw_route == example.label
         raw_correct.append(raw_top_correct)
+        decision_correct = predicted_label == expected_label
+        probability = probability_calibrator.predict(
+            correctness_features(
+                raw_result,
+                result,
+                acceptance_confidence=acceptance_confidence,
+            )
+        )
+        final_correct.append(decision_correct)
+        correctness_probabilities.append(probability)
         reasons[result.decision_reason.value] += 1
         records.append(
             prediction_record(
@@ -247,12 +351,13 @@ def _evaluate_test(
                         acceptance_confidence if np.isfinite(acceptance_confidence) else None
                     ),
                     "raw_top_correct": raw_top_correct,
+                    "correctness_probability": probability,
                 },
             )
         )
 
-    write_prediction_jsonl(output_path, records)
-    return _summary_metrics(
+    predictions_path = write_prediction_jsonl(output_path, records)
+    metrics = _summary_metrics(
         expected,
         predicted,
         latencies,
@@ -260,6 +365,48 @@ def _evaluate_test(
         acceptance_confidences,
         raw_correct,
     )
+    calibration_metrics = evaluate_calibration(
+        final_correct,
+        correctness_probabilities,
+        num_bins=10,
+    )
+    metrics.update(
+        {
+            "expected_calibration_error": calibration_metrics.expected_calibration_error,
+            "max_calibration_error": calibration_metrics.max_calibration_error,
+            "brier_score": calibration_metrics.brier_score,
+        }
+    )
+    reliability_data = {
+        "schema_version": 1,
+        "status": "unverified",
+        "paper_evidence_eligible": False,
+        "system": system_name,
+        "target": "final routing decision is correct",
+        "probability_calibration_method": probability_calibrator.method,
+        "metrics": asdict(calibration_metrics),
+        "source_predictions": {
+            "path": predictions_path.as_posix(),
+            "sha256": sha256_file(predictions_path),
+        },
+    }
+    reliability_path = output_path.parent / f"reliability_{system_name}.json"
+    reliability_path.write_text(
+        json.dumps(reliability_data, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    diagram_path = export_reliability_diagram(
+        calibration_metrics,
+        output_path.parent / f"reliability_{system_name}.svg",
+        title=f"{system_name} correctness reliability",
+    )
+    return metrics, {
+        "data_path": reliability_path.as_posix(),
+        "data_sha256": sha256_file(reliability_path),
+        "diagram_path": diagram_path.as_posix(),
+        "diagram_sha256": sha256_file(diagram_path),
+        "source_predictions_sha256": sha256_file(predictions_path),
+    }
 
 
 def run_bundle_experiment(
@@ -281,6 +428,10 @@ def run_bundle_experiment(
             limit=calibration_limit,
             seed=bundle.prepared.seed,
         )
+    )
+    policy_calibration_examples, probability_calibration_examples = split_calibration_examples(
+        calibration_examples,
+        seed=bundle.prepared.seed,
     )
 
     router = AdaptiveRouter(encoder=encoder, storage=SQLiteStorage(":memory:"), margin=0.0)
@@ -315,14 +466,16 @@ def run_bundle_experiment(
             if calibration_method != "none":
                 scored_examples, calibration_predictions_path = _collect_raw_predictions(
                     matcher,
-                    calibration_examples,
+                    policy_calibration_examples,
                     system_name=system_name,
                     output_path=output_dir / f"calibration_predictions_{system_name}.jsonl",
                 )
                 fit_dataset = {
                     **bundle.manifest_metadata(),
-                    "fit_split": sorted({example.split for example in calibration_examples}),
-                    "fit_count": len(calibration_examples),
+                    "fit_split": sorted(
+                        {example.split for example in policy_calibration_examples}
+                    ),
+                    "fit_count": len(policy_calibration_examples),
                 }
                 if calibration_method == "per_route":
                     calibration_result = fit_per_route_policy(
@@ -351,11 +504,23 @@ def run_bundle_experiment(
                     artifact,
                 )
 
-            metrics = _evaluate_test(
+            probability_calibrator, probability_calibration_summary = (
+                _fit_probability_calibrator(
+                    matcher,
+                    probability_calibration_examples,
+                    routes=route_lookup,
+                    policy_result=calibration_result,
+                    system_name=system_name,
+                    output_dir=output_dir,
+                    random_state=bundle.prepared.seed,
+                )
+            )
+            metrics, reliability_summary = _evaluate_test(
                 matcher,
                 bundle.prepared.evaluation_examples,
                 routes=route_lookup,
                 policy_result=calibration_result,
+                probability_calibrator=probability_calibrator,
                 system_name=system_name,
                 output_path=output_dir / f"test_predictions_{system_name}.jsonl",
             )
@@ -369,6 +534,8 @@ def run_bundle_experiment(
                     if calibration_result is not None
                     else None
                 ),
+                "probability_calibration": probability_calibration_summary,
+                "reliability": reliability_summary,
                 "test": metrics,
             }
     finally:
@@ -384,6 +551,9 @@ def run_bundle_experiment(
             "min_known_coverage": min_known_coverage,
             "max_ood_false_acceptance_rate": max_ood_false_acceptance_rate,
             "calibration_limit": calibration_limit,
+            "policy_calibration_count": len(policy_calibration_examples),
+            "probability_calibration_count": len(probability_calibration_examples),
+            "probability_calibration_split": "deterministic label-stratified held-out half",
             "index": type(router.index).__name__,
             "semantic_router_version": (
                 importlib.metadata.version("semantic-router") if include_semantic_router else None
@@ -392,6 +562,8 @@ def run_bundle_experiment(
         "systems": system_summaries,
         "notes": [
             "Policies were fitted only on calibration/validation examples.",
+            "Probability calibration used examples disjoint from policy fitting and test evaluation.",
+            "Raw similarity scores and margins were not treated as probabilities.",
             "Test predictions were generated after policy fitting.",
             "The run remains unverified until executed from a clean commit and independently reviewed.",
         ],

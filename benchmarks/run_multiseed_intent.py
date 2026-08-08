@@ -31,6 +31,9 @@ QUALITY_METRICS = (
     "coverage",
     "selective_accuracy",
     "selective_risk_coverage_auc",
+    "expected_calibration_error",
+    "max_calibration_error",
+    "brier_score",
 )
 
 

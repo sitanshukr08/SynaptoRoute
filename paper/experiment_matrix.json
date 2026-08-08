@@ -5,6 +5,12 @@
     "seeds": [13, 29, 42, 71, 101],
     "examples_per_intent": 20,
     "encoder": "BAAI/bge-small-en-v1.5",
+    "probability_calibration": {
+      "split": "deterministic_label_stratified_half",
+      "method": "logistic_correctness_calibration",
+      "one_class_fallback": "laplace_constant_one_class",
+      "reliability_bins": 10
+    },
     "baselines": ["exact_string", "logistic_regression", "exact_cosine", "semantic_router", "synaptoroute_global", "synaptoroute_per_route"]
   },
   "dynamic": {

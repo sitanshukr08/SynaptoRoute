@@ -19,6 +19,12 @@ PAIRED_METRICS = ("overall_accuracy", "known_accuracy", "known_coverage", "ood_r
 DEFAULT_COVERAGE_TARGETS = (0.80, 0.90, 0.95)
 
 
+def _non_null_float(value: float | int | None) -> float:
+    if value is None:
+        raise ValueError("expected a numeric matched-coverage value")
+    return float(value)
+
+
 def align_prediction_records(
     first: Sequence[Mapping[str, Any]],
     second: Sequence[Mapping[str, Any]],
@@ -180,7 +186,7 @@ def aggregate_matched_coverage(
         aggregate[target_key] = {}
         for metric_name in metric_names:
             values = [
-                float(curve[target_key][metric_name])
+                _non_null_float(curve[target_key][metric_name])
                 for curve in per_seed.values()
                 if target_key in curve and curve[target_key][metric_name] is not None
             ]
@@ -226,8 +232,8 @@ def paired_matched_coverage_effects(
         effects[target_key] = {}
         for metric in metrics:
             per_seed = {
-                seed: float(first_curves[seed][target_key][metric])
-                - float(second_curves[seed][target_key][metric])
+                seed: _non_null_float(first_curves[seed][target_key][metric])
+                - _non_null_float(second_curves[seed][target_key][metric])
                 for seed in first_curves
                 if target_key in first_curves[seed]
                 and target_key in second_curves[seed]
@@ -365,7 +371,13 @@ def main() -> int:
     parser.add_argument(
         "--comparators",
         nargs="+",
-        default=["synaptoroute", "logistic_regression", "semantic_router", "exact_cosine"],
+        default=[
+            "synaptoroute",
+            "exact_string",
+            "logistic_regression",
+            "semantic_router",
+            "exact_cosine",
+        ],
     )
     parser.add_argument("--bootstrap-repetitions", type=int, default=5000)
     parser.add_argument("--coverage-targets", nargs="+", type=float, default=list(DEFAULT_COVERAGE_TARGETS))
