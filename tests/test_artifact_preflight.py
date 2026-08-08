@@ -21,10 +21,11 @@ def test_development_preflight_passes_current_artifact_foundation():
         "historical_manifests",
         "paper_container",
         "ci_package_smoke",
-        "paper_files",
-        "matrix_resume",
-        "evidence_promotion",
-        "archive_builder",
+            "paper_files",
+            "matrix_resume",
+            "matrix_verifier",
+            "evidence_promotion",
+            "archive_builder",
     }
 
 

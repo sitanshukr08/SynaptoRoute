@@ -33,6 +33,9 @@ Not yet complete:
 * a manually dispatched, non-Docker GitHub-hosted Linux pilot is available for
   finding matrix failures, but its variable hardware is not acceptable for
   confirmatory performance claims;
+* the crash-recovery pilot completed all 16 cells and its 3,200 trial records,
+  hashes, and durability invariants passed independent matrix-run inspection;
+* quality, dynamic, scale, and backpressure hosted pilots remain pending;
 * controlled matrix runs, second-machine reproduction, archival DOI, and paper
   results remain pending.
 

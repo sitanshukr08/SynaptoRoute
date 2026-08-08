@@ -26,6 +26,13 @@ SynaptoRoute has a coherent engineering direction, but its historical benchmark 
 * `CLEAN_REPLICATION_RESULTS.md` records a historical local rerun. It remains
   an unverified candidate record, not an independent reproduction under the
   schema-v2 protocol.
+* A full GitHub-hosted crash-recovery pilot completed all 16 frozen cells and
+  3,200 child-process trials for artifact candidate
+  `paper-artifact-v0.5.0-rc1`. Its extracted manifest, state, raw-output, and
+  command-log hashes pass the standalone matrix-run verifier. The observation
+  remains unverified because the hardware is uncontrolled, the Actions bundle
+  is temporary, and there is no second-machine reproduction or reviewer
+  attestation.
 
 ## Research Claims
 
