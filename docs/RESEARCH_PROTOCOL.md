@@ -1,15 +1,16 @@
 # SynaptoRoute Research Protocol
 
-Version: 0.2
+Version: 0.3
 
-Status: final-experiment protocol; development pilots completed
+Status: confirmatory protocol draft; exploratory pilots already observed
 
 Scope: single-node semantic routing; Redis synchronization is excluded from
 the primary paper claim.
 
-This document defines the experiments before final results are observed. Any
-deviation must be recorded in the relevant manifest and in the paper's threats
-to validity.
+Earlier Banking77, CLINC150/OOS, and systems pilots informed this protocol and
+are therefore exploratory rather than preregistered evidence. The protocol is
+frozen before the final artifact runs. Any later deviation must be recorded in
+the relevant manifest and in the paper's threats to validity.
 
 ## Research Questions
 
@@ -61,6 +62,7 @@ The primary artifact excludes:
 
 * Redis consistency claims;
 * authorization or security enforcement;
+* adaptive-memory, hybrid lexical, slot, session, and permission-filter claims;
 * end-to-end LLM answer quality;
 * claims that bundled generated fixtures represent real user traffic.
 
@@ -70,8 +72,8 @@ The primary artifact excludes:
 |---|---|---|
 | Banking77 | Known-intent classification | Official train/test split; route examples sampled only from train. |
 | CLINC150/OOS | Intent classification and OOS rejection | Official train/validation/test splits; validation fits thresholds, test is evaluated once per frozen configuration. |
-| BOLT tasks | Open-set generalization | Use the published protocol and known-class ratios without local reinterpretation. |
-| MASSIVE subset | Optional multilingual robustness | Added only after the English protocol and baselines are frozen. |
+| BOLT tasks | Optional external-validity follow-up | Not required for the primary systems paper. |
+| MASSIVE subset | Optional multilingual follow-up | Not required for the primary systems paper. |
 | Synthetic vectors | Structural latency and scale only | Never used to support semantic accuracy claims. |
 
 For every run, record dataset source, version or revision, license, split,
@@ -109,9 +111,13 @@ Quality:
 * top-1 accuracy and macro-F1 on known intents;
 * AUROC, AUPRC, and FPR@95 for OOD detection;
 * coverage, selective risk, and risk-coverage AUC;
-* expected calibration error and Brier score where calibrated probabilities
-  are available;
+* expected calibration error and Brier score where probabilities are produced
+  by a held-out calibration method fixed before the confirmatory run; raw
+  cosine scores and margins are not treated as probabilities;
 * explicit abstention, ambiguity, and high-confidence-error counts.
+
+The frozen probability-calibration split, target, features, fallback, and
+artifact contract are specified in `paper/QUALITY_PROTOCOL.md`.
 
 Systems:
 
@@ -164,9 +170,16 @@ A run can be promoted to `verified` only when:
 * metrics are machine-readable and use explicit units;
 * all subprocesses completed successfully;
 * another contributor reviewed the manifest against the raw output.
+* an independent run from a different machine reproduced the same frozen
+  configuration;
+* the evidence bundle was archived immutably with a recorded digest.
 
 Paper tables must be generated from verified machine-readable result files.
 Values must not be transcribed manually from terminal output.
+
+The exact final systems matrix is stored in
+`paper/experiment_matrix.json`. Development smokes may use smaller parameters
+but must never be promoted as substitutes for that matrix.
 
 ## Failure And Exclusion Policy
 

@@ -1,10 +1,10 @@
 """
 SynaptoRoute Refined Adaptive Weighted Embedding & MFU/LRU Context Engine
 ===========================================================================
-Deeply refined architecture providing:
-1. Bounded Bayesian Prior Scoring (preserves pure cosine metric space).
+Experimental architecture providing:
+1. Bounded additive prior scoring after cosine retrieval.
 2. Saturation Dampening & Negative Feedback Penalties (prevents popularity entrenchment).
-3. Non-Blocking Asynchronous Statistics Collector (zero-lock read path).
+3. Thread-safe buffered access statistics.
 4. Adaptive Replacement Cache (ARC) for vector embedding memory.
 """
 
@@ -29,8 +29,10 @@ class ContextMetadata:
 
 class BoundedBayesianWeigher:
     """
-    Computes bounded logarithmic prior adjustments to preserve pure cosine metric space
-    while incorporating MFU (frequency) and LRU (recency) signals.
+    Computes bounded score adjustments from MFU and LRU signals.
+
+    The adjustment can change candidate ordering and is not a metric-space
+    preservation guarantee.
     """
 
     def __init__(
@@ -65,7 +67,7 @@ class BoundedBayesianWeigher:
         neg_penalty = self.penalty_weight * meta.negative_feedback_count
 
         adjustment = meta.base_priority + freq_boost - recency_penalty - neg_penalty
-        # Clamp prior adjustment to [-0.15, +0.08] to preserve metric integrity
+        # Bound the amount by which contextual signals can change a score.
         return max(-0.15, min(self.frequency_boost_cap, adjustment))
 
     def evaluate_score(
@@ -82,10 +84,11 @@ class BoundedBayesianWeigher:
         return float(np.clip(raw_cosine_score + prior, -1.0, 1.0))
 
 
-class LockFreeStatsCollector:
+class BufferedStatsCollector:
     """
-    Non-blocking statistics collector for read-path QPS optimization.
-    Buffers access hits in an in-memory queue and flushes them asynchronously.
+    Thread-safe in-memory statistics buffer.
+
+    This implementation uses a lock and makes no lock-free throughput claim.
     """
 
     def __init__(self, batch_flush_size: int = 100):
@@ -105,6 +108,11 @@ class LockFreeStatsCollector:
             drained = list(self._buffer)
             self._buffer.clear()
         return drained
+
+
+# Backward-compatible alias. The old name is retained for imports only; the
+# implementation has always used a lock.
+LockFreeStatsCollector = BufferedStatsCollector
 
 
 class VectorARCCache:

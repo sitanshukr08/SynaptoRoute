@@ -1,5 +1,8 @@
+import threading
+
 import pytest
 
+from synaptoroute.durability import MutationReceipt, QueuedStorageMutation
 from synaptoroute.models import Route
 from synaptoroute.router import AdaptiveRouter
 from synaptoroute.storage import SQLiteStorage
@@ -13,25 +16,37 @@ class FailableSQLiteStorage(SQLiteStorage):
         self.fail_update_threshold = False
         self.fail_delete_route = False
 
-    def save_route(self, route, embeddings=None):
+    def save_route(self, route, embeddings=None, expected_version=None):
         if self.fail_save_route:
             raise RuntimeError("forced save_route failure")
-        return super().save_route(route, embeddings)
+        return super().save_route(route, embeddings, expected_version)
 
-    def add_utterance(self, route_name: str, utterance: str, embedding=None):
+    def add_utterance(self, route_name: str, utterance: str, embedding=None, version=None):
         if self.fail_add_utterance:
             raise RuntimeError("forced add_utterance failure")
-        return super().add_utterance(route_name, utterance, embedding)
+        return super().add_utterance(route_name, utterance, embedding, version)
 
-    def update_threshold(self, route_name: str, threshold: float):
+    def update_threshold(self, route_name: str, threshold: float, version=None):
         if self.fail_update_threshold:
             raise RuntimeError("forced update_threshold failure")
-        return super().update_threshold(route_name, threshold)
+        return super().update_threshold(route_name, threshold, version)
 
-    def delete_route(self, route_name: str):
+    def delete_route(self, route_name: str, expected_version=None):
         if self.fail_delete_route:
             raise RuntimeError("forced delete_route failure")
-        return super().delete_route(route_name)
+        return super().delete_route(route_name, expected_version)
+
+
+class BlockingSaveStorage(SQLiteStorage):
+    def __init__(self, db_path: str):
+        super().__init__(db_path)
+        self.started = threading.Event()
+        self.release = threading.Event()
+
+    def save_route(self, route, embeddings=None, expected_version=None):
+        self.started.set()
+        self.release.wait(timeout=5.0)
+        return super().save_route(route, embeddings, expected_version)
 
 
 @pytest.fixture
@@ -126,36 +141,66 @@ async def test_sync_and_async_paths_apply_the_same_margin_policy(fake_encoder):
 
 
 @pytest.mark.asyncio
-async def test_rebuild_failure_clears_pending_mutations(fake_encoder):
+async def test_rebuild_failure_retries_then_clears_pending_state(fake_encoder):
     from unittest.mock import patch
     storage = SQLiteStorage(":memory:")
-    router = AdaptiveRouter(fake_encoder, storage)
+    router = AdaptiveRouter(fake_encoder, storage, max_rebuild_retries=2)
     router.add_route(Route(name="r1", utterances=["utterance1"], threshold=0.5))
+    router.durable_barrier()
 
     router._rebuild_pending = True
-    router._pending_rebuild_mutations.append(("add_route", "r2", None, None))
-
-    with patch("synaptoroute.index.NumpyIndex.rebuild", side_effect=RuntimeError("rebuild failed")):
+    with patch(
+        "synaptoroute.index.NumpyIndex.rebuild",
+        side_effect=RuntimeError("rebuild failed"),
+    ) as rebuild:
         await router._rebuild_index()
 
     assert router._rebuild_pending is False
-    assert len(router._pending_rebuild_mutations) == 0
+    assert rebuild.call_count == 2
     router.close()
 
 
-def test_resync_from_storage_clears_pending_rebuild_mutations(fake_encoder):
+def test_route_resync_does_not_replace_unrelated_memory_state(fake_encoder):
     storage = SQLiteStorage(":memory:")
     router = AdaptiveRouter(fake_encoder, storage)
     router.add_route(Route(name="r1", utterances=["utterance1"], threshold=0.5))
+    router.add_route(Route(name="r2", utterances=["utterance2"], threshold=0.5))
+    router.durable_barrier()
 
-    router._rebuild_pending = True
-    router._pending_rebuild_mutations.append(("add_route", "r2", None, None))
+    router._route_map["r2"].threshold = 0.9
+    router._resync_route_from_storage("r1")
 
-    router._resync_from_storage()
-
-    assert router._rebuild_pending is False
-    assert len(router._pending_rebuild_mutations) == 0
+    assert router._route_map["r2"].threshold == 0.9
     router.close()
+
+
+def test_failed_older_mutation_cannot_resync_over_newer_memory_version(fake_encoder):
+    storage = SQLiteStorage(":memory:")
+    router = AdaptiveRouter(fake_encoder, storage)
+    router.add_route(Route(name="r1", utterances=["hello"], threshold=0.5))
+    router.durable_barrier(timeout=2.0)
+    with router._route_map_lock:
+        router._route_map["r1"] = router._route_map["r1"].model_copy(
+            update={"threshold": 0.9, "version": 3}
+        )
+        router._route_versions["r1"] = 3
+
+    stale = QueuedStorageMutation(
+        action="update_threshold",
+        args=("r1", 0.7, 2),
+        receipt=MutationReceipt(
+            sequence=2,
+            action="update_threshold",
+            route_name="r1",
+            route_version=2,
+        ),
+    )
+    router._reconcile_failed_mutation(stale)
+
+    assert router._route_map["r1"].version == 3
+    assert router._route_map["r1"].threshold == 0.9
+    router.close()
+    storage.close()
 
 
 def test_durable_barrier_accumulates_multiple_storage_failures(failable_storage, fake_encoder):
@@ -175,6 +220,29 @@ def test_durable_barrier_accumulates_multiple_storage_failures(failable_storage,
 
     assert len(exc_info.value.failures) == 2
     assert "2 storage mutation(s) failed" in str(exc_info.value)
+    router.close()
+
+
+def test_full_storage_queue_rejects_without_partial_memory_application(fake_encoder):
+    from synaptoroute.exceptions import RouterOverloadedError
+
+    storage = BlockingSaveStorage(":memory:")
+    router = AdaptiveRouter(
+        fake_encoder,
+        storage,
+        max_storage_queue_size=1,
+    )
+    first = router.add_route(Route(name="first", utterances=["hello"]))
+    assert storage.started.wait(timeout=2.0)
+    second = router.add_route(Route(name="second", utterances=["bye"]))
+
+    with pytest.raises(RouterOverloadedError, match="Storage mutation queue is full"):
+        router.add_route(Route(name="rejected", utterances=["support"]))
+
+    assert "rejected" not in router._route_map
+    storage.release.set()
+    first.wait_durable(timeout=2.0)
+    second.wait_durable(timeout=2.0)
     router.close()
 
 
@@ -220,6 +288,3 @@ def test_delete_route_index_failure_rolls_back_in_memory_state(fake_encoder):
     assert "support" in router._route_map
     assert router._route_map["support"].utterances == ["help"]
     router.close()
-
-
-

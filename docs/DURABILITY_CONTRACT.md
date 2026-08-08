@@ -16,7 +16,8 @@ mutation is visible to subsequent queries in the current process and has been
 enqueued for storage. It does not mean SQLite has committed the mutation.
 
 Each non-no-op mutation returns a `MutationReceipt`. The receipt starts in the
-`queued` state and carries a process-local monotonically increasing sequence.
+`queued` state and carries a process-local monotonically increasing sequence,
+route name, resulting route version, and acknowledgement mode.
 
 ### Durable Acknowledgement
 
@@ -41,7 +42,8 @@ If a durable write fails:
 
 1. the failed receipt is marked `failed`;
 2. the error is retained for the next durable barrier;
-3. runtime route and index state are rebuilt from SQLite;
+3. the affected route is reconciled from SQLite only if the failed version is
+   still the newest in-memory version;
 4. callers that only used in-memory acknowledgement may observe the mutation
    disappear after resynchronization.
 
@@ -50,13 +52,13 @@ reported as durable.
 
 ## Restart Guarantee
 
-A mutation whose receipt reached `durable` must be present after a normal
-process restart using the same SQLite database, unless a later durable mutation
-overwrote or deleted it. Crash consistency under abrupt process termination is
-measured separately by the fault-injection benchmark.
+A mutation whose receipt reached `durable` must survive a process crash and
+restart using the same SQLite database, unless a later durable mutation
+overwrote or deleted it. This is a process-crash contract. It is not a
+power-loss or storage-hardware guarantee.
 
 ## Exclusions
 
 This contract does not cover Redis Pub/Sub delivery, multi-process writes to a
-shared database, filesystem or hardware failure beyond SQLite's guarantees,
-or authorization to execute a routed action.
+shared database, power loss beyond the configured SQLite synchronization mode,
+storage-hardware failure, or authorization to execute a routed action.

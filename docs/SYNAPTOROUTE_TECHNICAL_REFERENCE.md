@@ -1,112 +1,109 @@
 # SynaptoRoute Technical Reference
 
-> **Authoritative Documentation – SynaptoRoute v0.4.0**
+Status: development reference for `0.5.0.dev0`.
 
-## 1. Executive Summary
-SynaptoRoute is a high-performance, single-node semantic intent router designed to classify conversational inputs into predefined functions or topics using local embeddings. 
-* **What it solves:** It provides ultra-low latency semantic routing (~10ms) without API calls, relying on lightweight ONNX embeddings and FAISS for O(1) similarity search. It allows dynamic thresholds per route.
-* **What it does NOT solve:** It is not an absolute security boundary against prompt injection or adversarial jailbreaks (FPR is high at usable thresholds). It is currently not designed for massively scalable distributed writes without a dedicated synchronization layer.
+SynaptoRoute is a mutable, single-process semantic router. It maps text to a
+named route using a caller-supplied or local embedding encoder and an in-memory
+vector index. SQLite stores route definitions for restart recovery.
 
----
+This document describes implemented behavior. Historical benchmark values are
+audit records only; see [Current Evidence Status](CURRENT_EVIDENCE_STATUS.md).
 
-## 2. Project Evolution
+## Components
 
-* **v0.1:** Initial rigid regex/string matching layer. Focus was on basic routing.
-* **v0.2:** Introduction of embedding-based routing. Swapped rigid rules for dense vector cosine similarity.
-* **v0.3:** Integration of Redis and FAISS to scale routing beyond simple lists. Introduced dynamic route-specific thresholds.
-* **v0.3.1:** Hotfixes for memory leaks discovered during prolonged router uptime.
-* **v0.4.0 (Current):** Major asynchronous rewrite. Replaced the heavy Redis dependency with a robust SQLite storage layer. Stripped bloated metadata from FAISS to fix severe memory leaks and OOM crashes. Centralized `aquery` logic.
+### `AdaptiveRouter`
 
----
+The router owns the route map, vector index, query batching queues, mutation
+queue, and lifecycle. Its stable routing interfaces are:
 
-## 3. Architecture
+* `match(text)` for synchronous decisions;
+* `amatch(text)` for asynchronous decisions after `start()`;
+* callable compatibility, equivalent to the legacy route-returning query path.
 
-* **Router (`AdaptiveRouter`):** The orchestrator. Coordinates the Encoder, Storage, and Index. Exposes the asynchronous `aquery` API for non-blocking routing.
-* **Encoder (`FastEmbedEncoder`):** Wraps the FastEmbed library. Converts text strings into 384-dimensional dense vectors locally.
-* **FAISS (`FaissIndex`):** An in-memory vector index (IndexFlatIP) used exclusively for sub-millisecond similarity search.
-* **SQLite (`SQLiteStorage`):** The durable source of truth. Stores route definitions, thresholds, and all mapped utterances. 
-* **Redis:** Deprecated as the primary storage layer in v0.4.0; retained strictly as a Pub/Sub mechanism for eventual distributed consistency.
-* **Dynamic Updates:** Adding a route writes to SQLite first (durability), then reconstructs or updates the FAISS index (performance). 
-* **Synchronization:** Utilizes Python `asyncio.Lock` and threading locks to prevent index corruption during dynamic rebuilds.
+`match()` and `amatch()` return `RouterResult`, which records the selected
+route, score, candidate margin, unique route candidates, and decision reason.
 
----
+### Encoders
 
-## 4. Architectural Decisions
+`FastEmbedEncoder` is the default local encoder. `BaseEncoder` permits a
+deterministic or application-specific implementation to be injected. Unit
+tests use a deterministic network-free encoder; downloading a FastEmbed model
+belongs in the integration test job and paper image.
 
-* **Why FAISS?** CPU-based exact inner-product search (IndexFlatIP) provides 3.0ms P95 latency even at 1,000,000 routes.
-* **Why SQLite?** Eliminates the need for an external Redis/Postgres server cluster for single-node deployments, reducing operational overhead to zero.
-* **Why ONNX / BGE-Small?** Provides a massive speedup by running quantized embeddings locally without network latency or OpenAI API costs.
-* **Why Dynamic Thresholds?** Semantic similarity is not uniform. Some intents (e.g., "Transfer Money") require strict 0.85+ similarity, while casual intents ("Hello") can tolerate 0.60.
+### Indexes
 
----
+The built-in NumPy index performs exact cosine retrieval over normalized
+vectors. FAISS is optional and can be selected explicitly for scale
+experiments. No latency or complexity claim is implied by selecting either
+engine. Deleted vectors become tombstones until a generation-based rebuild
+successfully swaps in a stable index snapshot.
 
-## 5. Benchmark Methodology
+### SQLite Storage
 
-Benchmarks are executed via isolated Python scripts in the `scratch/` directory.
-* **Hardware Assumptions:** Tested primarily on standard x86 CPUs. GPU benchmarks utilize DirectML for vendor-agnostic hardware acceleration.
-* **Timing:** Exclusively uses `time.perf_counter()` for microsecond-precision latency tracking.
-* **Data:** Benchmarks use a mix of random normalized vectors for pure stress testing, and standard datasets (`Banking77`, `CLINC150`) for semantic accuracy.
-* **Output:** Manifests are generated in `.json` format tracking metrics like P50, P95, AUROC, and memory footprint.
+SQLite is the restart source of truth for local route state. The schema uses
+ordered migrations recorded in `schema_migrations`. Route state includes:
 
----
+* route name, threshold, metadata, and monotonically increasing version;
+* utterances in deterministic order;
+* optional persisted utterance embeddings.
 
-## 6. Historical Benchmark Claims
+Connections run in autocommit mode so transaction boundaries are explicit.
+Snapshot reads use `BEGIN`; writes use `BEGIN IMMEDIATE`. Research runs default
+to `PRAGMA synchronous=FULL`; `NORMAL` is an explicit experimental setting.
 
-These numbers are retained as audit targets, not verified publication claims. See `BENCHMARK_REGISTRY.md` and `CURRENT_EVIDENCE_STATUS.md` for the current status.
+## Mutation Contract
 
-* **Banking77 Accuracy:** historical 91.16%, currently unverified.
-* **CLINC150 Accuracy:** historical 92.0% Top-1, currently unverified.
-* **OOD Handling:** historical AUROC 0.908 | AUPRC 0.898 | FPR@95 = 36.5%, currently unverified and must be rerun.
-* **Retrieval Latency (Warm):** historical total ~7.80ms, currently unverified.
-* **Retrieval Scale:** historical 1,000,000-vector run retained only as a retracted/unit-bug audit artifact until rerun.
+Route mutations update memory and the index, then submit a versioned write to
+a bounded storage queue. An accepted mutation returns `MutationReceipt` with:
 
----
+* route name and route version;
+* acknowledgement mode;
+* `queued`, `durable`, or `failed` state;
+* durable commit latency or failure details.
 
-## 7. Audit History
+Memory visibility is not durability. In this project, `durable` means the
+SQLite commit completed and the mutation survives a subsequent process crash.
+It does not claim survival from power loss, storage-controller loss, or broken
+filesystem guarantees.
 
-* **Memory Leaks & OOM Crashes:** 
-  * *Problem:* Passing full string metadata into FAISS and `dict` indices bloated memory exponentially.
-  * *Fix:* FAISS was stripped down to handle purely numeric indices mapping back to SQLite integer Primary Keys.
-* **Tombstones & Index Deletion:**
-  * *Problem:* FAISS `IndexFlatIP` does not support `remove_ids()`. Deleting a route caused memory to remain allocated.
-  * *Fix:* System was rebuilt to fully reconstruct the FAISS index from SQLite upon deletion.
-* **Unit Conversion Bug:**
-  * *Problem:* Phase 3 telemetry reported `0.003ms` latency for 1M routes.
-  * *Fix:* Audit discovered `time.perf_counter()` returns seconds. The corrected interpretation is about `0.003 seconds` (3.0ms), but the benchmark still needs a clean rerun before publication.
-* **Encoder Bottleneck:**
-  * *Problem:* Assumed FAISS was the bottleneck.
-  * *Fix:* Bottleneck attribution proved the Encoder takes 97% of inference time (~7.6ms). FAISS takes <3%.
+If a queued write fails, the router reconciles only that route from SQLite and
+only when the failed version is still the newest in-memory version. SQLite
+also rejects stale expected versions, preventing an older replacement from
+overwriting a newer stored route.
 
----
+Missing-route deletion and duplicate-utterance insertion remain compatibility
+no-ops and return no receipt because no mutation occurred.
 
-## 8. Known Limitations
+## Overload And Shutdown
 
-* **Mutation Lock at Scale:** Rebuilding the FAISS index for 1,000,000 vectors takes ~290 seconds. SynaptoRoute cannot handle high-frequency dynamic writes at massive scale.
-* **Distributed Synchronization:** While Redis Pub/Sub exists, guaranteed consistency across multiple SynaptoRoute nodes is not natively guaranteed. Treat Redis sync as experimental until bootstrap, replay, and missed-window behavior are validated.
-* **OOD Vulnerability:** A 36.5% False Positive Rate means adversarial "junk" text will frequently match a valid route if thresholds are tuned for 95% TPR.
-* **GPU Utilization:** DirectML provides a 1.4x speedup on batch encoding (N=300), but single-user queries (N=1) do not experience significant acceleration due to tensor transfer overheads.
+Query and storage queues are bounded. Queue saturation raises
+`RouterOverloadedError` before applying a mutation that cannot be queued.
+Shutdown stops accepting new mutations, drains queued storage work or reports
+a timeout, stops workers, waits for rebuild work, and closes executor pools.
+Callers that require confirmation of every write should retain receipts or call
+`durable_barrier()` before shutdown.
 
----
+## Experimental Features
 
-## 9. Future Work
+The following are excluded from the primary paper configuration:
 
-**Engineering Roadmap:**
-* Externalize the embedding layer to an asynchronous queue to batch single-user queries automatically.
-* Implement a background mutation thread so adding routes doesn't block the async event loop during index rebuilds.
+* adaptive memory and learned weighting;
+* hybrid lexical routing;
+* sessions and slots;
+* permission-based route filtering;
+* Redis synchronization.
 
-**Research Roadmap:**
-* Compare Bi-Encoder architecture latency/accuracy against an equivalent Cross-Encoder.
-* Execute sequence-length ablation studies (10 tokens vs 500 tokens).
+Redis Pub/Sub does not currently establish complete bootstrap, replay, or
+missed-window semantics. Permission metadata is route filtering, not an
+authorization boundary.
 
----
+## Evidence Policy
 
-## 10. Research Gaps
+Benchmark scripts produce schema-v2 `unverified` manifests. Scripts cannot
+verify their own outputs. A claim becomes `verified` only through the separate
+promotion command after a clean original run, independent reproduction on a
+different machine, reviewer attestation, and immutable archive metadata.
 
-SynaptoRoute has a coherent engineering direction, but it is **not yet ready** for rigorous academic publication (e.g., a formal whitepaper or thesis). This prevents future readers from confusing "implemented" with "research validated".
-
-**Missing Evidence Required for Publication:**
-* **Ablation Studies:** Isolating how much the threshold fitting algorithm impacts end-to-end accuracy.
-* **Statistical Significance Testing:** Lack of p-value bounds or variance across multiple random seed initializations.
-* **Cross-Encoder Baselines:** Missing upper-bound performance tests against cross-encoder re-ranking.
-* **Calibration Analysis:** Expected Calibration Error (ECE) and reliability diagrams for the OOD rejection logic.
-* **Multilingual Evaluation:** Accuracy is only verified on English datasets.
+The working paper is framed as a systems study of durability, online mutation,
+overload, crash recovery, and selective routing. It does not claim a novel
+classifier or a generally superior routing algorithm.

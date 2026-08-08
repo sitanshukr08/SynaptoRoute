@@ -31,6 +31,9 @@ QUALITY_METRICS = (
     "coverage",
     "selective_accuracy",
     "selective_risk_coverage_auc",
+    "expected_calibration_error",
+    "max_calibration_error",
+    "brier_score",
 )
 
 
@@ -187,7 +190,12 @@ def main() -> int:
     )
     analysis = None
     if not args.skip_analysis:
-        comparators = ["synaptoroute", "logistic_regression", "exact_cosine"]
+        comparators = [
+            "synaptoroute",
+            "exact_string",
+            "logistic_regression",
+            "exact_cosine",
+        ]
         if not args.skip_semantic_router:
             comparators.append("semantic_router")
         analysis = analyze_multiseed_study(

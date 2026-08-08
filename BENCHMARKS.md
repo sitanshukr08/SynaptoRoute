@@ -74,7 +74,10 @@ They use a deterministic non-semantic encoder and always emit unverified
 diagnostic results. The crash smoke terminates child processes with
 `os._exit`; it never terminates the benchmark coordinator.
 
-The generated run manifest remains `unverified` until the raw logs are reviewed and promoted into a claim manifest that passes `benchmarks.manifest_schema.validate_manifest` with status `verified`.
+The generated run manifest always remains `unverified`. Promotion is a separate
+operation using `benchmarks/promote_evidence.py`; it requires a clean original
+run, a clean reproduction from a different machine, reviewer attestation, and
+an immutable archive digest.
 
 Experimental definitions and statistical requirements are fixed in
 [`docs/RESEARCH_PROTOCOL.md`](docs/RESEARCH_PROTOCOL.md).

@@ -4,16 +4,18 @@ SynaptoRoute Command Line Interface (CLI)
 Provides terminal commands:
   synaptoroute info      : Display environment, encoder, and storage details.
   synaptoroute match     : Evaluate a query against local SQLite route database.
-  synaptoroute benchmark : Execute the verified CI benchmark suite.
+  synaptoroute benchmark : Execute the unverified structural CI smoke.
 """
 
 import argparse
 import platform
 
+from synaptoroute import __version__
+
 def command_info():
     """Print system environment, Python runtime, and SynaptoRoute details."""
     print("\n--- SynaptoRoute System Information ---")
-    print("  SynaptoRoute Version: 0.5.0")
+    print(f"  SynaptoRoute Version: {__version__}")
     print(f"  Python Version      : {platform.python_version()}")
     print(f"  Operating System    : {platform.platform()}")
     print(f"  CPU Processor       : {platform.processor() or 'Standard CPU'}")
@@ -27,9 +29,10 @@ def command_info():
     print()
 
 def command_benchmark():
-    """Execute the self-contained CI verified benchmark suite."""
-    from benchmarks.run_verified_ci_benchmark import run_ci_benchmark
-    run_ci_benchmark()
+    """Execute the self-contained, explicitly unverified CI smoke."""
+    from pathlib import Path
+    from benchmarks.run_ci_smoke_benchmark import run_ci_smoke
+    run_ci_smoke(Path("benchmark_results") / "ci_smoke")
 
 def command_match(query: str, db_path: str = ":memory:"):
     """Evaluate a text query against a local route database."""
@@ -41,8 +44,18 @@ def command_match(query: str, db_path: str = ":memory:"):
 
     if not router._route_map:
         print("Storage is empty. Adding default demo routes (billing, support)...")
-        router.add_route(Route(name="billing", utterances=["my payment failed", "invoice status", "refund"]))
-        router.add_route(Route(name="support", utterances=["app crashes", "database error", "api timeout"]))
+        router.add_route(
+            Route(
+                name="billing",
+                utterances=["billing issue", "my payment failed", "invoice status", "refund"],
+            )
+        )
+        router.add_route(
+            Route(
+                name="support",
+                utterances=["support issue", "app crashes", "database error", "api timeout"],
+            )
+        )
         router.durable_barrier()
 
     res = router.match(query)
@@ -67,7 +80,7 @@ def main():
     subparsers.add_parser("info", help="Display system information and encoder status")
 
     # Benchmark command
-    subparsers.add_parser("benchmark", help="Execute the verified CI benchmark suite")
+    subparsers.add_parser("benchmark", help="Execute the unverified structural CI smoke")
 
     # Match command
     match_parser = subparsers.add_parser("match", help="Evaluate a query against routes")

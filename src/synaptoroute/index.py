@@ -171,11 +171,14 @@ class NumpyIndex:
                 embeddings = np.stack(valid_embs)
                 self._add_unlocked(embeddings, route_name)
 
-def get_index(dim: int, max_capacity: int = 50000):
-    if HAS_FAISS:
+def get_index(dim: int, max_capacity: int = 50000, engine: str = "auto"):
+    if engine not in {"auto", "numpy", "faiss"}:
+        raise ValueError("engine must be 'auto', 'numpy', or 'faiss'")
+    if engine == "faiss" and not HAS_FAISS:
+        raise ImportError("FAISS is not installed; install synaptoroute[faiss]")
+    if engine == "faiss" or (engine == "auto" and HAS_FAISS):
         return FaissIndex(dim)
-    else:
-        return NumpyIndex(dim, max_capacity)
+    return NumpyIndex(dim, max_capacity)
 
 class FaissIndex:
     """

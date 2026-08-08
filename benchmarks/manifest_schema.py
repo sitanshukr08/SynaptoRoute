@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 import hashlib
+import re
 from pathlib import Path
 from typing import Any
 
 
 VALID_STATUSES = {"verified", "unverified", "retracted"}
+FULL_GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 BASE_REQUIRED = {
     "schema_version",
     "benchmark",
@@ -100,8 +102,8 @@ def validate_manifest(manifest: dict[str, Any], repo_root: Path | str = ".") -> 
     if status == "verified":
         if command is None:
             errors.append("verified manifests require command")
-        if not manifest.get("git_commit") or manifest.get("git_commit") == "unknown":
-            errors.append("verified manifests require a concrete git_commit")
+        if not FULL_GIT_SHA.fullmatch(str(manifest.get("git_commit", ""))):
+            errors.append("verified manifests require a full 40-character git_commit")
         if manifest.get("working_tree_dirty") is not False:
             errors.append("verified manifests require working_tree_dirty=false")
         if not script_path:
@@ -139,10 +141,112 @@ def validate_manifest(manifest: dict[str, Any], repo_root: Path | str = ".") -> 
         timing_unit = evidence.get("timing_unit")
         if timing_unit in (None, "", "varies", "unknown"):
             errors.append("verified manifests require an explicit evidence.timing_unit")
+        if manifest.get("schema_version", 1) >= 2:
+            if not isinstance(manifest.get("run_id"), str) or not manifest["run_id"].strip():
+                errors.append("verified schema v2 manifests require run_id")
+            if manifest.get("paper_evidence_eligible") is not True:
+                errors.append("verified schema v2 manifests require paper_evidence_eligible=true")
+            if not isinstance(manifest.get("claim"), str) or not manifest["claim"].strip():
+                errors.append("verified schema v2 manifests require a non-empty claim")
+            if manifest.get("exit_status") != 0:
+                errors.append("verified schema v2 manifests require exit_status=0")
+            if not isinstance(manifest.get("configuration"), dict):
+                errors.append("verified schema v2 manifests require configuration")
+            lock = manifest.get("dependency_lock")
+            if not isinstance(lock, dict) or not {
+                "path",
+                "sha256",
+            }.issubset(lock):
+                errors.append("verified schema v2 manifests require dependency_lock")
+            else:
+                lock_path = _as_path(root, lock.get("path"))
+                if lock_path is None or not lock_path.exists() or lock_path.stat().st_size == 0:
+                    errors.append("verified schema v2 dependency_lock.path must be non-empty")
+                elif lock.get("sha256") != sha256_file(lock_path):
+                    errors.append("verified schema v2 dependency_lock.sha256 must match")
+            review = manifest.get("review")
+            if not isinstance(review, dict) or not {
+                "reviewer",
+                "reviewed_at_utc",
+                "original_run_id",
+                "reproduction_run_id",
+                "decision",
+                "notes",
+                "attestation_path",
+                "attestation_sha256",
+            }.issubset(review):
+                errors.append("verified schema v2 manifests require independent review")
+            else:
+                for field in (
+                    "reviewer",
+                    "reviewed_at_utc",
+                    "original_run_id",
+                    "reproduction_run_id",
+                    "notes",
+                ):
+                    if not isinstance(review.get(field), str) or not review[field].strip():
+                        errors.append(f"verified review.{field} must be non-empty")
+                if review.get("original_run_id") == review.get("reproduction_run_id"):
+                    errors.append("verified review requires distinct original and reproduction runs")
+                if review.get("decision") != "approve":
+                    errors.append("verified review.decision must be approve")
+                attestation_path = _as_path(root, review.get("attestation_path"))
+                if (
+                    attestation_path is None
+                    or not attestation_path.exists()
+                    or attestation_path.stat().st_size == 0
+                ):
+                    errors.append("verified review.attestation_path must be non-empty")
+                elif review.get("attestation_sha256") != sha256_file(attestation_path):
+                    errors.append("verified review.attestation_sha256 must match")
+                else:
+                    try:
+                        attestation = json.loads(attestation_path.read_text(encoding="utf-8"))
+                    except (json.JSONDecodeError, OSError):
+                        errors.append("verified review attestation must be readable JSON")
+                    else:
+                        expected_attestation = {
+                            "schema_version": 1,
+                            "decision": "approve",
+                            "reviewer": review.get("reviewer"),
+                            "reviewed_at_utc": review.get("reviewed_at_utc"),
+                            "original_run_id": review.get("original_run_id"),
+                            "reproduction_run_id": review.get("reproduction_run_id"),
+                            "claim": manifest.get("claim"),
+                            "archive_uri": manifest.get("archive", {}).get("uri"),
+                            "archive_sha256": manifest.get("archive", {}).get("sha256"),
+                            "notes": review.get("notes"),
+                        }
+                        if not isinstance(attestation, dict) or any(
+                            attestation.get(field) != value
+                            for field, value in expected_attestation.items()
+                        ):
+                            errors.append("verified review attestation does not match manifest")
+            archive = manifest.get("archive")
+            if not isinstance(archive, dict) or not {"uri", "sha256"}.issubset(archive):
+                errors.append("verified schema v2 manifests require immutable archive metadata")
+            else:
+                if not isinstance(archive.get("uri"), str) or not archive["uri"].strip():
+                    errors.append("verified archive.uri must be non-empty")
+                if not re.fullmatch(r"[0-9a-f]{64}", str(archive.get("sha256", ""))):
+                    errors.append("verified archive.sha256 must be a lowercase SHA-256 digest")
+            if isinstance(environment, dict):
+                machine_id = environment.get("machine_id")
+                if not isinstance(machine_id, str) or not machine_id.strip():
+                    errors.append("verified schema v2 environment.machine_id must be concrete")
+            reproduction = manifest.get("reproduction")
+            if not isinstance(reproduction, dict) or not {"environment", "metrics", "evidence"}.issubset(reproduction):
+                errors.append("verified schema v2 manifests require reproduction evidence")
+            elif isinstance(environment, dict):
+                reproduced_machine = reproduction.get("environment", {}).get("machine_id")
+                if not reproduced_machine or reproduced_machine == environment.get("machine_id"):
+                    errors.append("verified schema v2 reproduction must use a different machine")
     elif status == "unverified":
         missing_evidence = manifest.get("missing_evidence")
         if not isinstance(missing_evidence, list) or not missing_evidence:
             errors.append("unverified manifests require non-empty missing_evidence")
+        if manifest.get("schema_version", 1) >= 2 and manifest.get("paper_evidence_eligible") is not False:
+            errors.append("unverified schema v2 manifests require paper_evidence_eligible=false")
     elif status == "retracted":
         if not manifest.get("retraction_reason"):
             errors.append("retracted manifests require retraction_reason")

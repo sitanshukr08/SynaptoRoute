@@ -16,6 +16,7 @@ router = AdaptiveRouter(
     profile=None,
     max_capacity=50000,
     max_queue_size=1000,
+    max_storage_queue_size=1000,
     max_in_flight_batches=4,
     margin=0.0
 )
@@ -30,7 +31,7 @@ router = AdaptiveRouter(
 * **`match(query: str) -> RouterResult`**: Synchronously evaluates a query string and returns a `RouterResult` object containing the decision reason, top candidate, score, and candidate pool.
 * **`durable_barrier(timeout: float = 10.0)`**: Blocks until all pending storage mutations are committed to SQLite disk WAL.
 * **`fit_thresholds(samples: list[str], labels: list[str])`**: Calibrates per-route thresholds using validation samples and ground-truth intent labels.
-* **`close()`**: Gracefully stops worker threads, flushes pending storage writes, and closes database connections.
+* **`close()`**: Stops accepting mutations, flushes pending writes, and deterministically stops router-owned workers.
 
 #### Asynchronous Methods
 
@@ -84,6 +85,14 @@ Immutable result object returned by `match()` and `amatch()`.
 
 Receipt object returned by mutation operations (`add_route`, `add_utterance`, `delete_route`).
 
+**Attributes:**
+* `sequence`: Process-local FIFO mutation sequence.
+* `route_name`: Affected route.
+* `route_version`: Resulting route version.
+* `acknowledgement_mode`: `memory` for the immediate return milestone.
+* `state`: `queued`, `durable`, or `failed`.
+* `error_detail`: Failure detail when state is `failed`.
+
 **Methods:**
 * **`wait_durable(timeout: float = 10.0) -> float`**: Blocks until the mutation is committed to disk storage and returns disk commit latency in milliseconds.
 
@@ -96,5 +105,9 @@ Local SQLite storage engine providing persistent WAL storage for routes and BLOB
 ```python
 from synaptoroute import SQLiteStorage
 
-storage = SQLiteStorage(db_path="routes.sqlite3")
+storage = SQLiteStorage(db_path="routes.sqlite3", synchronous="FULL")
 ```
+
+`FULL` is the default research mode. `NORMAL` is available for explicitly
+configured performance experiments. Both use WAL; neither is presented as a
+hardware power-loss guarantee.

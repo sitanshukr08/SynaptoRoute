@@ -30,11 +30,11 @@ class FailOnceStorage(SQLiteStorage):
         super().__init__(db_path)
         self.fail_next_save = True
 
-    def save_route(self, route, embeddings=None):
+    def save_route(self, route, embeddings=None, expected_version=None):
         if self.fail_next_save:
             self.fail_next_save = False
             raise RuntimeError("injected save failure")
-        return super().save_route(route, embeddings)
+        return super().save_route(route, embeddings, expected_version)
 
 
 def _route_snapshot(storage: SQLiteStorage) -> dict[str, dict[str, Any]]:

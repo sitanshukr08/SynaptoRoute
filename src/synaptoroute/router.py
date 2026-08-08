@@ -24,7 +24,7 @@ from synaptoroute.profile import OptimizationProfile, get_profile, ProfileType
 from synaptoroute.index import get_index
 
 class AdaptiveRouter:
-    def __init__(self, encoder: Optional[BaseEncoder] = None, storage: Optional[BaseStorage] = None, profile: Optional[OptimizationProfile] = None, max_capacity: int = 50000, max_queue_size: int = 10000, metrics: Optional[MetricsRegistry] = None, sync_manager: Optional[BaseSyncManager] = None, margin: float = 0.0, reranker: Any = None, max_in_flight_batches: int = 4, enable_adaptive_memory: bool = False, adaptive_weigher: Any = None):
+    def __init__(self, encoder: Optional[BaseEncoder] = None, storage: Optional[BaseStorage] = None, profile: Optional[OptimizationProfile] = None, max_capacity: int = 50000, max_queue_size: int = 10000, metrics: Optional[MetricsRegistry] = None, sync_manager: Optional[BaseSyncManager] = None, margin: float = 0.0, reranker: Any = None, max_in_flight_batches: int = 4, enable_adaptive_memory: bool = False, adaptive_weigher: Any = None, max_storage_queue_size: int = 1000, max_rebuild_retries: int = 3, index_engine: str = "auto"):
         if profile is None:
             profile = get_profile(ProfileType.THROUGHPUT)
             
@@ -46,30 +46,49 @@ class AdaptiveRouter:
             raise ValueError("max_queue_size must be positive")
         if max_in_flight_batches < 1:
             raise ValueError("max_in_flight_batches must be positive")
+        if max_storage_queue_size < 1:
+            raise ValueError("max_storage_queue_size must be positive")
+        if max_rebuild_retries < 1:
+            raise ValueError("max_rebuild_retries must be positive")
         self.max_capacity = max_capacity
+        self.index_engine = index_engine
         self.max_queue_size = max_queue_size
         self.max_in_flight_batches = max_in_flight_batches
         self.margin = margin
         self.reranker = reranker
         self.enable_adaptive_memory = enable_adaptive_memory
         if self.enable_adaptive_memory:
-            from synaptoroute.adaptive_weights import BoundedBayesianWeigher, LockFreeStatsCollector, ContextMetadata
+            from synaptoroute.adaptive_weights import BoundedBayesianWeigher, BufferedStatsCollector, ContextMetadata
             self.adaptive_weigher = adaptive_weigher or BoundedBayesianWeigher()
-            self.stats_collector = LockFreeStatsCollector()
+            self.stats_collector: Any = BufferedStatsCollector()
             self._route_metadata_context: dict[str, ContextMetadata] = {}
         else:
             self.adaptive_weigher = None
             self.stats_collector = None
             self._route_metadata_context = {}
         
-        self.index = get_index(dim=self.encoder.dim, max_capacity=self.max_capacity)
+        self.index = get_index(
+            dim=self.encoder.dim,
+            max_capacity=self.max_capacity,
+            engine=self.index_engine,
+        )
         self._route_map: dict[str, Route] = {}
         self._route_map_lock = threading.Lock()
+        self._mutation_lock = threading.RLock()
+        self._route_versions: dict[str, int] = {}
+        self._mutation_generation = 0
         self._mutation_count = 0
-        self._pending_rebuild_mutations: list[tuple[str, str, Any, Any]] = []
+        self._max_rebuild_retries = max_rebuild_retries
+        self._rebuild_state_lock = threading.Lock()
+        self._rebuild_thread: Optional[threading.Thread] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._accepting_mutations = True
+        self._accepting_queries = False
+        self._closed = False
         
-        self._storage_queue: queue.Queue[QueuedStorageMutation] = queue.Queue()
+        self._storage_queue: queue.Queue[QueuedStorageMutation] = queue.Queue(
+            maxsize=max_storage_queue_size
+        )
         self._storage_failures: queue.Queue[tuple[MutationReceipt, BaseException]] = queue.Queue()
         self._mutation_sequence_lock = threading.Lock()
         self._next_mutation_sequence = 1
@@ -96,14 +115,29 @@ class AdaptiveRouter:
         self._load_routes()
         
     async def start(self):
+        if self._closed:
+            raise RuntimeError("AdaptiveRouter is closed")
+        if self._worker_task is not None and not self._worker_task.done():
+            return
         if self.sync_manager:
             await self.sync_manager.start()
         self._loop = asyncio.get_running_loop()
         self._batch_queue = asyncio.Queue(maxsize=self.max_queue_size)
         self._batch_semaphore = asyncio.Semaphore(self.max_in_flight_batches)
         self._worker_task = asyncio.create_task(self._batch_worker())
+        self._accepting_queries = True
 
-    async def stop(self):
+    async def stop(self, timeout: float = 5.0):
+        if self._closed:
+            return
+        self._accepting_queries = False
+        drain_error: BaseException | None = None
+        if self._batch_queue is not None and self._worker_task is not None:
+            if not self._worker_task.done():
+                try:
+                    await asyncio.wait_for(self._batch_queue.join(), timeout=timeout)
+                except TimeoutError as error:
+                    drain_error = error
         if self._worker_task:
             self._worker_task.cancel()
             try:
@@ -112,20 +146,22 @@ class AdaptiveRouter:
                 pass
         if self._inflight_batch_tasks:
             await asyncio.gather(*list(self._inflight_batch_tasks), return_exceptions=True)
-        await asyncio.to_thread(self.close)
+        await asyncio.to_thread(self.close, timeout)
         if self.sync_manager:
             await self.sync_manager.stop()
-        if hasattr(self, '_read_pool'):
-            self._read_pool.shutdown(wait=False)
-        if hasattr(self, '_write_pool'):
-            self._write_pool.shutdown(wait=False)
+        if drain_error is not None:
+            raise TimeoutError("Timed out draining accepted queries during shutdown") from drain_error
 
     def _load_routes(self):
         routes, embeddings_map = self.storage.load_all_routes()
         self._replace_runtime_state(routes, embeddings_map)
 
     def _replace_runtime_state(self, routes, embeddings_map):
-        new_index = get_index(dim=self.encoder.dim, max_capacity=self.max_capacity)
+        new_index = get_index(
+            dim=self.encoder.dim,
+            max_capacity=self.max_capacity,
+            engine=self.index_engine,
+        )
         new_route_map = {}
 
         print(f"Loading {len(routes)} routes from storage...")
@@ -175,12 +211,13 @@ class AdaptiveRouter:
             
             new_index.add(final_embeddings, route.name)
             
-        with self._route_map_lock:
-            self._route_map = new_route_map
         with self.rwlock.write_lock():
+            with self._route_map_lock:
+                self._route_map = new_route_map
+                self._route_versions = {
+                    route.name: route.version for route in routes
+                }
             self.index = new_index
-            if hasattr(self, '_pending_rebuild_mutations'):
-                self._pending_rebuild_mutations.clear()
             self._rebuild_pending = False
         self.metrics.capacity_usage.set(self.index.total_vectors)
 
@@ -188,55 +225,140 @@ class AdaptiveRouter:
         routes, embeddings_map = self.storage.load_all_routes()
         self._replace_runtime_state(routes, embeddings_map)
 
-    def _enqueue_storage(self, action: str, args: tuple[Any, ...]) -> MutationReceipt:
+    def _ensure_mutation_capacity(self) -> None:
+        if not self._accepting_mutations or self._closed:
+            raise RuntimeError("AdaptiveRouter is not accepting mutations")
+        if self._storage_queue.full():
+            raise RouterOverloadedError("Storage mutation queue is full")
+
+    def _enqueue_storage(
+        self,
+        action: str,
+        route_name: str,
+        route_version: int,
+        args: tuple[Any, ...],
+    ) -> MutationReceipt:
         with self._mutation_sequence_lock:
             sequence = self._next_mutation_sequence
             self._next_mutation_sequence += 1
-        receipt = MutationReceipt(sequence=sequence, action=action)
-        self._storage_queue.put(QueuedStorageMutation(action=action, args=args, receipt=receipt))
+        receipt = MutationReceipt(
+            sequence=sequence,
+            action=action,
+            route_name=route_name,
+            route_version=route_version,
+        )
+        try:
+            self._storage_queue.put_nowait(
+                QueuedStorageMutation(action=action, args=args, receipt=receipt)
+            )
+        except queue.Full as error:
+            receipt._mark_failed(error)
+            raise RouterOverloadedError("Storage mutation queue is full") from error
         return receipt
 
-    def delete_route(self, route_name: str, _broadcast: bool = True):
-        with self._route_map_lock:
-            if route_name not in self._route_map:
-                return
-            
-            deleted_route = self._route_map.pop(route_name)
-            self._mutation_count += 1
+    def _load_stored_route(self, route_name: str):
+        load_route = getattr(self.storage, "load_route", None)
+        if load_route is not None:
+            return load_route(route_name)
+        routes, embeddings = self.storage.load_all_routes()
+        route = next((item for item in routes if item.name == route_name), None)
+        return route, embeddings.get(route_name, [])
 
-        try:
-            with self.rwlock.write_lock():
-                self.index.delete(route_name)
-                if self._rebuild_pending:
-                    self._pending_rebuild_mutations.append(("delete_route", route_name, None, None))
-                self.metrics.capacity_usage.set(self.index.total_vectors)
-        except Exception:
+    def _decode_stored_embeddings(self, route: Route, stored_embeddings) -> np.ndarray:
+        decoded: list[np.ndarray | None] = []
+        expected_bytes = self.encoder.dim * np.dtype(np.float32).itemsize
+        for raw in stored_embeddings:
+            if raw is not None and len(raw) == expected_bytes:
+                decoded.append(np.frombuffer(raw, dtype=np.float32).copy())
+            else:
+                decoded.append(None)
+        while len(decoded) < len(route.utterances):
+            decoded.append(None)
+        missing = [
+            index for index, embedding in enumerate(decoded[: len(route.utterances)])
+            if embedding is None
+        ]
+        if missing:
+            texts = [route.utterances[index] for index in missing]
+            if getattr(self.encoder, "requires_lock", True):
+                with self._encoder_lock:
+                    generated = self.encoder.encode_batch(texts)
+            else:
+                generated = self.encoder.encode_batch(texts)
+            for index, embedding in zip(missing, generated):
+                decoded[index] = embedding
+        if not route.utterances:
+            return np.empty((0, self.encoder.dim), dtype=np.float32)
+        return np.asarray(decoded[: len(route.utterances)], dtype=np.float32)
+
+    def _resync_route_from_storage(self, route_name: str) -> None:
+        stored_route, stored_embeddings = self._load_stored_route(route_name)
+        decoded = (
+            self._decode_stored_embeddings(stored_route, stored_embeddings)
+            if stored_route is not None
+            else None
+        )
+        with self.rwlock.write_lock():
             with self._route_map_lock:
-                self._route_map[route_name] = deleted_route
-            self._resync_from_storage()
-            raise
+                if stored_route is None:
+                    self._route_map.pop(route_name, None)
+                    self._route_versions[route_name] = 0
+                else:
+                    self._route_map[route_name] = stored_route
+                    self._route_versions[route_name] = stored_route.version
+            self.index.delete(route_name)
+            if decoded is not None and len(decoded):
+                self.index.add(decoded, route_name)
+            self.metrics.capacity_usage.set(self.index.total_vectors)
+        self._mutation_generation += 1
 
-        receipt = self._enqueue_storage("delete_route", (route_name,))
+    def _reconcile_failed_mutation(self, mutation: QueuedStorageMutation) -> None:
+        receipt = mutation.receipt
+        with self._mutation_lock:
+            if self._route_versions.get(receipt.route_name, 0) != receipt.route_version:
+                return
+            try:
+                self._resync_route_from_storage(receipt.route_name)
+            except Exception as error:
+                logging.getLogger(__name__).error(
+                    "Failed to reconcile route %s after mutation %s: %s",
+                    receipt.route_name,
+                    receipt.sequence,
+                    error,
+                )
+
+    def delete_route(self, route_name: str, _broadcast: bool = True):
+        with self._mutation_lock:
+            self._ensure_mutation_capacity()
+            with self.rwlock.write_lock():
+                with self._route_map_lock:
+                    deleted_route = self._route_map.get(route_name)
+                    if deleted_route is None:
+                        return None
+                    resulting_version = deleted_route.version + 1
+                try:
+                    self.index.delete(route_name)
+                    with self._route_map_lock:
+                        self._route_map.pop(route_name)
+                        self._route_versions[route_name] = resulting_version
+                    self.metrics.capacity_usage.set(self.index.total_vectors)
+                    receipt = self._enqueue_storage(
+                        "delete_route",
+                        route_name,
+                        resulting_version,
+                        (route_name, deleted_route.version),
+                    )
+                except Exception:
+                    with self._route_map_lock:
+                        self._route_map[route_name] = deleted_route
+                        self._route_versions[route_name] = deleted_route.version
+                    raise
+                self._mutation_count += 1
+                self._mutation_generation += 1
 
         if _broadcast and self.sync_manager:
             self.sync_manager.broadcast("delete_route", {"route_name": route_name})
         return receipt
-
-    def _rollback_mutation_in_memory(self, action: str, args: tuple[Any, ...]):
-        try:
-            if action == "add_route":
-                route = args[0]
-                with self._route_map_lock:
-                    self._route_map.pop(route.name, None)
-                with self.rwlock.write_lock():
-                    self.index.delete(route.name)
-            elif action == "add_utterance":
-                route_name, utterance, _ = args
-                with self._route_map_lock:
-                    if route_name in self._route_map and utterance in self._route_map[route_name].utterances:
-                        self._route_map[route_name].utterances.remove(utterance)
-        except Exception as e:
-            logging.getLogger(__name__).warning(f"In-memory mutation rollback failed: {e}")
 
     def _flush_storage_batch(self):
         batch: list[QueuedStorageMutation] = []
@@ -258,15 +380,13 @@ class AdaptiveRouter:
                     action = mutation.action
                     args = mutation.args
                     if action == "add_route":
-                        route, embeddings = args
-                        self.storage.save_route(route, embeddings)
+                        self.storage.save_route(*args)
                     elif action == "delete_route":
-                        self.storage.delete_route(args[0])
+                        self.storage.delete_route(*args)
                     elif action == "update_threshold":
                         self.storage.update_threshold(*args)
                     elif action == "add_utterance":
-                        route_name, utterance, embedding = args
-                        self.storage.add_utterance(route_name, utterance, embedding)
+                        self.storage.add_utterance(*args)
                     else:
                         raise ValueError(f"Unknown storage mutation action: {action}")
                     mutation.receipt._mark_durable()
@@ -281,11 +401,7 @@ class AdaptiveRouter:
                         mutation.action,
                         failure_error,
                     )
-                    self._rollback_mutation_in_memory(mutation.action, mutation.args)
-                try:
-                    self._resync_from_storage()
-                except Exception as resync_error:
-                    logging.getLogger(__name__).error(f"Storage resync failed: {resync_error}")
+                    self._reconcile_failed_mutation(mutation)
                 for mutation, failure_error in failed:
                     mutation.receipt._mark_failed(failure_error)
                     self._storage_failures.put((mutation.receipt, failure_error))
@@ -293,10 +409,12 @@ class AdaptiveRouter:
             for _ in batch:
                 self._storage_queue.task_done()
                 
-            if not self._rebuild_pending and len(self.index.tombstones) > 1000 and len(self.index.tombstones) > self.index.total_vectors * 0.2:
-                self._rebuild_pending = True
-                if self._loop and not self._loop.is_closed():
-                    asyncio.run_coroutine_threadsafe(self._rebuild_index(), self._loop)
+            if (
+                getattr(self._storage_queue, "unfinished_tasks", 0) == 0
+                and len(self.index.tombstones) > 1000
+                and len(self.index.tombstones) > self.index.total_vectors * 0.2
+            ):
+                self._schedule_rebuild()
                 
     def _storage_worker(self):
         while not self._storage_stop_event.is_set() or not self._storage_queue.empty():
@@ -327,10 +445,28 @@ class AdaptiveRouter:
             raise StorageFlushError(failures)
 
     def close(self, timeout: float = 5.0):
-        self.flush_storage(timeout=timeout)
-        self._storage_stop_event.set()
+        with self._mutation_lock:
+            if self._closed:
+                return
+            self._accepting_mutations = False
+        flush_error: BaseException | None = None
+        try:
+            self.flush_storage(timeout=timeout)
+        except BaseException as error:
+            flush_error = error
+        finally:
+            self._storage_stop_event.set()
+            if self._storage_worker_thread.is_alive():
+                self._storage_worker_thread.join(timeout=timeout)
+            if self._rebuild_thread is not None and self._rebuild_thread.is_alive():
+                self._rebuild_thread.join(timeout=timeout)
+            self._read_pool.shutdown(wait=True)
+            self._write_pool.shutdown(wait=True)
+            self._closed = True
         if self._storage_worker_thread.is_alive():
-            self._storage_worker_thread.join(timeout=timeout)
+            raise TimeoutError("Timed out stopping storage worker")
+        if flush_error is not None:
+            raise flush_error
 
     def add_route(self, route: Route, _broadcast: bool = True, _precomputed_embeddings=None):
         embeddings = _precomputed_embeddings
@@ -342,43 +478,65 @@ class AdaptiveRouter:
                 embeddings = self.encoder.encode_batch(route.utterances)
             len(embeddings)
 
-        with self._route_map_lock:
-            previous_route = self._route_map.get(route.name)
-            
-            # Check capacity based on vectors
-            new_vectors = len(route.utterances)
-            current_vectors = sum(len(existing.utterances) for existing in self._route_map.values())
-            if route.name in self._route_map:
-                current_vectors -= len(self._route_map[route.name].utterances)
-            if current_vectors + new_vectors > self.max_capacity:
-                raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
-            
-            self._route_map[route.name] = route
-            self._mutation_count += 1
-
-        try:
+        with self._mutation_lock:
+            self._ensure_mutation_capacity()
             with self.rwlock.write_lock():
-                if previous_route is not None:
+                with self._route_map_lock:
+                    previous_route = self._route_map.get(route.name)
+                    new_vectors = len(route.utterances)
+                    current_vectors = sum(
+                        len(existing.utterances) for existing in self._route_map.values()
+                    )
+                    if previous_route is not None:
+                        current_vectors -= len(previous_route.utterances)
+                    if current_vectors + new_vectors > self.max_capacity:
+                        raise RouterCapacityError(
+                            f"Maximum capacity ({self.max_capacity}) exceeded."
+                        )
+                    expected_version = previous_route.version if previous_route is not None else 0
+                    version = expected_version + 1
+                    applied_route = route.model_copy(update={"version": version}, deep=True)
+                try:
+                    if previous_route is not None:
+                        self.index.delete(route.name)
+                    if embeddings is not None:
+                        self.index.add(embeddings, route.name)
+                    with self._route_map_lock:
+                        self._route_map[route.name] = applied_route
+                        self._route_versions[route.name] = version
+                    self.metrics.capacity_usage.set(self.index.total_vectors)
+                    receipt = self._enqueue_storage(
+                        "add_route",
+                        route.name,
+                        version,
+                        (
+                            applied_route.model_copy(deep=True),
+                            embeddings,
+                            expected_version,
+                        ),
+                    )
+                except Exception:
+                    with self._route_map_lock:
+                        if previous_route is None:
+                            self._route_map.pop(route.name, None)
+                            self._route_versions[route.name] = 0
+                        else:
+                            self._route_map[route.name] = previous_route
+                            self._route_versions[route.name] = previous_route.version
                     self.index.delete(route.name)
-                if embeddings is not None:
-                    self.index.add(embeddings, route.name)
-                self.metrics.capacity_usage.set(self.index.total_vectors)
-                if self._rebuild_pending:
-                    self._pending_rebuild_mutations.append(("add_route", route.name, embeddings, route))
-        except Exception:
-            with self._route_map_lock:
-                if previous_route is None:
-                    self._route_map.pop(route.name, None)
-                else:
-                    self._route_map[route.name] = previous_route
-            self._resync_from_storage()
-            raise
-
-        receipt = self._enqueue_storage("add_route", (route, embeddings))
+                    if previous_route is not None:
+                        previous_embeddings = self.encoder.encode_batch(
+                            previous_route.utterances
+                        )
+                        self.index.add(previous_embeddings, route.name)
+                    self.metrics.capacity_usage.set(self.index.total_vectors)
+                    raise
+                self._mutation_count += 1
+                self._mutation_generation += 1
 
         if _broadcast and self.sync_manager:
             emb_bytes: Optional[bytes] = embeddings.tobytes() if embeddings is not None else None
-            self.sync_manager.broadcast("add_route", route.model_dump(mode="json"), embeddings=emb_bytes)
+            self.sync_manager.broadcast("add_route", applied_route.model_dump(mode="json"), embeddings=emb_bytes)
         return receipt
 
     def add_utterance(self, route_name: str, utterance: str, _broadcast: bool = True, _precomputed_embedding=None):
@@ -391,75 +549,112 @@ class AdaptiveRouter:
             else:
                 embedding = self.encoder.encode(utterance)
         
-        with self._route_map_lock:
-            if route_name not in self._route_map:
-                raise RouteNotFoundError(f"Route '{route_name}' not found.")
-            if utterance in self._route_map[route_name].utterances:
-                return
-            current_vectors = sum(len(route.utterances) for route in self._route_map.values())
-            if current_vectors + 1 > self.max_capacity:
-                raise RouterCapacityError(f"Maximum capacity ({self.max_capacity}) exceeded.")
-
-            self._route_map[route_name].utterances.append(utterance)
-            self._mutation_count += 1
-
-        try:
+        with self._mutation_lock:
+            self._ensure_mutation_capacity()
             with self.rwlock.write_lock():
-                self.index.add(np.array([embedding]), route_name)
-                self.metrics.capacity_usage.set(self.index.total_vectors)
-                if self._rebuild_pending:
-                    self._pending_rebuild_mutations.append(("add_utterance", route_name, np.array([embedding]), utterance))
-        except Exception:
-            with self._route_map_lock:
-                if route_name in self._route_map and utterance in self._route_map[route_name].utterances:
-                    self._route_map[route_name].utterances.remove(utterance)
-            self._resync_from_storage()
-            raise
-
-        receipt = self._enqueue_storage("add_utterance", (route_name, utterance, embedding))
+                with self._route_map_lock:
+                    current_route = self._route_map.get(route_name)
+                    if current_route is None:
+                        raise RouteNotFoundError(f"Route '{route_name}' not found.")
+                    if utterance in current_route.utterances:
+                        return None
+                    current_vectors = sum(
+                        len(route.utterances) for route in self._route_map.values()
+                    )
+                    if current_vectors + 1 > self.max_capacity:
+                        raise RouterCapacityError(
+                            f"Maximum capacity ({self.max_capacity}) exceeded."
+                        )
+                    version = current_route.version + 1
+                    updated_route = current_route.model_copy(
+                        update={
+                            "utterances": [*current_route.utterances, utterance],
+                            "version": version,
+                        },
+                        deep=True,
+                    )
+                try:
+                    self.index.add(np.array([embedding]), route_name)
+                    with self._route_map_lock:
+                        self._route_map[route_name] = updated_route
+                        self._route_versions[route_name] = version
+                    self.metrics.capacity_usage.set(self.index.total_vectors)
+                    receipt = self._enqueue_storage(
+                        "add_utterance",
+                        route_name,
+                        version,
+                        (route_name, utterance, embedding, version),
+                    )
+                except Exception:
+                    with self._route_map_lock:
+                        self._route_map[route_name] = current_route
+                        self._route_versions[route_name] = current_route.version
+                    self.index.delete(route_name)
+                    previous_embeddings = self.encoder.encode_batch(
+                        current_route.utterances
+                    )
+                    self.index.add(previous_embeddings, route_name)
+                    self.metrics.capacity_usage.set(self.index.total_vectors)
+                    raise
+                self._mutation_count += 1
+                self._mutation_generation += 1
 
         if _broadcast and self.sync_manager:
             emb_bytes: Optional[bytes] = embedding.tobytes() if embedding is not None else None
             self.sync_manager.broadcast("add_utterance", {"route_name": route_name, "utterance": utterance}, embeddings=emb_bytes)
         return receipt
 
+    def _schedule_rebuild(self) -> None:
+        with self._rebuild_state_lock:
+            if self._rebuild_pending or self._closed:
+                return
+            self._rebuild_pending = True
+            if self._loop is not None and not self._loop.is_closed():
+                asyncio.run_coroutine_threadsafe(self._rebuild_index(), self._loop)
+                return
+            self._rebuild_thread = threading.Thread(
+                target=lambda: asyncio.run(self._rebuild_index()),
+                name="router_index_rebuild",
+                daemon=True,
+            )
+            self._rebuild_thread.start()
+
     async def _rebuild_index(self):
+        last_error: BaseException | None = None
         try:
-            routes, embeddings_map = await asyncio.to_thread(self.storage.load_all_routes)
-            route_dict = {r.name: r for r in routes}
-            new_index = get_index(dim=self.encoder.dim, max_capacity=self.max_capacity)
-            await asyncio.to_thread(new_index.rebuild, route_dict, embeddings_map)
-            
-            with self.rwlock.write_lock():
-                self.index = new_index
-                if hasattr(self, '_pending_rebuild_mutations'):
-                    for action, r_name, data, extra in self._pending_rebuild_mutations:
-                        try:
-                            if action == "add_route" and data is not None:
-                                self.index.delete(r_name)
-                                self.index.add(data, r_name)
-                                route_dict[r_name] = extra
-                            elif action == "add_utterance" and data is not None:
-                                utterance = extra
-                                if r_name in route_dict:
-                                    if utterance not in route_dict[r_name].utterances:
-                                        self.index.add(data, r_name)
-                                        route_dict[r_name].utterances.append(utterance)
-                                else:
-                                    self.index.add(data, r_name)
-                            elif action == "delete_route":
-                                self.index.delete(r_name)
-                                route_dict.pop(r_name, None)
-                        except Exception as e:
-                            logging.getLogger(__name__).warning(f"Failed to replay WAL mutation {action} on {r_name}: {e}")
-                    self._pending_rebuild_mutations.clear()
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Rebuild failed: {e}")
+            for attempt in range(self._max_rebuild_retries):
+                with self._mutation_lock:
+                    snapshot_generation = self._mutation_generation
+                try:
+                    routes, embeddings_map = await asyncio.to_thread(self.storage.load_all_routes)
+                    route_dict = {route.name: route for route in routes}
+                    new_index = get_index(
+                        dim=self.encoder.dim,
+                        max_capacity=self.max_capacity,
+                        engine=self.index_engine,
+                    )
+                    await asyncio.to_thread(new_index.rebuild, route_dict, embeddings_map)
+                    with self._mutation_lock:
+                        superseded = (
+                            snapshot_generation != self._mutation_generation
+                            or getattr(self._storage_queue, "unfinished_tasks", 0) != 0
+                        )
+                        if not superseded:
+                            with self.rwlock.write_lock():
+                                self.index = new_index
+                                self.metrics.capacity_usage.set(self.index.total_vectors)
+                            return
+                except Exception as error:
+                    last_error = error
+                await asyncio.sleep(min(0.05 * (2**attempt), 0.5))
             self.metrics.gc_errors.inc()
+            logging.getLogger(__name__).error(
+                "Index rebuild did not reach a stable generation after %s attempts: %s",
+                self._max_rebuild_retries,
+                last_error or "concurrent mutations",
+            )
         finally:
-            with self.rwlock.write_lock():
-                if hasattr(self, '_pending_rebuild_mutations'):
-                    self._pending_rebuild_mutations.clear()
+            with self._rebuild_state_lock:
                 self._rebuild_pending = False
 
     async def aadd_route(self, route: Route, _broadcast: bool = True, _precomputed_embeddings=None):
@@ -618,6 +813,8 @@ class AdaptiveRouter:
         """Asynchronously return the same observable decision as ``match``."""
         if self._batch_queue is None:
             raise RuntimeError("Router must be started with `await router.start()` before calling amatch.")
+        if not self._accepting_queries:
+            raise RuntimeError("AdaptiveRouter is not accepting queries")
         if self._worker_task is None or self._worker_task.done():
             if self._worker_task and self._worker_task.done():
                 try:
@@ -766,12 +963,36 @@ class AdaptiveRouter:
                     break
 
     def update_threshold(self, route_name: str, threshold: float, _broadcast: bool = True):
-        with self._route_map_lock:
-            if route_name in self._route_map:
-                self._route_map[route_name].threshold = threshold
-                receipt = self._enqueue_storage("update_threshold", (route_name, threshold))
-            else:
-                receipt = None
+        with self._mutation_lock:
+            self._ensure_mutation_capacity()
+            with self.rwlock.write_lock():
+                with self._route_map_lock:
+                    current_route = self._route_map.get(route_name)
+                    if current_route is None:
+                        return None
+                    version = current_route.version + 1
+                    updated_route = current_route.model_copy(
+                        update={"threshold": threshold, "version": version},
+                        deep=True,
+                    )
+                    # Validate the updated threshold through Route's assignment model.
+                    updated_route.threshold = threshold
+                    self._route_map[route_name] = updated_route
+                    self._route_versions[route_name] = version
+                try:
+                    receipt = self._enqueue_storage(
+                        "update_threshold",
+                        route_name,
+                        version,
+                        (route_name, threshold, version),
+                    )
+                except Exception:
+                    with self._route_map_lock:
+                        self._route_map[route_name] = current_route
+                        self._route_versions[route_name] = current_route.version
+                    raise
+                self._mutation_count += 1
+                self._mutation_generation += 1
 
         if _broadcast and self.sync_manager:
             self.sync_manager.broadcast("update_threshold", {"route_name": route_name, "threshold": threshold})
@@ -788,14 +1009,12 @@ class AdaptiveRouter:
         with self.rwlock.read_lock():
             if self.index.total_vectors == 0:
                 return
-                
-        with self._route_map_lock:
-            if not self._route_map:
-                return
-            route_map_snapshot = dict(self._route_map)
-
-        # Evaluate all samples against the index
-        search_results = self.index.search(query_embeddings, top_k=50)
+            with self._route_map_lock:
+                if not self._route_map:
+                    return
+                route_map_snapshot = dict(self._route_map)
+            # Keep the route snapshot and index search at one visible generation.
+            search_results = self.index.search(query_embeddings, top_k=50)
         
         labels_arr = np.array(labels)
         

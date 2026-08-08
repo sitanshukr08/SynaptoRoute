@@ -22,9 +22,12 @@ def _run_trial(
     trial: int,
     delay_ms: float,
     timeout_seconds: float,
+    mutation: str,
+    synchronous: str,
 ) -> dict[str, Any]:
-    database_path = output_dir / f"{mode}-{trial}.sqlite3"
-    marker_path = output_dir / f"{mode}-{trial}.ack"
+    prefix = f"{mutation}-{synchronous.lower()}-{mode}-{trial}"
+    database_path = output_dir / f"{prefix}.sqlite3"
+    marker_path = output_dir / f"{prefix}.ack"
     command = [
         sys.executable,
         "-m",
@@ -37,6 +40,10 @@ def _run_trial(
         mode,
         "--delay-ms",
         str(delay_ms),
+        "--mutation",
+        mutation,
+        "--synchronous",
+        synchronous,
     ]
     environment = os.environ.copy()
     repo_root = Path(__file__).resolve().parents[1]
@@ -58,11 +65,22 @@ def _run_trial(
     )
     wall_ms = (time.perf_counter() - started) * 1000.0
     marker = marker_path.read_text(encoding="utf-8").strip() if marker_path.exists() else None
-    storage = SQLiteStorage(str(database_path))
+    storage = SQLiteStorage(str(database_path), synchronous=synchronous)
     routes, _ = storage.load_all_routes()
-    survived = any(route.name == "crash_route" for route in routes)
+    routes_by_name = {route.name: route for route in routes}
+    if mutation == "add_route":
+        survived = "crash_route" in routes_by_name
+    elif mutation == "add_utterance":
+        survived = "target utterance" in routes_by_name["base_route"].utterances
+    elif mutation == "update_threshold":
+        survived = routes_by_name["base_route"].threshold == 0.9
+    else:
+        survived = "base_route" not in routes_by_name
+    storage.close()
     return {
         "mode": mode,
+        "mutation": mutation,
+        "sqlite_synchronous": synchronous,
         "trial": trial,
         "return_code": completed.returncode,
         "marker": marker,
@@ -79,11 +97,18 @@ def run_benchmark(
     trials: int,
     delay_ms: float,
     timeout_seconds: float = 10.0,
+    mutation: str = "add_route",
+    synchronous: str = "FULL",
 ) -> dict[str, Any]:
     if trials < 1:
         raise ValueError("trials must be positive")
     if delay_ms <= 0:
         raise ValueError("delay_ms must be positive")
+    if mutation not in {"add_route", "add_utterance", "update_threshold", "delete_route"}:
+        raise ValueError("unsupported mutation")
+    synchronous = synchronous.upper()
+    if synchronous not in {"FULL", "NORMAL"}:
+        raise ValueError("synchronous must be FULL or NORMAL")
     output_dir.mkdir(parents=True, exist_ok=True)
     trial_results = [
         _run_trial(
@@ -92,6 +117,8 @@ def run_benchmark(
             trial=trial,
             delay_ms=delay_ms,
             timeout_seconds=timeout_seconds,
+            mutation=mutation,
+            synchronous=synchronous,
         )
         for mode in ("memory", "durable")
         for trial in range(trials)
@@ -119,6 +146,8 @@ def run_benchmark(
             "trials_per_mode": trials,
             "injected_storage_delay_ms": delay_ms,
             "modes": ["memory", "durable"],
+            "mutation": mutation,
+            "sqlite_synchronous": synchronous,
         },
         "environment": {
             "python": platform.python_version(),
@@ -139,6 +168,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--trials", type=int, default=10)
     parser.add_argument("--delay-ms", type=float, default=250.0)
+    parser.add_argument(
+        "--mutation",
+        choices=("add_route", "add_utterance", "update_threshold", "delete_route"),
+        default="add_route",
+    )
+    parser.add_argument("--synchronous", choices=("FULL", "NORMAL"), default="FULL")
     default_dir = Path(os.environ.get("SYNAPTOROUTE_RUN_DIR", "benchmark_results/crash-recovery"))
     parser.add_argument("--output-dir", type=Path, default=default_dir)
     args = parser.parse_args()
@@ -147,6 +182,8 @@ def main() -> int:
         output_dir=args.output_dir,
         trials=args.trials,
         delay_ms=args.delay_ms,
+        mutation=args.mutation,
+        synchronous=args.synchronous,
     )
     output_path = args.output_dir / "crash_recovery_summary.json"
     output_path.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")

@@ -10,7 +10,7 @@ from synaptoroute import (
 
 
 class FailingSaveStorage(SQLiteStorage):
-    def save_route(self, route, embeddings=None):
+    def save_route(self, route, embeddings=None, expected_version=None):
         raise RuntimeError("forced durable write failure")
 
 
@@ -22,6 +22,10 @@ def test_mutation_receipt_reaches_durable_state_and_survives_restart(tmp_path, f
     latency_ms = receipt.wait_durable(timeout=2.0)
 
     assert receipt.state == "durable"
+    assert receipt.route_name == "support"
+    assert receipt.route_version == 1
+    assert receipt.acknowledgement_mode == "durable"
+    assert receipt.error_detail is None
     assert latency_ms >= 0.0
     router.close()
 
@@ -38,6 +42,7 @@ def test_failed_receipt_is_observable_and_barrier_reports_failure(fake_encoder):
         receipt.wait_durable(timeout=2.0)
 
     assert receipt.state == "failed"
+    assert receipt.error_detail == "forced durable write failure"
     assert "bad" not in router._route_map
     with pytest.raises(StorageFlushError) as error:
         router.durable_barrier(timeout=2.0)

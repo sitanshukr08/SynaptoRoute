@@ -12,10 +12,13 @@ from synaptoroute.exceptions import StorageMutationError
 
 @dataclass
 class MutationReceipt:
-    """Tracks one mutation from in-memory acknowledgement to durable commit."""
+    """Tracks one memory-visible mutation through its durable commit."""
 
     sequence: int
     action: str
+    route_name: str
+    route_version: int
+    acknowledgement_mode: str = "memory"
     enqueued_at_ns: int = field(default_factory=time.perf_counter_ns)
     durable_at_ns: int | None = field(default=None, init=False)
     _error: BaseException | None = field(default=None, init=False, repr=False)
@@ -33,6 +36,10 @@ class MutationReceipt:
             return None
         return (self.durable_at_ns - self.enqueued_at_ns) / 1_000_000.0
 
+    @property
+    def error_detail(self) -> str | None:
+        return str(self._error) if self._error is not None else None
+
     def wait_durable(self, timeout: float | None = None) -> float:
         if not self._completed.wait(timeout):
             raise TimeoutError(
@@ -43,6 +50,7 @@ class MutationReceipt:
         latency = self.durable_latency_ms
         if latency is None:
             raise RuntimeError("durable mutation completed without a commit timestamp")
+        self.acknowledgement_mode = "durable"
         return latency
 
     def _mark_durable(self) -> None:
