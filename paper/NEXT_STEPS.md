@@ -18,7 +18,9 @@ Implemented:
 * a repeatable five-family bounded protocol smoke with machine-readable
   invariants and a schema-v2 unverified manifest;
 * an atomic per-command matrix ledger with candidate-bound resume, hashed-log
-  validation, failed-cell retry, and optional fail-fast/timeout controls.
+  validation, failed-cell retry, and optional fail-fast/timeout controls;
+* a streaming, content-inventoried archive builder that rejects dirty source,
+  mismatched manifests, failed runs, changed hashes, and symlinks.
 
 Not yet complete:
 

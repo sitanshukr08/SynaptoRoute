@@ -22,6 +22,7 @@ def test_development_preflight_passes_current_artifact_foundation():
         "paper_container",
         "paper_files",
         "matrix_resume",
+        "archive_builder",
     }
 
 

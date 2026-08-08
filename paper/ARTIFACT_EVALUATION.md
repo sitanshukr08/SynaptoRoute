@@ -68,3 +68,21 @@ python benchmarks/promote_evidence.py \
 Performance values may differ across hardware. Correctness invariants must
 agree, and quality results must be interpreted using the frozen paired
 statistical analysis rather than an ad hoc equality tolerance.
+
+## Archive Construction
+
+After original and reproduction runs pass review, build a content-inventoried
+deposit bundle from the clean candidate:
+
+```bash
+python paper/build_archive.py \
+  --input original=benchmark_results/original \
+  --input reproduction=benchmark_results/reproduction \
+  --output dist/synaptoroute-artifact.zip
+```
+
+The builder includes the tracked source tree, rejects dirty candidates, failed
+runs, changed raw-output hashes, changed lock hashes, manifest/commit
+mismatches, duplicate labels, and symlinks. `ARCHIVE_INVENTORY.json` hashes
+every payload entry and a `.sha256` sidecar records the final ZIP digest. Upload
+that immutable ZIP before using its URI and digest in evidence promotion.

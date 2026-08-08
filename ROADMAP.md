@@ -68,6 +68,7 @@ Deliverables:
 * strict candidate preflight for source, lock, matrix, manifests, and package version.
 * a five-family bounded protocol smoke with explicit correctness invariants.
 * resumable matrix execution with atomic per-command state and hashed logs.
+* deterministic archive construction with a streamed content inventory.
 
 Exit criteria:
 

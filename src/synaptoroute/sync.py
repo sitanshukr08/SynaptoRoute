@@ -2,7 +2,7 @@ import asyncio
 import json
 import uuid
 try:
-    import redis.asyncio as redis
+    import redis.asyncio as redis  # type: ignore[import-untyped]
     HAS_REDIS = True
 except ImportError:
     HAS_REDIS = False

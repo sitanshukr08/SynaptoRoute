@@ -203,6 +203,7 @@ def run_preflight(
             "paper/QUALITY_PROTOCOL.md",
             "paper/experiment_matrix.json",
             "benchmarks/run_protocol_smoke.py",
+            "paper/build_archive.py",
             "docs/RESEARCH_PROTOCOL.md",
             "docs/CURRENT_EVIDENCE_STATUS.md",
         )
@@ -224,6 +225,19 @@ def run_preflight(
         detail = "atomic checkpoint and candidate-bound resume configured"
         return not missing, detail if not missing else f"missing: {missing}"
 
+    def check_archive_builder() -> tuple[bool, str]:
+        content = (repo_root / "paper" / "build_archive.py").read_text(encoding="utf-8")
+        required = (
+            "ARCHIVE_INVENTORY.json",
+            "archive requires a clean working tree",
+            "manifest raw-output hash mismatch",
+            "evidence symlinks are not allowed",
+            "force_zip64=True",
+        )
+        missing = [fragment for fragment in required if fragment not in content]
+        detail = "streamed content inventory and evidence integrity gates configured"
+        return not missing, detail if not missing else f"missing: {missing}"
+
     checks = (
         _result("source_commit", check_source),
         _result("working_tree", check_tree),
@@ -237,6 +251,7 @@ def run_preflight(
         _result("paper_container", check_container),
         _result("paper_files", check_paper_files),
         _result("matrix_resume", check_matrix_runner),
+        _result("archive_builder", check_archive_builder),
     )
     return PreflightReport(
         strict=strict,
