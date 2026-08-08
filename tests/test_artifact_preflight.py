@@ -20,6 +20,7 @@ def test_development_preflight_passes_current_artifact_foundation():
         "experiment_matrix",
         "historical_manifests",
         "paper_container",
+        "ci_package_smoke",
         "paper_files",
         "matrix_resume",
         "archive_builder",

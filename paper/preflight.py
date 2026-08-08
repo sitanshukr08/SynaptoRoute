@@ -196,6 +196,21 @@ def run_preflight(
         missing = [fragment for fragment in required if fragment not in content]
         return not missing, "CPU Python 3.11 lock and pip check configured" if not missing else f"missing: {missing}"
 
+    def check_ci_package_smoke() -> tuple[bool, str]:
+        content = (repo_root / ".github" / "workflows" / "ci.yml").read_text(
+            encoding="utf-8"
+        )
+        required = (
+            "python -m build --outdir build/package-smoke/dist",
+            "build/package-smoke/venv/bin/python -m pip install build/package-smoke/dist/*.whl",
+        )
+        missing = [fragment for fragment in required if fragment not in content]
+        stale_dist_install = "pip install dist/*.whl" in content
+        if stale_dist_install:
+            missing.append("remove tracked-dist wildcard install")
+        detail = "wheel smoke uses a fresh build output directory"
+        return not missing, detail if not missing else f"missing: {missing}"
+
     def check_paper_files() -> tuple[bool, str]:
         required = (
             "paper/PAPER.md",
@@ -264,6 +279,7 @@ def run_preflight(
         _result("experiment_matrix", lambda: validate_matrix(repo_root)),
         _result("historical_manifests", lambda: validate_historical_manifests(repo_root)),
         _result("paper_container", check_container),
+        _result("ci_package_smoke", check_ci_package_smoke),
         _result("paper_files", check_paper_files),
         _result("matrix_resume", check_matrix_runner),
         _result("archive_builder", check_archive_builder),

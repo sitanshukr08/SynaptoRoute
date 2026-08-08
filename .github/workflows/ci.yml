@@ -35,10 +35,10 @@ jobs:
 
     - name: Build and install wheel
       run: |
-        python -m build
-        python -m venv .wheel-smoke
-        .wheel-smoke/bin/python -m pip install dist/*.whl
-        .wheel-smoke/bin/python -c "import synaptoroute; print(synaptoroute.__version__)"
+        python -m build --outdir build/package-smoke/dist
+        python -m venv build/package-smoke/venv
+        build/package-smoke/venv/bin/python -m pip install build/package-smoke/dist/*.whl
+        build/package-smoke/venv/bin/python -c "import synaptoroute; print(synaptoroute.__version__)"
 
   test:
     name: Test (${{ matrix.os }}, Python ${{ matrix.python-version }})
