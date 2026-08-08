@@ -7,8 +7,8 @@ is reviewable.
 
 The detailed experimental contract is in
 [`docs/RESEARCH_PROTOCOL.md`](docs/RESEARCH_PROTOCOL.md). Competitive context
-and the longer product backlog are in
-[`docs/PROJECT_IMPROVEMENT_ROADMAP.md`](docs/PROJECT_IMPROVEMENT_ROADMAP.md).
+and artifact execution instructions are in
+[`paper/ARTIFACT_EVALUATION.md`](paper/ARTIFACT_EVALUATION.md).
 
 ## Target Contribution
 
@@ -20,6 +20,15 @@ Working thesis:
 
 This is a systems claim, not a claim that embeddings, HNSW, SQLite, or
 thresholding are individually novel.
+
+Working paper title:
+
+> SynaptoRoute: Durability and Backpressure Semantics for Mutable Local
+> Semantic Routers
+
+The primary contribution is the observable mutation/durability contract and
+its fault-injection evaluation. Calibration is an ablation, not a general
+accuracy-superiority claim.
 
 ## Current State
 
@@ -44,8 +53,9 @@ Evidence limitations:
 
 ## Phase 0: Evidence Integrity
 
-**Status:** implementation complete; clean candidate rerun complete; independent
-review and evidence promotion pending
+**Status:** schema-v2 foundation and candidate preflight implemented; clean
+candidate freeze, final runs, immutable archive, independent reproduction, and
+evidence promotion pending
 
 Deliverables:
 
@@ -55,6 +65,7 @@ Deliverables:
 * corrected Top-K, latency, split, seed, and timing-unit definitions;
 * a deterministic local structural benchmark suitable for CI;
 * documentation that maps every public claim to evidence.
+* strict candidate preflight for source, lock, matrix, manifests, and package version.
 
 Exit criteria:
 
@@ -97,6 +108,9 @@ Implemented so far:
 Still required: reliability diagrams and independent review of the multi-seed
 confidence intervals and matched-coverage implementation.
 
+The ordered execution checklist is maintained in
+[`paper/NEXT_STEPS.md`](paper/NEXT_STEPS.md).
+
 ## Phase 2: Static Quality Baselines
 
 **Status:** in progress
@@ -136,10 +150,9 @@ Implemented so far:
   quality metrics.
 
 The pilots are intentionally marked `unverified` and are not paper evidence.
-Diagnostic five-seed runs and paired statistics are implemented. The full
-studies were repeated from clean commit `df94df3` with exactly equal aggregate
-and paired statistical sections. Artifact archival, independent reproduction,
-and evidence promotion remain open.
+Diagnostic five-seed runs and paired statistics are implemented. Historical
+local reruns remain unverified under schema v2. Artifact archival, independent
+reproduction, and evidence promotion remain open.
 
 Pilot interpretation is recorded in
 [`docs/DEVELOPMENT_PILOT_RESULTS.md`](docs/DEVELOPMENT_PILOT_RESULTS.md). The
@@ -174,17 +187,20 @@ Implemented so far:
 * normal-restart and injected storage-failure tests;
 * abrupt child-process exit experiments at memory and durable acknowledgement
   boundaries;
-* a controlled concurrent read/write workload with visibility, durable
-  latency, query latency, correctness, and restart checks.
-* a bounded in-flight async batch executor and offered-load shedding sweep.
+* ordered migrations, route versions, and stale-write rejection;
+* a controlled concurrent read/write workload with queue depth, memory,
+  visibility, durable latency, query latency, correctness, and restart checks;
+* a bounded in-flight async batch executor and measured-saturation offered-load
+  shedding sweep;
+* four-mutation process-crash trials across acknowledgement and SQLite modes.
 
-Still required: route versions, a cross-process ordering model, repeated
-controlled-hardware runs, broader queue/backpressure parameter sweeps, and
-broader crash timing windows.
+Still required: frozen controlled-hardware runs, independent reproduction,
+archive publication, and broader cross-process semantics if multi-writer
+operation is later claimed.
 
 ## Phase 4: Scale And Ablation Study
 
-**Target:** weeks 14-18
+**Target:** weeks 9-14
 
 Experiments:
 
@@ -204,7 +220,7 @@ Exit criteria:
 
 ## Phase 5: Artifact And Paper
 
-**Target:** weeks 18-24
+**Target:** weeks 15-18
 
 Deliverables:
 
@@ -215,13 +231,10 @@ Deliverables:
 * limitations, ethics, and threat-to-validity sections;
 * independent reproduction by a contributor who did not write the benchmark.
 
-Preferred submission direction:
-
-1. SIGMETRICS/POMACS for a strong dynamic systems and measurement result.
-2. Expert Systems with Applications for a comprehensive applied study.
-3. ACM SAC for a narrower applied systems paper.
-4. JOSS as a separate software citation after the project is feature-complete
-   and has sufficient public development history.
+Submission direction is intentionally venue-neutral until final results exist.
+An applied systems venue is the primary target; JOSS remains the software-paper
+fallback. A top-tier measurement claim is considered only if the controlled
+results establish a contribution beyond straightforward component assembly.
 
 ## First 90 Days
 

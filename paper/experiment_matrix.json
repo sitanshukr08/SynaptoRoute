@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "quality": {
+    "datasets": ["banking77", "clinc150"],
+    "seeds": [13, 29, 42, 71, 101],
+    "examples_per_intent": 20,
+    "encoder": "BAAI/bge-small-en-v1.5",
+    "baselines": ["exact_string", "logistic_regression", "exact_cosine", "semantic_router", "synaptoroute_global", "synaptoroute_per_route"]
+  },
+  "dynamic": {
+    "route_counts": [100, 1000, 10000],
+    "query_workers": [1, 8, 32],
+    "mutation_rates_per_second": [0, 10, 50],
+    "warmup_seconds": 10,
+    "measurement_seconds": 60,
+    "repetitions": 5
+  },
+  "scale": {
+    "route_counts": [1000, 10000, 50000, 100000],
+    "indexes": ["numpy_exact", "faiss_hnsw"],
+    "query_count": 10000,
+    "repetitions": 5
+  },
+  "crash_recovery": {
+    "mutations": ["add_route", "add_utterance", "update_threshold", "delete_route"],
+    "acknowledgement_modes": ["memory", "durable"],
+    "sqlite_synchronous": ["FULL", "NORMAL"],
+    "injected_commit_delay_ms": [10, 100],
+    "trials_per_cell": 100
+  },
+  "backpressure": {
+    "profiles": {
+      "low_latency": {"queue_size": 8, "batch_size": 1},
+      "balanced": {"queue_size": 32, "batch_size": 8},
+      "throughput": {"queue_size": 128, "batch_size": 32}
+    },
+    "offered_load_fraction": [0.5, 1.0, 1.5, 2.0],
+    "saturation_measurement_seconds": 10,
+    "measurement_seconds": 60,
+    "repetitions": 5
+  }
+}

@@ -1,281 +1,162 @@
-<div align="center">
-
 # SynaptoRoute
 
-### *Local, Persistent & Adaptive Semantic Pre-Routing Engine for AI Agents*
+Local, persistent semantic routing with explicit abstention, mutation, and
+durability behavior.
 
-[![PyPI Version](https://img.shields.io/pypi/v/synaptoroute.svg?color=blue)](https://pypi.org/project/synaptoroute/)
-[![Python Versions](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/downloads/)
-[![CI Build](https://github.com/sitanshukr08/SynaptoRoute/actions/workflows/ci.yml/badge.svg)](https://github.com/sitanshukr08/SynaptoRoute/actions)
-[![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/synaptoroute.svg)](https://pypi.org/project/synaptoroute/)
+[![CI](https://github.com/sitanshukr08/SynaptoRoute/actions/workflows/ci.yml/badge.svg)](https://github.com/sitanshukr08/SynaptoRoute/actions)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
----
+SynaptoRoute maps natural-language queries to predefined tool handlers, APIs,
+or workflow chains. It is not an LLM, an authorization boundary, or a prompt
+injection defense. Downstream systems must still validate inputs and authorize
+actions.
 
-**SynaptoRoute** is a high-throughput, edge-native semantic router that dispatches natural language queries to discrete tool handlers, APIs, or workflow chains locally—eliminating unnecessary, expensive LLM calls for known user intents.
+## Capabilities
 
-[Quickstart](#quickstart) • [Architecture](#architecture) • [Adaptive Memory](#adaptive-memory-engine) • [Integrations](#framework-integrations) • [CLI](#developer-cli) • [Documentation](#developer-resources)
+* local embedding-based retrieval with NumPy exact search and optional FAISS;
+* route thresholds, score margins, explicit abstention, and ranked results;
+* bounded asynchronous query batching and overload signaling;
+* versioned SQLite WAL persistence with explicit mutation receipts;
+* online add, replace, utterance-add, threshold-update, and delete operations;
+* optional LangChain, LlamaIndex, Redis, reranking, and metrics integrations.
 
-</div>
+Adaptive-memory and Redis synchronization features are experimental, disabled
+by default, and excluded from the primary research artifact.
 
----
+No performance or semantic-quality number in this repository is publication
+evidence unless its manifest is independently reproduced and marked
+`verified`. See [Current Evidence Status](docs/CURRENT_EVIDENCE_STATUS.md).
 
-## Key Highlights
-
-- **Local FastEmbed ONNX Engine:** Runs lightweight vector embeddings locally on CPU using ONNX Runtime—achieving sub-10ms P50 dispatch latencies.
-- **Durable SQLite WAL Storage:** Persistent state management with non-blocking `MutationReceipt` acknowledgements and explicit `durable_barrier()` disk flushing.
-- **Adaptive Memory Engine:** Dynamic MFU/LRU prior adjustments via `BoundedBayesianWeigher`, lock-free access stats logging, and Adaptive Replacement Cache (ARC).
-- **Framework Integrations:** Native zero-boilerplate adapters for **LangChain** (`Runnable`) and **LlamaIndex** (`BaseSelector`).
-- **Truth-First Benchmarks:** 100% schema-validated benchmark manifests and raw log evidence.
-- **Developer CLI (`synaptoroute`):** Built-in terminal CLI for inspecting system capabilities, testing matching rules, and executing benchmark suites.
-
----
-
-## Quickstart
-
-### Installation
+## Installation
 
 ```bash
 pip install synaptoroute
 ```
 
-*Optional extras:*
+For local development:
+
 ```bash
-pip install "synaptoroute[all]"       # Installs LangChain, LlamaIndex, Redis, OpenAI, and FAISS
-pip install "synaptoroute[langchain]" # Installs LangChain integration
-pip install "synaptoroute[llamaindex]" # Installs LlamaIndex integration
+git clone https://github.com/sitanshukr08/SynaptoRoute.git
+cd SynaptoRoute
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# Linux/macOS: source .venv/bin/activate
+python -m pip install -e ".[dev,test]"
+python -m pytest tests -q
 ```
 
----
-
-### Synchronous Routing
-
-```python
-from synaptoroute import AdaptiveRouter, Route
-
-# 1. Initialize AdaptiveRouter (uses FastEmbed ONNX local CPU encoder by default)
-router = AdaptiveRouter()
-
-# 2. Register semantic intent routes with example utterances
-router.add_route(
-    Route(
-        name="billing_support",
-        utterances=[
-            "I need a refund for my order",
-            "Where is my invoice or receipt?",
-            "Cancel my monthly subscription",
-            "My card was charged twice",
-        ],
-        threshold=0.75,
-    )
-)
-
-router.add_route(
-    Route(
-        name="technical_support",
-        utterances=[
-            "The app crashes on startup",
-            "Cannot connect to the database",
-            "Getting a 500 internal server error",
-            "API request timed out",
-        ],
-        threshold=0.75,
-    )
-)
-
-# 3. Match user query
-result = router.match("Where can I download my billing receipt?")
-
-if result.matched:
-    print(f"Matched Route   : {result.route_name}")
-    print(f"Confidence Score: {result.score:.4f}")
-    print(f"Decision Reason : {result.decision_reason}")
-else:
-    print(f"Abstained: {result.decision_reason}")
-
-router.close()
-```
-
----
-
-### Asynchronous Routing with Microbatching
-
-```python
-import asyncio
-from synaptoroute import AdaptiveRouter, Route
-
-async def main():
-    # Bounded queue (1,000 queries) and bounded in-flight batch workers (4)
-    router = AdaptiveRouter(max_queue_size=1000, max_in_flight_batches=4)
-    
-    router.add_route(
-        Route(
-            name="password_reset",
-            utterances=["forgot password", "reset login password", "locked out of account"],
-            threshold=0.75,
-        )
-    )
-
-    await router.start()
-    try:
-        # Non-blocking concurrent async query evaluation
-        result = await router.amatch("How do I reset my password?")
-        print(f"Async Matched: {result.route_name} (Score: {result.score:.4f})")
-    finally:
-        await router.stop()
-
-asyncio.run(main())
-```
-
----
-
-## Architecture
-
-SynaptoRoute decouples query evaluation from storage persistence. In-memory SIMD vector matrices process query evaluations under a writer-priority reader/writer lock (`RWLock`), while a dedicated FIFO background worker streams mutation writes to an SQLite WAL database.
-
-```mermaid
-graph TD
-    Client["User Query or Mutation Request"] --> Router["AdaptiveRouter Core"]
-
-    subgraph Evaluation Pipeline
-        Router --> Encoder["Local FastEmbed (ONNX)"]
-        Encoder --> Index["SIMD Vector Index (Numpy / FAISS)"]
-        Index --> AdaptiveMemory["Adaptive Memory (Bounded Bayesian Priors)"]
-        AdaptiveMemory --> Gate["Threshold & Margin Decision Gate"]
-        Gate --> Result["RouterResult (Route, Score, Margin, Candidates)"]
-    end
-
-    subgraph Persistent Storage & Sync
-        Router --> RouteMap["In-Memory Route Map"]
-        Router --> FIFO["FIFO Storage Queue"]
-        FIFO --> SQLite[("SQLite WAL Storage")]
-        Router -. "experimental" .-> Redis["Redis Cluster Sync"]
-    end
-
-    subgraph Async Microbatching
-        Router --> Queue["Bounded Request Queue"]
-        Queue --> Batches["In-Flight Microbatch Workers"]
-    end
-```
-
----
-
-## Adaptive Memory Engine
-
-SynaptoRoute introduces **Adaptive Memory Semantic Routing (AMSR)**—replacing rigid, static vector matching with dynamic Bayesian prior adjustments based on usage frequency (MFU) and temporal recency (LRU).
-
-```mermaid
-flowchart LR
-    Query["Query e(q)"] --> Cosine["Raw Cosine Similarity\ncos(e(q), v_k)"]
-    Cosine --> AddPrior["Bounded Prior Adjustment\n+ clamp(Prior, -0.15, +0.08)"]
-    AddPrior --> Score["Final Scored Decision"]
-    Score --> Stats["Lock-Free Access Stats Queue"]
-
-    subgraph MFU & LRU Signals
-        Stats --> MFU["MFU Boost: +0.08 * (freq / (freq + 50))"]
-        Stats --> LRU["LRU Decay: -lambda * delta_t"]
-    end
-
-    MFU --> AddPrior
-    LRU --> AddPrior
-```
-
-### Enabling Adaptive Memory
+## Quickstart
 
 ```python
 from synaptoroute import AdaptiveRouter, Route, SQLiteStorage
 
-router = AdaptiveRouter(
-    storage=SQLiteStorage("routes.sqlite3"),
-    enable_adaptive_memory=True  # Enables Bounded Bayesian Prior scoring
+storage = SQLiteStorage("routes.sqlite3", synchronous="FULL")
+router = AdaptiveRouter(storage=storage)
+
+receipt = router.add_route(
+    Route(
+        name="billing_support",
+        utterances=[
+            "I need a refund",
+            "Where is my invoice?",
+            "Cancel my subscription",
+        ],
+        threshold=0.75,
+    )
 )
 
-router.add_route(Route(name="billing", utterances=["payment failed", "refund"]))
+# The mutation is already visible in this process. Wait explicitly when the
+# caller needs process-crash durability before continuing.
+receipt.wait_durable(timeout=10.0)
 
-# Matching queries automatically records hits and adapts candidate scores in real-time
-result = router.match("refund status")
-print(result.route_name, result.score)
+result = router.match("Where can I download my invoice?")
+if result.matched:
+    print(result.route_name, result.score, result.decision_reason)
+else:
+    print("abstained", result.decision_reason)
 
 router.close()
 ```
 
-Read the full research paper specification: **[docs/RESEARCH_ADAPTIVE_MEMORY_ROUTING.md](docs/RESEARCH_ADAPTIVE_MEMORY_ROUTING.md)**.
+`MutationReceipt` reports the route, resulting route version, queue state,
+durable latency, and failure detail. A memory-visible mutation is not described
+as durable until `wait_durable()` succeeds.
 
----
-
-## Framework Integrations
-
-### LangChain Integration
+## Async Queries
 
 ```python
+import asyncio
+
 from synaptoroute import AdaptiveRouter, Route
-from examples.langchain_router import SynaptoRouteLangChainAdapter
 
-router = AdaptiveRouter()
-router.add_route(Route(name="account_management", utterances=["change email", "delete account"]))
 
-adapter = SynaptoRouteLangChainAdapter(router)
-output = adapter.invoke({"input": "I need to update my email address"})
-print(output["route"], output["score"])
+async def main():
+    router = AdaptiveRouter(
+        max_queue_size=1000,
+        max_in_flight_batches=4,
+        max_storage_queue_size=1000,
+    )
+    router.add_route(
+        Route(name="password_reset", utterances=["forgot password", "reset login"])
+    )
+    await router.start()
+    try:
+        result = await router.amatch("How do I reset my password?")
+        print(result.route_name, result.decision_reason)
+    finally:
+        await router.stop()
+
+
+asyncio.run(main())
 ```
 
-### LlamaIndex Integration
+## Evidence Workflow
 
-```python
-from synaptoroute import AdaptiveRouter, Route
-from examples.llamaindex_selector import SynaptoRouteLlamaIndexSelector
-
-router = AdaptiveRouter()
-router.add_route(Route(name="sql_analytics_engine", utterances=["total revenue q3", "user churn rate"]))
-
-selector = SynaptoRouteLlamaIndexSelector(router)
-selections = selector.select("Calculate total revenue for Q3")
-print(selections[0]["route_name"])
-```
-
----
-
-## Developer CLI
-
-SynaptoRoute includes a built-in terminal CLI tool for diagnostics, interactive testing, and benchmarking:
+Run the offline structural smoke:
 
 ```bash
-# Print system environment, Python runtime, and ONNX encoder status
-synaptoroute info
-
-# Test query matching directly from terminal
-synaptoroute match "Where is my latest billing invoice?"
-
-# Execute the self-contained CI verified benchmark suite
-synaptoroute benchmark
+python benchmarks/run_ci_smoke_benchmark.py --output-dir benchmark_results/ci_smoke
 ```
 
----
+The output is always `unverified` and is not semantic-quality or paper
+evidence. Long-running candidate experiments use the unified runner:
 
-## Project Positioning & Safety Boundaries
+```bash
+python benchmarks/run_all_benchmarks.py \
+  --benchmarks banking77_multiseed clinc150_multiseed \
+  --output-dir benchmark_results/candidate
+```
 
-SynaptoRoute is designed specifically as a **local, persistent semantic pre-routing layer**.
+Evidence promotion is a separate operation requiring a clean original run, a
+clean reproduction from another machine, reviewer attestation, and an
+immutable archive digest. See [Artifact Evaluation](paper/ARTIFACT_EVALUATION.md).
 
-* **What it IS:** An edge-native pre-routing dispatch library for routing known user intents to tool handlers or workflow chains.
-* **What it IS NOT:** It is not an LLM, a generative model, a security authorization boundary, or a prompt injection barrier. Security authorization and input validation must be enforced downstream by target tool handlers.
+## Research Direction
 
----
+The primary research question is whether a mutable local semantic router can
+provide explicit process-crash durability and predictable overload behavior
+while routes change concurrently. Calibration remains an ablation; the project
+does not claim superior intent-classification accuracy.
 
-## Developer Resources
+Working paper:
 
-- 📖 **[Public API Reference](docs/API_REFERENCE.md):** Complete technical reference for all classes, methods, and exceptions.
-- 🔬 **[Adaptive Memory Research Paper](docs/RESEARCH_ADAPTIVE_MEMORY_ROUTING.md):** Mathematical formulation and metric topology proofs.
-- 📋 **[Changelog](CHANGELOG.md):** Version history and feature updates.
-- 🛡️ **[Security Policy](SECURITY.md):** Security boundaries and disclosure process.
-- 🤝 **[Code of Conduct](CODE_OF_CONDUCT.md):** Community standards.
-- 🛠️ **[Contributing Guide](CONTRIBUTING.md):** Setup, testing, and pull request guidelines.
-- 📐 **[Architecture Overview](docs/ARCHITECTURE.md):** Deep-dive into concurrency and storage lock hierarchy.
-- ⚡ **[Durability Contract](docs/DURABILITY_CONTRACT.md):** Mutation receipt state transitions and barrier guarantees.
+> SynaptoRoute: Durability and Backpressure Semantics for Mutable Local
+> Semantic Routers
 
----
+The frozen questions, baselines, metrics, experiment matrix, and evidence gates
+are documented in:
 
-<div align="center">
+* [Research Protocol](docs/RESEARCH_PROTOCOL.md)
+* [Research Roadmap](ROADMAP.md)
+* [Mutation And Durability Contract](docs/DURABILITY_CONTRACT.md)
+* [Benchmark Registry](docs/BENCHMARK_REGISTRY.md)
+* [Paper Skeleton](paper/PAPER.md)
 
-*SynaptoRoute is licensed under the [MIT License](LICENSE).*
+## Project Status
 
-</div>
+PyPI `0.4.1` is the latest published release. The research artifact line is
+developed as `0.5.0.dev0`; `v0.5.0` will be released only after its source,
+documentation, tests, and archived evidence agree.
+
+SynaptoRoute is licensed under the [MIT License](LICENSE).

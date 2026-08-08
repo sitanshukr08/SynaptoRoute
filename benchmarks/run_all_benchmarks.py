@@ -1,9 +1,11 @@
 import argparse
+import hashlib
 import json
 import os
 import platform
 import subprocess
 import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -113,6 +115,11 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def machine_id() -> str:
+    value = f"{platform.node()}|{platform.platform()}|{platform.processor()}"
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
 def _command_for(command: list[str]) -> list[str]:
     return [sys.executable, *command]
 
@@ -124,24 +131,54 @@ def benchmark_command(name: str, model: str) -> list[str]:
     return command
 
 
-def write_manifest(output_dir: Path, selected: list[str], model: str, results: dict | None = None) -> Path:
+def write_manifest(
+    output_dir: Path,
+    selected: list[str],
+    model: str,
+    results: dict | None = None,
+    exit_status: int | None = None,
+) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = output_dir / "benchmark_manifest.json"
+    run_id = str(uuid.uuid4())
+    if manifest_path.exists():
+        try:
+            run_id = json.loads(manifest_path.read_text(encoding="utf-8"))["run_id"]
+        except (KeyError, json.JSONDecodeError):
+            pass
     raw_outputs = {
         name: str((output_dir / f"{name}.log").as_posix())
         for name in selected
     }
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
+        "run_id": run_id,
         "benchmark": "synaptoroute_benchmark_run",
         "status": "unverified",
+        "paper_evidence_eligible": False,
         "git_commit": git_revision(),
         "working_tree_dirty": git_worktree_dirty(),
         "timestamp_utc": _utc_now(),
         "command": [sys.executable, "benchmarks/run_all_benchmarks.py", "--benchmarks", *selected, "--model", model, "--output-dir", str(output_dir)],
+        "exit_status": exit_status,
         "environment": {
             "python_version": platform.python_version(),
             "platform": platform.platform(),
             "cpu": platform.processor() or "unknown",
             "gpu": "unknown",
+            "machine_id": machine_id(),
+        },
+        "dependency_lock": {
+            "path": "paper/requirements-linux-py311.lock",
+            "sha256": manifest_schema.sha256_file(
+                "paper/requirements-linux-py311.lock"
+            ),
+        },
+        "configuration": {
+            "benchmarks": selected,
+            "encoder": model,
+            "adaptive_memory": False,
+            "redis": False,
         },
         "dataset": "varies by selected benchmark",
         "encoder": model,
@@ -163,8 +200,6 @@ def write_manifest(output_dir: Path, selected: list[str], model: str, results: d
     errors = manifest_schema.validate_manifest(manifest, repo_root=Path.cwd())
     if errors:
         raise RuntimeError(f"Invalid benchmark manifest: {errors}")
-    output_dir.mkdir(parents=True, exist_ok=True)
-    manifest_path = output_dir / "benchmark_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return manifest_path
 
@@ -222,11 +257,18 @@ def main() -> int:
             "return_code": return_code,
             "raw_output_path": str(output_path.as_posix()),
             "completed_at_utc": _utc_now(),
+            "raw_output_sha256": manifest_schema.sha256_file(output_path),
         }
         if return_code != 0:
             failures.append((name, return_code))
 
-    write_manifest(output_dir, args.benchmarks, args.model, results=results)
+    write_manifest(
+        output_dir,
+        args.benchmarks,
+        args.model,
+        results=results,
+        exit_status=1 if failures else 0,
+    )
 
     if failures:
         for name, return_code in failures:

@@ -19,6 +19,19 @@ class RouterCapacityError(SynaptoRouteError):
     pass
 
 
+class StorageVersionConflictError(SynaptoRouteError):
+    """Raised when a queued mutation no longer follows the persisted route version."""
+
+    def __init__(self, route_name: str, expected: int, actual: int | None):
+        self.route_name = route_name
+        self.expected = expected
+        self.actual = actual
+        super().__init__(
+            f"Route '{route_name}' storage version conflict: "
+            f"expected {expected}, found {actual}."
+        )
+
+
 class StorageMutationError(SynaptoRouteError):
     """Raised when an asynchronously queued storage mutation fails."""
 

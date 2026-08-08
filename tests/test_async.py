@@ -62,10 +62,22 @@ async def test_batch_worker_shutdown(storage, encoder):
     
     await router.stop()
 
-    try:
-        await task
-    except (RuntimeError, asyncio.CancelledError):
-        pass
+    await task
+
+
+@pytest.mark.asyncio
+async def test_repeated_start_and_stop_are_idempotent(storage, fake_encoder):
+    router = AdaptiveRouter(fake_encoder, storage)
+
+    await router.start()
+    first_worker = router._worker_task
+    await router.start()
+    assert router._worker_task is first_worker
+
+    await router.stop()
+    await router.stop()
+    with pytest.raises(RuntimeError, match="closed"):
+        await router.start()
 
 
 @pytest.mark.asyncio

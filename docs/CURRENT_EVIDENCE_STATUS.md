@@ -12,6 +12,9 @@ SynaptoRoute has a coherent engineering direction, but its historical benchmark 
   executes each timed query once under the same bounded-concurrency harness.
 * A deterministic NumPy index smoke benchmark validates structural behavior
   and the evidence pipeline. Its timing is diagnostic, not paper evidence.
+* The former CI "verified" manifest was reclassified as unverified because it
+  recorded the placeholder `ci_commit_build` instead of an immutable commit.
+  CI runners now emit unverified schema-v2 evidence and cannot promote it.
 * Pinned Banking77 and CLINC150/OOS loaders enforce disjoint route,
   calibration, and test text while recording source-dataset exclusions.
 * Development pilots emit hashed calibration artifacts and privacy-conscious
@@ -20,13 +23,9 @@ SynaptoRoute has a coherent engineering direction, but its historical benchmark 
 * Full-test five-seed diagnostic studies and paired bootstrap analyses now
   exist for Banking77 and CLINC150/OOS. Their interpretation is recorded in
   `MULTISEED_DIAGNOSTIC_RESULTS.md`.
-* Both five-seed studies were reproduced from clean commit `df94df3`; their
-  aggregate and paired statistical sections exactly match the dirty-tree
-  diagnostics. Clean systems smokes also completed without invariant
-  failures. Digests and commands are recorded in
-  `CLEAN_REPLICATION_RESULTS.md`.
-* The clean artifacts remain local and unverified. They are candidate evidence,
-  not paper evidence, until archived and independently reproduced.
+* `CLEAN_REPLICATION_RESULTS.md` records a historical local rerun. It remains
+  an unverified candidate record, not an independent reproduction under the
+  schema-v2 protocol.
 
 ## Research Claims
 
@@ -52,3 +51,6 @@ A result can be used in a paper or release only after it has:
 * a schema-valid manifest with status `verified`;
 * dataset/split details, seed, environment, encoder, route count, query count, and explicit timing units.
 * a clean working tree and a SHA-256 digest matching the archived raw log.
+* an independent reproduction from a different machine and reviewer
+  attestation;
+* an immutable archive URI and bundle digest.

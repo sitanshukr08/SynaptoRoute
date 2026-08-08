@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "benchmark": "ci_verified_retrieval",
-  "status": "verified",
+  "benchmark": "historical_ci_structural_smoke",
+  "status": "unverified",
   "timestamp_utc": "2026-07-27T12:32:33Z",
-  "git_commit": "ci_commit_build",
+  "git_commit": "unknown",
   "working_tree_dirty": false,
   "command": [
     "python",
@@ -36,6 +36,11 @@
     "raw_output_path": "benchmark_results/ci_verified/ci_verified.log",
     "raw_output_sha256": "1905d721d5c06e12552e55ca716f03c92d58eb573a66b80a4d8650b43511511e",
     "timing_unit": "milliseconds",
-    "notes": "Self-contained CI verified benchmark for SynaptoRoute release pipeline."
-  }
+    "notes": "Historical structural smoke reclassified as unverified because the source commit was not recorded."
+  },
+  "missing_evidence": [
+    "The source commit was recorded as the placeholder ci_commit_build.",
+    "No independent reproduction or reviewer attestation exists.",
+    "The synthetic deterministic workload is not semantic-quality evidence."
+  ]
 }

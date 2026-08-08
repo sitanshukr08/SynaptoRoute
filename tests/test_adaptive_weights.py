@@ -3,12 +3,12 @@ import pytest
 import numpy as np
 from synaptoroute.adaptive_weights import (
     BoundedBayesianWeigher,
-    LockFreeStatsCollector,
+    BufferedStatsCollector,
     VectorARCCache,
     ContextMetadata,
 )
 
-def test_bounded_bayesian_weigher_preserves_metric_space():
+def test_bounded_bayesian_weigher_caps_positive_adjustment():
     weigher = BoundedBayesianWeigher(frequency_boost_cap=0.08, saturation_constant=50.0)
     meta = ContextMetadata(
         key="test_intent",
@@ -21,7 +21,7 @@ def test_bounded_bayesian_weigher_preserves_metric_space():
     raw_cosine = 0.70
     adjusted_score = weigher.evaluate_score(raw_cosine, meta)
 
-    # Assert prior boost is capped at +0.08, preventing metric space explosion
+    # The bounded boost is an implementation property, not a ranking guarantee.
     assert adjusted_score == pytest.approx(0.78, abs=0.005)
 
 def test_negative_feedback_penalty():
@@ -38,8 +38,8 @@ def test_negative_feedback_penalty():
     prior = weigher.compute_prior_adjustment(meta)
     assert prior < 0.0  # Penalty outweighs modest frequency boost
 
-def test_lock_free_stats_collector():
-    collector = LockFreeStatsCollector()
+def test_buffered_stats_collector():
+    collector = BufferedStatsCollector()
     collector.record_hit("intent_a")
     collector.record_hit("intent_b", is_negative=True)
 
@@ -94,4 +94,3 @@ def test_adaptive_router_integration(fake_encoder):
     meta = router._route_metadata_context["route1"]
     assert meta.frequency_count == 1
     router.close()
-

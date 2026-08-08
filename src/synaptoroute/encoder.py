@@ -73,16 +73,22 @@ class OpenAIEncoder(BaseEncoder):
     Handles remote intent embeddings using OpenAI models.
     """
     def __init__(self, model_name: str = "text-embedding-3-small", dim: Optional[int] = None, dimensions: Optional[int] = None, client=None):
-        openai_module: Any
         try:
-            import openai as openai_module
+            import openai
         except ImportError as e:
             if client is None:
                 raise RuntimeError("Please install synaptoroute[openai] to use the OpenAIEncoder. Run `pip install synaptoroute[openai]`.") from e
             openai_module = None
+        else:
+            openai_module = openai
         self.model_name = model_name
         self._openai_error = openai_module.OpenAIError if openai_module is not None else Exception
-        self.client = client or openai_module.OpenAI()
+        if client is not None:
+            self.client = client
+        elif openai_module is not None:
+            self.client = openai_module.OpenAI()
+        else:  # pragma: no cover - guarded by the ImportError branch above
+            raise RuntimeError("OpenAI client is unavailable")
         
         self.dimensions = dimensions
         if dimensions is not None:
