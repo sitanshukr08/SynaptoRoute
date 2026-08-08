@@ -33,6 +33,21 @@ Execute the frozen commands generated from `paper/experiment_matrix.json`.
 Archive every manifest, raw log, prediction file, calibration record, and
 analysis output without manual edits.
 
+After extracting a matrix artifact, independently verify its candidate
+identity, ledger consistency, hashes, output/log binding, and family-specific
+correctness invariants:
+
+```bash
+python paper/verify_matrix_run.py EXTRACTED_ROOT/matrix \
+  --expected-commit 0de734be8427aa3786e29062339a83b2ffb79bdd \
+  --family crash_recovery \
+  --require-environment
+```
+
+The verifier only accepts an `unverified`, paper-ineligible run. A successful
+report does not promote a claim; independent reproduction, immutable archival,
+and reviewer attestation remain separate gates.
+
 Long runs checkpoint `run_state.json` after every command. Resume an interrupted
 run only from the same clean commit, matrix, command plan, output directory,
 and timeout configuration:

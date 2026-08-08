@@ -222,6 +222,7 @@ def run_preflight(
             "benchmarks/run_protocol_smoke.py",
             "paper/build_archive.py",
             "paper/verify_archive.py",
+            "paper/verify_matrix_run.py",
             "docs/RESEARCH_PROTOCOL.md",
             "docs/CURRENT_EVIDENCE_STATUS.md",
         )
@@ -241,6 +242,21 @@ def run_preflight(
         )
         missing = [fragment for fragment in required if fragment not in content]
         detail = "atomic checkpoint and candidate-bound resume configured"
+        return not missing, detail if not missing else f"missing: {missing}"
+
+    def check_matrix_verifier() -> tuple[bool, str]:
+        content = (repo_root / "paper" / "verify_matrix_run.py").read_text(
+            encoding="utf-8"
+        )
+        required = (
+            "valid_unverified_matrix_run",
+            "raw results reference or SHA-256 is invalid",
+            "summary differs from hashed command log",
+            "restart survival violated",
+            "Independent reproduction, immutable archival, and reviewer attestation",
+        )
+        missing = [fragment for fragment in required if fragment not in content]
+        detail = "matrix outputs, hashes, and family invariants independently checked"
         return not missing, detail if not missing else f"missing: {missing}"
 
     def check_evidence_promotion() -> tuple[bool, str]:
@@ -308,6 +324,7 @@ def run_preflight(
         _result("ci_package_smoke", check_ci_package_smoke),
         _result("paper_files", check_paper_files),
         _result("matrix_resume", check_matrix_runner),
+        _result("matrix_verifier", check_matrix_verifier),
         _result("evidence_promotion", check_evidence_promotion),
         _result("archive_builder", check_archive_builder),
     )

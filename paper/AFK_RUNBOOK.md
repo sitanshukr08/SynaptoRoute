@@ -70,6 +70,19 @@ schema-valid unverified manifest, complete raw logs, and generated analysis
 artifacts. Statistical and paper outputs must be regenerated from archived
 machine-readable inputs. A failed or incomplete run is diagnostic only.
 
+Run the independent matrix verifier against the extracted or native matrix
+directory before reviewing any metric:
+
+```bash
+python paper/verify_matrix_run.py benchmark_results/paper-matrix-CANDIDATE-MACHINE \
+  --expected-commit CANDIDATE_SHA
+```
+
+For hosted pilot artifacts, also pass `--family FAMILY --require-environment`.
+The verifier checks the frozen command plan, manifest/state/raw/log hashes,
+summary-to-log binding, and family correctness invariants. Its success still
+leaves the run unverified and paper-ineligible.
+
 ## 5. Independent Reproduction
 
 Transfer the candidate commit and runbook to a second contributor using a
