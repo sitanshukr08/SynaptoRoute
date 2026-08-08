@@ -21,6 +21,7 @@ def test_development_preflight_passes_current_artifact_foundation():
         "historical_manifests",
         "paper_container",
         "paper_files",
+        "matrix_resume",
     }
 
 

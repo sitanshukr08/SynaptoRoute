@@ -16,7 +16,9 @@ Implemented:
 * disjoint policy/probability calibration, ECE/Brier output, reliability-bin
   JSON, and generated SVG reliability diagrams;
 * a repeatable five-family bounded protocol smoke with machine-readable
-  invariants and a schema-v2 unverified manifest.
+  invariants and a schema-v2 unverified manifest;
+* an atomic per-command matrix ledger with candidate-bound resume, hashed-log
+  validation, failed-cell retry, and optional fail-fast/timeout controls.
 
 Not yet complete:
 

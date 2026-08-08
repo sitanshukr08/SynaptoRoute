@@ -67,6 +67,7 @@ Deliverables:
 * documentation that maps every public claim to evidence.
 * strict candidate preflight for source, lock, matrix, manifests, and package version.
 * a five-family bounded protocol smoke with explicit correctness invariants.
+* resumable matrix execution with atomic per-command state and hashed logs.
 
 Exit criteria:
 

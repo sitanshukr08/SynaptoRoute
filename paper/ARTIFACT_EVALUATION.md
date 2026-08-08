@@ -33,6 +33,22 @@ Execute the frozen commands generated from `paper/experiment_matrix.json`.
 Archive every manifest, raw log, prediction file, calibration record, and
 analysis output without manual edits.
 
+Long runs checkpoint `run_state.json` after every command. Resume an interrupted
+run only from the same clean commit, matrix, command plan, output directory,
+and timeout configuration:
+
+```bash
+python benchmarks/run_paper_matrix.py \
+  --execute \
+  --resume \
+  --output-dir benchmark_results/paper-matrix
+```
+
+Successful commands are skipped only when their logs still match the recorded
+SHA-256. Failed commands are retried. A changed commit, matrix, command plan,
+timeout, command identity, or successful log aborts resume instead of mixing
+evidence. `--stop-on-failure` is available for supervised pilot runs.
+
 ## Independent Reproduction
 
 The reproducer must use the same source commit and configuration on a different

@@ -209,6 +209,21 @@ def run_preflight(
         missing = [relative for relative in required if not (repo_root / relative).is_file()]
         return not missing, "required paper/protocol files present" if not missing else f"missing: {missing}"
 
+    def check_matrix_runner() -> tuple[bool, str]:
+        content = (repo_root / "benchmarks" / "run_paper_matrix.py").read_text(
+            encoding="utf-8"
+        )
+        required = (
+            "--resume",
+            "run_state.json",
+            "command_plan_sha256",
+            "_atomic_write_json",
+            "successful checkpoint log is missing or changed",
+        )
+        missing = [fragment for fragment in required if fragment not in content]
+        detail = "atomic checkpoint and candidate-bound resume configured"
+        return not missing, detail if not missing else f"missing: {missing}"
+
     checks = (
         _result("source_commit", check_source),
         _result("working_tree", check_tree),
@@ -221,6 +236,7 @@ def run_preflight(
         _result("historical_manifests", lambda: validate_historical_manifests(repo_root)),
         _result("paper_container", check_container),
         _result("paper_files", check_paper_files),
+        _result("matrix_resume", check_matrix_runner),
     )
     return PreflightReport(
         strict=strict,
