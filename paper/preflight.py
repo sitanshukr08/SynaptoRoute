@@ -243,12 +243,38 @@ def run_preflight(
         detail = "atomic checkpoint and candidate-bound resume configured"
         return not missing, detail if not missing else f"missing: {missing}"
 
+    def check_evidence_promotion() -> tuple[bool, str]:
+        promotion = (repo_root / "benchmarks" / "promote_evidence.py").read_text(
+            encoding="utf-8"
+        )
+        schema = (repo_root / "benchmarks" / "manifest_schema.py").read_text(
+            encoding="utf-8"
+        )
+        required = (
+            "--attestation",
+            "attestation_sha256",
+            "reviewer attestation decision must be 'approve'",
+        )
+        missing = [fragment for fragment in required if fragment not in promotion]
+        schema_required = (
+            "verified review.attestation_sha256 must match",
+            "verified review attestation does not match manifest",
+        )
+        missing.extend(
+            f"schema:{fragment}"
+            for fragment in schema_required
+            if fragment not in schema
+        )
+        detail = "verified promotion requires a hash-checked reviewer attestation"
+        return not missing, detail if not missing else f"missing: {missing}"
+
     def check_archive_builder() -> tuple[bool, str]:
         content = (repo_root / "paper" / "build_archive.py").read_text(encoding="utf-8")
         required = (
             "ARCHIVE_INVENTORY.json",
             "archive requires a clean working tree",
             "manifest raw-output hash mismatch",
+            "manifest raw output is not included in evidence input",
             "evidence symlinks are not allowed",
             "force_zip64=True",
         )
@@ -282,6 +308,7 @@ def run_preflight(
         _result("ci_package_smoke", check_ci_package_smoke),
         _result("paper_files", check_paper_files),
         _result("matrix_resume", check_matrix_runner),
+        _result("evidence_promotion", check_evidence_promotion),
         _result("archive_builder", check_archive_builder),
     )
     return PreflightReport(

@@ -123,6 +123,7 @@ def _validate_evidence_manifest(
     *,
     repo_root: Path,
     commit: str,
+    included_paths: set[Path],
 ) -> dict[str, Any]:
     manifest = json.loads(path.read_text(encoding="utf-8"))
     errors = validate_manifest(manifest, repo_root=repo_root)
@@ -145,6 +146,8 @@ def _validate_evidence_manifest(
         raise RuntimeError(f"manifest lacks hashed raw output: {path}")
     if sha256_file(raw_path) != raw_sha256:
         raise RuntimeError(f"manifest raw-output hash mismatch: {path}")
+    if raw_path.resolve() not in included_paths:
+        raise RuntimeError(f"manifest raw output is not included in evidence input: {path}")
 
     dependency_lock = manifest.get("dependency_lock")
     if isinstance(dependency_lock, dict):
@@ -256,6 +259,7 @@ def build_archive(
     manifest_records = []
     for item in sorted(inputs, key=lambda value: value.label):
         files = _input_files(item)
+        included_paths = {path.resolve() for _, path in files}
         manifests = [
             (relative, path)
             for relative, path in files
@@ -268,6 +272,7 @@ def build_archive(
                 manifest_path,
                 repo_root=repo_root,
                 commit=commit,
+                included_paths=included_paths,
             )
             manifest_records.append(
                 {

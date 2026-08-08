@@ -23,6 +23,35 @@ def make_runtime_dir(name: str) -> Path:
     return path
 
 
+def write_reviewer_attestation(
+    path: Path,
+    *,
+    original_run_id: str = "original",
+    reproduction_run_id: str = "reproduction",
+    claim: str = "The invariant reproduced.",
+    archive_uri: str = "https://doi.org/10.0000/example",
+    archive_sha256: str = "c" * 64,
+) -> Path:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "decision": "approve",
+                "reviewer": "reviewer@example.com",
+                "reviewed_at_utc": "2026-08-08T00:00:00Z",
+                "original_run_id": original_run_id,
+                "reproduction_run_id": reproduction_run_id,
+                "claim": claim,
+                "archive_uri": archive_uri,
+                "archive_sha256": archive_sha256,
+                "notes": "Reviewed raw logs, invariants, configuration, and analysis.",
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
 def test_historical_benchmark_manifests_are_schema_valid():
     manifest_dir = REPO_ROOT / "benchmarks" / "manifests"
     for manifest_path in manifest_dir.glob("*.json"):
@@ -194,25 +223,42 @@ def test_promotion_requires_independent_machine_and_review(tmp_path):
 
     original = candidate("original", "machine-a")
     reproduction = candidate("reproduction", "machine-b")
+    attestation = write_reviewer_attestation(tmp_path / "review-attestation.json")
     promoted = promote(
         original,
         reproduction,
-        reviewer="reviewer@example.com",
+        reviewer_attestation=attestation,
         claim="The invariant reproduced.",
         archive_uri="https://doi.org/10.0000/example",
         archive_sha256="c" * 64,
+        repo_root=tmp_path,
     )
 
     assert promoted["status"] == "verified"
     assert promoted["review"]["reproduction_run_id"] == "reproduction"
     assert validate_manifest(promoted, repo_root=tmp_path) == []
 
+    mismatched_attestation = write_reviewer_attestation(
+        tmp_path / "mismatched-review-attestation.json",
+        claim="A different claim.",
+    )
+    with pytest.raises(ValueError, match="claim does not match"):
+        promote(
+            original,
+            reproduction,
+            reviewer_attestation=mismatched_attestation,
+            claim="The invariant reproduced.",
+            archive_uri="https://doi.org/10.0000/example",
+            archive_sha256="c" * 64,
+            repo_root=tmp_path,
+        )
+
     reproduction["environment"]["machine_id"] = "machine-a"
     with pytest.raises(ValueError, match="different machine_id"):
         promote(
             original,
             reproduction,
-            reviewer="reviewer@example.com",
+            reviewer_attestation=attestation,
             claim="claim",
             archive_uri="https://doi.org/10.0000/example",
             archive_sha256="c" * 64,
@@ -221,11 +267,16 @@ def test_promotion_requires_independent_machine_and_review(tmp_path):
 
     reproduction = candidate("reproduction-2", "machine-b")
     reproduction["evidence"]["raw_output_sha256"] = "0" * 64
+    second_attestation = write_reviewer_attestation(
+        tmp_path / "review-attestation-2.json",
+        reproduction_run_id="reproduction-2",
+        claim="claim",
+    )
     with pytest.raises(ValueError, match="raw output hash"):
         promote(
             original,
             reproduction,
-            reviewer="reviewer@example.com",
+            reviewer_attestation=second_attestation,
             claim="claim",
             archive_uri="https://doi.org/10.0000/example",
             archive_sha256="c" * 64,
@@ -262,14 +313,29 @@ def test_verified_schema_v2_rechecks_lock_archive_and_reproduction(tmp_path):
     reproduction = json.loads(json.dumps(base))
     reproduction["run_id"] = "reproduction"
     reproduction["environment"]["machine_id"] = "machine-b"
-    promoted = promote(base, reproduction, reviewer="reviewer", claim="claim", archive_uri="https://doi.org/example", archive_sha256="c" * 64)
+    attestation = write_reviewer_attestation(
+        tmp_path / "review-attestation.json",
+        claim="claim",
+        archive_uri="https://doi.org/example",
+    )
+    promoted = promote(
+        base,
+        reproduction,
+        reviewer_attestation=attestation,
+        claim="claim",
+        archive_uri="https://doi.org/example",
+        archive_sha256="c" * 64,
+        repo_root=tmp_path,
+    )
 
     assert validate_manifest(promoted, repo_root=tmp_path) == []
     promoted["dependency_lock"]["sha256"] = "0" * 64
     promoted["archive"]["sha256"] = "invalid"
+    attestation.write_text("{}\n", encoding="utf-8")
     errors = validate_manifest(promoted, repo_root=tmp_path)
     assert any("dependency_lock.sha256" in error for error in errors)
     assert any("archive.sha256" in error for error in errors)
+    assert any("attestation_sha256" in error for error in errors)
 
 
 def test_paper_table_generator_refuses_unverified_manifest(tmp_path):

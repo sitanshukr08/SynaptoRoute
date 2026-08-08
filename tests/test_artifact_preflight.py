@@ -23,6 +23,7 @@ def test_development_preflight_passes_current_artifact_foundation():
         "ci_package_smoke",
         "paper_files",
         "matrix_resume",
+        "evidence_promotion",
         "archive_builder",
     }
 

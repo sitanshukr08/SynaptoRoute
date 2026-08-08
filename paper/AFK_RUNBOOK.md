@@ -94,11 +94,16 @@ archive. Record the DOI/URI and digest; do not rebuild the ZIP after upload.
 
 Promote claims individually only after reviewer attestation and archive upload:
 
+The attestation must be a non-empty JSON object using the schema documented in
+`paper/ARTIFACT_EVALUATION.md`. It must identify both run IDs, the exact claim,
+archive URI and SHA-256, reviewer, UTC review time, approval decision, and
+review notes. Promotion records and revalidates the attestation hash.
+
 ```bash
 python benchmarks/promote_evidence.py \
   --original ORIGINAL_MANIFEST \
   --reproduction REPRODUCTION_MANIFEST \
-  --reviewer REVIEWER_ID \
+  --attestation REVIEW_ATTESTATION.json \
   --claim "CLAIM TEXT" \
   --archive-uri ARCHIVE_URI \
   --archive-sha256 ARCHIVE_SHA256 \

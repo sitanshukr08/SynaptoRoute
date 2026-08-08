@@ -170,14 +170,58 @@ def validate_manifest(manifest: dict[str, Any], repo_root: Path | str = ".") -> 
                 "reviewed_at_utc",
                 "original_run_id",
                 "reproduction_run_id",
+                "decision",
+                "notes",
+                "attestation_path",
+                "attestation_sha256",
             }.issubset(review):
                 errors.append("verified schema v2 manifests require independent review")
             else:
-                for field in ("reviewer", "reviewed_at_utc", "original_run_id", "reproduction_run_id"):
+                for field in (
+                    "reviewer",
+                    "reviewed_at_utc",
+                    "original_run_id",
+                    "reproduction_run_id",
+                    "notes",
+                ):
                     if not isinstance(review.get(field), str) or not review[field].strip():
                         errors.append(f"verified review.{field} must be non-empty")
                 if review.get("original_run_id") == review.get("reproduction_run_id"):
                     errors.append("verified review requires distinct original and reproduction runs")
+                if review.get("decision") != "approve":
+                    errors.append("verified review.decision must be approve")
+                attestation_path = _as_path(root, review.get("attestation_path"))
+                if (
+                    attestation_path is None
+                    or not attestation_path.exists()
+                    or attestation_path.stat().st_size == 0
+                ):
+                    errors.append("verified review.attestation_path must be non-empty")
+                elif review.get("attestation_sha256") != sha256_file(attestation_path):
+                    errors.append("verified review.attestation_sha256 must match")
+                else:
+                    try:
+                        attestation = json.loads(attestation_path.read_text(encoding="utf-8"))
+                    except (json.JSONDecodeError, OSError):
+                        errors.append("verified review attestation must be readable JSON")
+                    else:
+                        expected_attestation = {
+                            "schema_version": 1,
+                            "decision": "approve",
+                            "reviewer": review.get("reviewer"),
+                            "reviewed_at_utc": review.get("reviewed_at_utc"),
+                            "original_run_id": review.get("original_run_id"),
+                            "reproduction_run_id": review.get("reproduction_run_id"),
+                            "claim": manifest.get("claim"),
+                            "archive_uri": manifest.get("archive", {}).get("uri"),
+                            "archive_sha256": manifest.get("archive", {}).get("sha256"),
+                            "notes": review.get("notes"),
+                        }
+                        if not isinstance(attestation, dict) or any(
+                            attestation.get(field) != value
+                            for field, value in expected_attestation.items()
+                        ):
+                            errors.append("verified review attestation does not match manifest")
             archive = manifest.get("archive")
             if not isinstance(archive, dict) or not {"uri", "sha256"}.issubset(archive):
                 errors.append("verified schema v2 manifests require immutable archive metadata")

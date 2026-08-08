@@ -123,6 +123,24 @@ def test_archive_builder_rejects_tampered_raw_output(tmp_path):
         )
 
 
+def test_archive_builder_rejects_raw_output_outside_evidence_input(tmp_path):
+    repo, evidence, raw_path = _archive_fixture(tmp_path)
+    external_raw = tmp_path / "external-raw.json"
+    external_raw.write_bytes(raw_path.read_bytes())
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["evidence"]["raw_output_path"] = external_raw.as_posix()
+    manifest["evidence"]["raw_output_sha256"] = sha256_file(external_raw)
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="raw output is not included"):
+        build_archive(
+            repo_root=repo,
+            inputs=[ArchiveInput("original", evidence)],
+            output_path=tmp_path / "artifact.zip",
+        )
+
+
 def test_archive_verifier_rejects_duplicate_members(tmp_path):
     repo, evidence, _ = _archive_fixture(tmp_path)
     archive_path = tmp_path / "artifact.zip"
