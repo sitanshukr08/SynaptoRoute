@@ -14,12 +14,15 @@ Implemented:
 * the frozen 208-command paper matrix and pinned CPU-only Python 3.11 environment;
 * network-free unit tests and a separately marked real-model integration test;
 * disjoint policy/probability calibration, ECE/Brier output, reliability-bin
-  JSON, and generated SVG reliability diagrams.
+  JSON, and generated SVG reliability diagrams;
+* a repeatable five-family bounded protocol smoke with machine-readable
+  invariants and a schema-v2 unverified manifest.
 
 Not yet complete:
 
 * the paper container has not been rebuilt on a running Linux Docker engine;
-* the quality and systems harnesses have not completed bounded protocol pilots;
+* the bounded native protocol smoke passes, but the Linux paper-container run
+  remains blocked until a Docker daemon is available;
 * controlled matrix runs, second-machine reproduction, archival DOI, and paper results remain pending.
 
 ## Execution Order
@@ -45,8 +48,10 @@ Not yet complete:
 ### 3. Validate The Systems Harness
 
 1. Build `Dockerfile.paper` and record its image digest and resolved package inventory.
-2. Execute one short smoke cell from each experiment family.
-3. Confirm zero correctness violations, complete raw logs, stable units, and schema-valid unverified manifests.
+2. Execute one short smoke cell from each experiment family. The native runner
+   is implemented and passes; repeat it inside the paper container.
+3. Confirm zero correctness violations, complete raw logs, stable units, and
+   schema-valid unverified manifests. Native smoke currently passes this gate.
 4. Freeze a new candidate if any correctness code changes.
 
 ### 4. Run Confirmatory Experiments

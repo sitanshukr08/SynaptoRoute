@@ -13,6 +13,7 @@ and fails the build if `pip check` detects an inconsistent dependency closure.
 python paper/preflight.py
 python -m pytest tests -q
 python benchmarks/run_ci_smoke_benchmark.py --output-dir benchmark_results/artifact-smoke
+python benchmarks/run_protocol_smoke.py --output-dir benchmark_results/protocol-smoke
 ```
 
 During development, `python paper/preflight.py --allow-dirty` checks the
@@ -21,6 +22,10 @@ runs. Strict preflight must pass from the committed candidate.
 
 The smoke manifest must remain `unverified` and
 `paper_evidence_eligible=false`.
+
+`run_protocol_smoke.py` executes bounded synthetic quality, dynamic mutation,
+scale, process-crash, and sustained-backpressure cells. It is a wiring and
+correctness gate, not a substitute for the frozen confirmatory matrix.
 
 ## Candidate Runs
 

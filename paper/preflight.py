@@ -202,6 +202,7 @@ def run_preflight(
             "paper/ARTIFACT_EVALUATION.md",
             "paper/QUALITY_PROTOCOL.md",
             "paper/experiment_matrix.json",
+            "benchmarks/run_protocol_smoke.py",
             "docs/RESEARCH_PROTOCOL.md",
             "docs/CURRENT_EVIDENCE_STATUS.md",
         )

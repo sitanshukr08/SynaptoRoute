@@ -66,6 +66,7 @@ Deliverables:
 * a deterministic local structural benchmark suitable for CI;
 * documentation that maps every public claim to evidence.
 * strict candidate preflight for source, lock, matrix, manifests, and package version.
+* a five-family bounded protocol smoke with explicit correctness invariants.
 
 Exit criteria:
 
