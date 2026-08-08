@@ -1,7 +1,24 @@
+from collections import Counter
+
 from benchmarks.hf_intent_datasets import ExternalDatasetBundle, HFDatasetSpec
 from benchmarks.prediction_io import read_prediction_jsonl
 from benchmarks.research_datasets import IntentExample, PreparedRoutingDataset
-from benchmarks.run_intent_experiment import run_bundle_experiment
+from benchmarks.run_intent_experiment import _summary_metrics, run_bundle_experiment
+
+
+def test_summary_metrics_marks_zero_coverage_selective_accuracy_undefined():
+    metrics = _summary_metrics(
+        expected=["greeting", "farewell"],
+        predicted=["OOD", "OOD"],
+        latencies_seconds=[0.001, 0.002],
+        reasons=Counter({"no_candidates": 2}),
+        acceptance_confidences=[float("-inf"), float("-inf")],
+        raw_correct=[False, False],
+    )
+
+    assert metrics["coverage"] == 0.0
+    assert metrics["selective_accuracy"] is None
+    assert metrics["selective_risk_coverage_auc"] is None
 
 
 def test_bundle_experiment_calibrates_before_test_and_writes_artifacts(tmp_path, fake_encoder):

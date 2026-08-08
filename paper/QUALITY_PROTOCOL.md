@@ -47,6 +47,11 @@ error, Brier score, reliability-bin JSON, and an SVG generated from that JSON's
 metrics. Every probability artifact references its source prediction file by
 SHA-256.
 
+Selective accuracy is undefined and emitted as `null` when a system accepts no
+test queries. Selective risk-coverage AUC is likewise `null` when the system
+provides no finite confidence signal from which to rank queries. Reports must
+not replace either value with a perfect score.
+
 Per-system files are:
 
 * `calibration_<system>.json` for the routing policy, when applicable;

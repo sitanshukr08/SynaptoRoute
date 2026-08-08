@@ -130,7 +130,7 @@ def _summary_metrics(
     selective_accuracy = (
         sum(predicted[index] == expected[index] for index in accepted_indices) / len(accepted_indices)
         if accepted_indices
-        else 1.0
+        else None
     )
     finite_confidences = [value for value in acceptance_confidences if np.isfinite(value)]
     confidence_floor = min(finite_confidences, default=0.0) - 1.0
@@ -144,6 +144,9 @@ def _summary_metrics(
     for rank, index in enumerate(ranked_indices, start=1):
         cumulative_errors += not raw_correct[index]
         selective_risks.append(cumulative_errors / rank)
+    selective_risk_coverage_auc = (
+        float(np.mean(selective_risks)) if finite_confidences else None
+    )
 
     ood_targets = np.asarray([label == "OOD" for label in expected], dtype=np.int8)
     if len(set(ood_targets.tolist())) == 2:
@@ -173,7 +176,7 @@ def _summary_metrics(
         "coverage": len(accepted_indices) / len(expected),
         "known_coverage": len(accepted_known_indices) / len(known_indices) if known_indices else None,
         "selective_accuracy": selective_accuracy,
-        "selective_risk_coverage_auc": float(np.mean(selective_risks)),
+        "selective_risk_coverage_auc": selective_risk_coverage_auc,
         "latency_p50_ms": float(np.percentile(latencies_seconds, 50) * 1000.0),
         "latency_p95_ms": float(np.percentile(latencies_seconds, 95) * 1000.0),
         "latency_p99_ms": float(np.percentile(latencies_seconds, 99) * 1000.0),
