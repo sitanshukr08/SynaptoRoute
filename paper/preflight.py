@@ -223,6 +223,7 @@ def run_preflight(
             "paper/build_archive.py",
             "paper/verify_archive.py",
             "paper/verify_matrix_run.py",
+            "paper/verify_quality_artifacts.py",
             "docs/RESEARCH_PROTOCOL.md",
             "docs/CURRENT_EVIDENCE_STATUS.md",
         )
@@ -253,6 +254,7 @@ def run_preflight(
             "raw results reference or SHA-256 is invalid",
             "summary differs from hashed command log",
             "restart survival violated",
+            "verify_quality_artifacts",
             "Independent reproduction, immutable archival, and reviewer attestation",
         )
         missing = [fragment for fragment in required if fragment not in content]

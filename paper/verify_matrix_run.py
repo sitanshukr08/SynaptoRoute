@@ -16,6 +16,10 @@ if str(REPO_ROOT) not in sys.path:
 
 from benchmarks.manifest_schema import sha256_file, validate_manifest  # noqa: E402
 from benchmarks.run_paper_matrix import build_commands  # noqa: E402
+from paper.verify_quality_artifacts import (  # noqa: E402
+    QualityArtifactVerificationError,
+    verify_quality_artifacts,
+)
 
 
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -195,6 +199,7 @@ def _verify_family_invariants(
 ) -> dict[str, Any]:
     counts: dict[str, int] = {}
     crash_trials = 0
+    quality_seed_reports = 0
     for result in results:
         family = result["family"]
         summary = _verify_summary_binding(run_dir, result, log_paths[result["index"]], errors)
@@ -249,9 +254,20 @@ def _verify_family_invariants(
                     errors.append(f"quality:{name}: per-seed summary missing")
                 elif sha256_file(seed_path) != item.get("summary_sha256"):
                     errors.append(f"quality:{name}: per-seed summary hash mismatch")
+                else:
+                    try:
+                        verify_quality_artifacts(seed_path)
+                    except QualityArtifactVerificationError as error:
+                        errors.extend(
+                            f"quality:{name}:seed-{item.get('seed')}: {message}"
+                            for message in error.errors
+                        )
+                    else:
+                        quality_seed_reports += 1
     return {
         "family_command_counts": dict(sorted(counts.items())),
         "crash_trial_record_count": crash_trials,
+        "quality_seed_report_count": quality_seed_reports,
     }
 
 

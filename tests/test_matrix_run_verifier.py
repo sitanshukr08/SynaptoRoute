@@ -358,3 +358,42 @@ def test_quality_handler_checks_seed_artifact_hashes(tmp_path):
     )
 
     assert "quality:banking77: per-seed summary hash mismatch" in errors
+
+
+def test_quality_handler_runs_deep_seed_verification(tmp_path, monkeypatch):
+    run_dir = tmp_path / "matrix"
+    name = "banking77"
+    seed_summary = run_dir / "quality" / name / "seed-13" / "experiment_summary.json"
+    _write_json(seed_summary, {"systems": {"fixture": {}}})
+    study = {
+        "status": "unverified",
+        "paper_evidence_eligible": False,
+        "per_seed": [
+            {
+                "seed": 13,
+                "summary_path": "/original/matrix/quality/banking77/seed-13/experiment_summary.json",
+                "summary_sha256": sha256_file(seed_summary),
+            }
+        ],
+    }
+    log_path = run_dir / "logs" / "0000-quality-banking77.log"
+    _write_json(run_dir / "quality" / name / "multiseed_summary.json", study)
+    _write_json(log_path, {"study": study, "analysis": {}})
+
+    def reject_seed(_path):
+        from paper.verify_quality_artifacts import QualityArtifactVerificationError
+
+        raise QualityArtifactVerificationError(["fixture deep-verification failure"])
+
+    monkeypatch.setattr("paper.verify_matrix_run.verify_quality_artifacts", reject_seed)
+    errors = []
+
+    _verify_family_invariants(
+        run_dir,
+        [{"index": 0, "family": "quality", "name": name}],
+        {"quality": {"seeds": [13]}},
+        {0: log_path},
+        errors,
+    )
+
+    assert "quality:banking77:seed-13: fixture deep-verification failure" in errors

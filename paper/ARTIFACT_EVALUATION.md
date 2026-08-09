@@ -44,6 +44,15 @@ python paper/verify_matrix_run.py EXTRACTED_ROOT/matrix \
   --require-environment
 ```
 
+For quality-family output, the matrix verifier also inspects every per-seed
+prediction, policy, probability model, and reliability artifact. A single seed
+can be audited directly with:
+
+```bash
+python paper/verify_quality_artifacts.py \
+  EXTRACTED_ROOT/matrix/quality/DATASET/seed-SEED/DATASET/experiment_summary.json
+```
+
 The verifier only accepts an `unverified`, paper-ineligible run. A successful
 report does not promote a claim; independent reproduction, immutable archival,
 and reviewer attestation remain separate gates.

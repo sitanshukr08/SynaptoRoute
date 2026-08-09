@@ -519,6 +519,8 @@ def calibration_artifact(
         raise ValueError("source_predictions_sha256 must be a SHA-256 hex digest") from error
     return {
         "schema_version": CALIBRATION_SCHEMA_VERSION,
+        "status": "unverified",
+        "paper_evidence_eligible": False,
         "method": "global_threshold_margin_grid_search",
         "policy": asdict(result.policy),
         "calibration_metrics": asdict(result.metrics),

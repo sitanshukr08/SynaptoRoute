@@ -60,6 +60,23 @@ Per-system files are:
 * `test_predictions_<system>.jsonl` for untouched test decisions;
 * `reliability_<system>.json` and `reliability_<system>.svg` for test reliability.
 
+## Independent Artifact Check
+
+Each seed output must pass the standalone verifier before a matrix run can pass
+inspection:
+
+```bash
+python paper/verify_quality_artifacts.py PATH/TO/experiment_summary.json
+```
+
+The verifier resolves relocated artifacts by their frozen filenames, validates
+all declared SHA-256 links, rejects raw query text, checks split disjointness
+and cross-system cohort alignment, applies the serialized probability model to
+each test record, and independently recomputes classification, selective, and
+calibration metrics. `paper/verify_matrix_run.py` invokes this check for every
+quality seed automatically. Passing preserves `status=unverified`; it is an
+integrity check, not evidence promotion.
+
 ## Interpretation
 
 Probability-fit metrics are in-sample diagnostics and are never publication
