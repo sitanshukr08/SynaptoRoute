@@ -34,3 +34,12 @@ with 10ms and 100ms injected commit delays.
 This is an unverified pilot observation, not a paper result. GitHub-hosted
 hardware is uncontrolled, the Actions artifact expires, and no independent
 reproduction or reviewer attestation exists.
+
+A second clean local pilot on 2026-08-10 exercised the revised version 2
+systems summaries at commit
+`78e96ec392b448f84f3b677d2d3af859153961d0`. It reproduced the same aggregate
+crash-recovery outcome across 3,200 trials and passed the matrix verifier with
+zero outcome observations. This is corroborating development evidence, not the
+independent reproduction required to promote C2 or C6; the host was
+uncontrolled and no environment bundle, immutable archive, or reviewer
+attestation was produced.

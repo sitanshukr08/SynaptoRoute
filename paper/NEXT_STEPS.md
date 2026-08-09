@@ -20,6 +20,8 @@ Implemented:
   invariants and a schema-v2 unverified manifest;
 * an atomic per-command matrix ledger with candidate-bound resume, hashed-log
   validation, failed-cell retry, and optional fail-fast/timeout controls;
+* version 2 systems summaries with explicit counts, denominators, timing
+  windows, SQLite hashes, and outcome-neutral matrix verification;
 * a streaming, content-inventoried archive builder that rejects dirty source,
   mismatched manifests, failed runs, changed hashes, and symlinks;
 * an independent streaming archive verifier, unattended runbook, paper methods
@@ -35,6 +37,8 @@ Not yet complete:
   confirmatory performance claims;
 * the crash-recovery pilot completed all 16 cells and its 3,200 trial records,
   hashes, and durability invariants passed independent matrix-run inspection;
+* a clean local repeat at `78e96ec3` passed the revised verifier across another
+  3,200 crash-recovery trials, including a successful checkpoint resume;
 * quality, dynamic, scale, and backpressure hosted pilots remain pending;
 * controlled matrix runs, second-machine reproduction, archival DOI, and paper
   results remain pending.
@@ -64,8 +68,10 @@ Not yet complete:
 1. Build `Dockerfile.paper` and record its image digest and resolved package inventory.
 2. Execute one short smoke cell from each experiment family. The native runner
    is implemented and passes; repeat it inside the paper container.
-3. Confirm zero correctness violations, complete raw logs, stable units, and
-   schema-valid unverified manifests. Native smoke currently passes this gate.
+3. Confirm complete raw logs, stable units, reproducible denominators, evidence
+   hashes, and schema-valid unverified manifests. Retain correctness failures
+   and other unfavorable outcomes for analysis. Native smoke currently passes
+   this gate.
 4. Freeze a new candidate if any correctness code changes.
 
 ### 4. Run Confirmatory Experiments

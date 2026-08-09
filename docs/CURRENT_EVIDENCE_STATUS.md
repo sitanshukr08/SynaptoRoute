@@ -33,6 +33,14 @@ SynaptoRoute has a coherent engineering direction, but its historical benchmark 
   remains unverified because the hardware is uncontrolled, the Actions bundle
   is temporary, and there is no second-machine reproduction or reviewer
   attestation.
+* A clean local Windows pilot at `78e96ec392b448f84f3b677d2d3af859153961d0`
+  separately exercised the revised version 2 systems ledger. All 16 frozen
+  crash-recovery cells and 3,200 trials completed, and the matrix verifier
+  checked all command logs plus 3,200 SQLite and 3,200 acknowledgement-marker
+  hashes. It reported zero integrity errors and zero outcome observations. The
+  run is corroborating development evidence only; it has no controlled-host
+  environment bundle, immutable archive, independent reviewer, or attestation.
+  Details are in `SYSTEMS_PILOT_RESULTS.md`.
 
 ## Research Claims
 
