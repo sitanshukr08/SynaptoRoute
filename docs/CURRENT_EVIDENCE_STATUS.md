@@ -20,6 +20,11 @@ SynaptoRoute has a coherent engineering direction, but its historical benchmark 
 * Development pilots emit hashed calibration artifacts and privacy-conscious
   per-example predictions. Both pilots completed locally, but their dirty-tree
   manifests keep them ineligible for paper claims.
+* A clean, bounded Banking77 and CLINC150/OOS validation run at commit
+  `c275e3fc4dc1b6172c0e58a42cb54fbd5c19fd12` passed independent inspection of
+  27,285 policy, probability-fit, and test records. It remains an unverified
+  single-machine pilot; details and artifact hashes are recorded in
+  `QUALITY_PILOT_VALIDATION.md`.
 * Full-test five-seed diagnostic studies and paired bootstrap analyses now
   exist for Banking77 and CLINC150/OOS. Their interpretation is recorded in
   `MULTISEED_DIAGNOSTIC_RESULTS.md`.
@@ -47,6 +52,9 @@ SynaptoRoute has a coherent engineering direction, but its historical benchmark 
   logistic regression remains stronger on overall CLINC quality.
 * Clean replication strengthens confidence in that negative result but does
   not change its publication status.
+* The clean bounded quality pilot reproduced the prior non-latency metrics
+  exactly after the artifact-contract fix. This validates the measurement
+  path, not the hypotheses or publication claims.
 
 ## Publication Gate
 

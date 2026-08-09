@@ -1,0 +1,41 @@
+# Local environments and Python caches
+.venv*
+venv/
+env/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest-tmp*/
+.ruff_cache/
+.mypy_cache/
+.test-runtime/
+runtime-pytest-*/
+
+# Local benchmark and build outputs
+benchmark_results/
+build/
+dist/
+*.egg-info/
+audit_reports/
+*.log
+*.log.utf8.txt
+
+# Local databases and application state
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+data/
+scratch/
+chroma_db/
+.deskbot/
+
+# Workstation-only configuration
+.env
+.env.*
+.DS_Store
+Thumbs.db
+
+# Git metadata is intentionally retained. Artifact runners record the source
+# commit and clean-tree state from inside the paper image.

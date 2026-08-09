@@ -188,13 +188,22 @@ def run_preflight(
 
     def check_container() -> tuple[bool, str]:
         content = (repo_root / "Dockerfile.paper").read_text(encoding="utf-8")
+        ignore_path = repo_root / ".dockerignore"
+        ignore_content = ignore_path.read_text(encoding="utf-8") if ignore_path.is_file() else ""
         required = (
             "FROM python:3.11",
             "paper/requirements-linux-py311.lock",
             "python -m pip check",
         )
         missing = [fragment for fragment in required if fragment not in content]
-        return not missing, "CPU Python 3.11 lock and pip check configured" if not missing else f"missing: {missing}"
+        required_ignores = (".venv*", "benchmark_results/", "build/", ".mypy_cache/")
+        missing.extend(
+            f".dockerignore:{fragment}"
+            for fragment in required_ignores
+            if fragment not in ignore_content
+        )
+        detail = "CPU Python 3.11 lock, pip check, and bounded build context configured"
+        return not missing, detail if not missing else f"missing: {missing}"
 
     def check_ci_package_smoke() -> tuple[bool, str]:
         content = (repo_root / ".github" / "workflows" / "ci.yml").read_text(

@@ -2,7 +2,8 @@
 
 Status: artifact candidate `paper-artifact-v0.5.0-rc1` is frozen at
 `0de734be8427aa3786e29062339a83b2ffb79bdd`; controlled confirmatory runs are
-pending.
+pending. Independent quality-artifact verification was added after this
+candidate, so a successor must be frozen after Linux container validation.
 
 ## Current Position
 
@@ -35,6 +36,9 @@ Not yet complete:
   confirmatory performance claims;
 * the crash-recovery pilot completed all 16 cells and its 3,200 trial records,
   hashes, and durability invariants passed independent matrix-run inspection;
+* clean bounded Banking77 and CLINC150/OOS pilots completed at `c275e3f`; all
+  27,285 per-example records and calibration artifacts passed the standalone
+  quality verifier without non-latency metric drift;
 * quality, dynamic, scale, and backpressure hosted pilots remain pending;
 * controlled matrix runs, second-machine reproduction, archival DOI, and paper
   results remain pending.
@@ -56,8 +60,9 @@ Not yet complete:
    only for systems that produce probabilities under that frozen method.
 3. Add exact-string results to paired analysis and preserve matched-coverage comparisons.
 4. Generate tables and figures only from archived machine-readable outputs.
-5. Run small protocol pilots before freezing a new candidate. This is the
-   remaining step in this section.
+5. Run small protocol pilots before freezing a new candidate. Clean local
+   Banking77 and CLINC150/OOS pilots now pass; a Linux container smoke remains
+   part of the successor-candidate gate.
 
 ### 3. Validate The Systems Harness
 

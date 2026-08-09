@@ -34,3 +34,14 @@ with 10ms and 100ms injected commit delays.
 This is an unverified pilot observation, not a paper result. GitHub-hosted
 hardware is uncontrolled, the Actions artifact expires, and no independent
 reproduction or reviewer attestation exists.
+
+The clean local quality pilot at commit
+`c275e3fc4dc1b6172c0e58a42cb54fbd5c19fd12` completed bounded Banking77 and
+CLINC150/OOS runs on 2026-08-09. Independent artifact inspection recomputed
+classification, selective, OOD, and calibration metrics across 27,285 records
+without finding a discrepancy. The run reproduces the existing diagnostic
+direction: per-route calibration helps CLINC open-set rejection but harms
+Banking77, while logistic regression remains stronger on overall CLINC
+quality. This is still an unverified single-seed, single-machine observation;
+the exact provenance and limitations are in
+`docs/QUALITY_PILOT_VALIDATION.md`.

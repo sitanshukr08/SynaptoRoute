@@ -6,6 +6,9 @@ Build `Dockerfile.paper` on a CPU-only Linux host. Record the image digest and
 retain `paper/resolved-environment.txt` from the image used for final runs.
 The image installs `paper/requirements-linux-py311.lock`, including CPU FAISS,
 and fails the build if `pip check` detects an inconsistent dependency closure.
+The checked-in `.dockerignore` excludes workstation environments, caches, and
+prior run outputs from the build context while retaining Git metadata needed
+for in-container commit and clean-tree checks.
 
 ## Smoke
 
