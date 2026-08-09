@@ -191,6 +191,7 @@ def run_preflight(
         required = (
             "FROM python:3.11",
             "paper/requirements-linux-py311.lock",
+            "--no-build-isolation --no-deps -e .",
             "python -m pip check",
         )
         missing = [fragment for fragment in required if fragment not in content]
@@ -224,6 +225,7 @@ def run_preflight(
             "paper/verify_archive.py",
             "paper/verify_matrix_run.py",
             "docs/RESEARCH_PROTOCOL.md",
+            "docs/SYSTEMS_EVIDENCE_SCHEMA.md",
             "docs/CURRENT_EVIDENCE_STATUS.md",
         )
         missing = [relative for relative in required if not (repo_root / relative).is_file()]
@@ -252,11 +254,13 @@ def run_preflight(
             "valid_unverified_matrix_run",
             "raw results reference or SHA-256 is invalid",
             "summary differs from hashed command log",
-            "restart survival violated",
+            "outcome_observations",
+            "database hash differs",
+            "offered-load denominator mismatch",
             "Independent reproduction, immutable archival, and reviewer attestation",
         )
         missing = [fragment for fragment in required if fragment not in content]
-        detail = "matrix outputs, hashes, and family invariants independently checked"
+        detail = "matrix integrity and outcome observations independently checked"
         return not missing, detail if not missing else f"missing: {missing}"
 
     def check_evidence_promotion() -> tuple[bool, str]:

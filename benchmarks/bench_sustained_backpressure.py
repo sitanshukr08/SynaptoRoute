@@ -56,15 +56,23 @@ async def run_benchmark(
     setup.wait_durable(timeout=5.0)
     await router.start()
 
+    calibration_attempts = 0
     calibration_successes = 0
+    calibration_overloaded = 0
+    calibration_errors: list[str] = []
 
     async def calibration_worker(deadline: float) -> None:
-        nonlocal calibration_successes
+        nonlocal calibration_attempts, calibration_overloaded, calibration_successes
         while time.perf_counter() < deadline:
+            calibration_attempts += 1
             try:
                 await router.amatch("help me")
                 calibration_successes += 1
             except RouterOverloadedError:
+                calibration_overloaded += 1
+                await asyncio.sleep(0)
+            except Exception as error:
+                calibration_errors.append(type(error).__name__)
                 await asyncio.sleep(0)
 
     calibration_started = time.perf_counter()
@@ -123,25 +131,41 @@ async def run_benchmark(
                     continue
                 tasks.append(asyncio.create_task(request()))
                 next_arrival += interval
+            offering_wall_seconds = time.perf_counter() - started
+            drain_started = time.perf_counter()
             results = await asyncio.gather(*tasks)
-            wall_seconds = time.perf_counter() - started
+            drain_seconds = time.perf_counter() - drain_started
+            scenario_wall_seconds = time.perf_counter() - started
             successful = [item for item in results if item["status"] == "success"]
             overloaded = [item for item in results if item["status"] == "overloaded"]
             errors = [
                 item for item in results if item["status"] not in {"success", "overloaded"}
             ]
+            successful_correct = sum(bool(item["correct"]) for item in successful)
+            successful_incorrect = len(successful) - successful_correct
+            offered_count = len(results)
             scenarios.append(
                 {
                     "load_fraction": fraction,
                     "target_qps": target_qps,
-                    "offered_count": len(results),
+                    "offered_count": offered_count,
                     "successful_count": len(successful),
+                    "successful_correct_count": successful_correct,
+                    "successful_incorrect_count": successful_incorrect,
                     "overloaded_count": len(overloaded),
                     "error_count": len(errors),
-                    "completed_qps": len(successful) / wall_seconds,
-                    "shedding_rate": len(overloaded) / len(results) if results else 0.0,
+                    "success_rate": len(successful) / offered_count if offered_count else 0.0,
+                    "shedding_rate": len(overloaded) / offered_count if offered_count else 0.0,
+                    "error_rate": len(errors) / offered_count if offered_count else 0.0,
+                    "offering_wall_seconds": offering_wall_seconds,
+                    "drain_seconds": drain_seconds,
+                    "scenario_wall_seconds": scenario_wall_seconds,
+                    "offered_qps": offered_count / offering_wall_seconds,
+                    "successful_qps": len(successful) / scenario_wall_seconds,
+                    "resolved_qps": offered_count / scenario_wall_seconds,
+                    "completed_qps": len(successful) / scenario_wall_seconds,
                     "successful_accuracy": (
-                        sum(item["correct"] for item in successful) / len(successful)
+                        successful_correct / len(successful)
                         if successful
                         else None
                     ),
@@ -151,12 +175,14 @@ async def run_benchmark(
                     "overload_latency": _percentiles(
                         [float(item["latency_ms"]) for item in overloaded]
                     ),
+                    "error_types": sorted(item["status"] for item in errors),
                 }
             )
     finally:
         await router.stop()
 
     return {
+        "schema_version": 2,
         "benchmark": "sustained_async_backpressure",
         "status": "unverified",
         "paper_evidence_eligible": False,
@@ -167,8 +193,13 @@ async def run_benchmark(
             "batch_size": batch_size,
             "max_in_flight_batches": max_in_flight_batches,
             "encoder_delay_ms": encoder_delay_ms,
+            "saturation_calibration_target_seconds": calibration_seconds,
             "saturation_calibration_seconds": calibration_wall_seconds,
+            "saturation_calibration_attempts": calibration_attempts,
             "saturation_calibration_successes": calibration_successes,
+            "saturation_calibration_overloaded": calibration_overloaded,
+            "saturation_calibration_error_count": len(calibration_errors),
+            "saturation_calibration_error_types": sorted(calibration_errors),
             "measured_saturation_qps": measured_saturation_qps,
         },
         "environment": {
@@ -181,6 +212,7 @@ async def run_benchmark(
             "Requests are offered on an open-loop fixed-interval schedule.",
             "Offered load is relative to a measured saturated closed-loop calibration.",
             "Overloaded and failed requests remain in the denominator.",
+            "Offering and drain windows are reported separately from end-to-end scenario time.",
             "The deterministic delayed encoder isolates queue behavior.",
         ],
     }

@@ -13,12 +13,21 @@ def test_dynamic_workload_preserves_visibility_and_restart_state(tmp_path):
 
     metrics = result["metrics"]
     assert metrics["completed_queries"] > 0
+    assert metrics["query_attempts"] == metrics["completed_queries"] + metrics["query_errors"]
+    assert metrics["completed_queries"] == metrics["query_correct"] + metrics["query_incorrect"]
     assert metrics["query_errors"] == 0
+    assert metrics["query_incorrect"] == 0
     assert metrics["query_accuracy"] == 1.0
+    assert metrics["query_success_rate"] == 1.0
+    assert metrics["mutation_attempts"] == (
+        metrics["mutation_successes"] + metrics["mutation_errors"]
+    )
     assert metrics["mutation_errors"] == 0
     assert metrics["visibility_failures"] == 0
     assert metrics["deletion_visibility_failures"] == 0
     assert metrics["correctness_violations"] == 0
+    assert metrics["operation_failures"] == 0
+    assert metrics["total_adverse_outcomes"] == 0
     assert metrics["pre_restart_state_equal"] is True
     assert metrics["restart_state_equal"] is True
     assert metrics["restart_recovery_ms"] >= 0.0
@@ -38,3 +47,5 @@ def test_dynamic_workload_supports_read_only_baseline(tmp_path):
 
     assert result["metrics"]["completed_queries"] > 0
     assert result["metrics"]["mutation_attempts"] == 0
+    assert result["metrics"]["mutation_success_rate"] is None
+    assert result["metrics"]["mutation_error_rate"] is None

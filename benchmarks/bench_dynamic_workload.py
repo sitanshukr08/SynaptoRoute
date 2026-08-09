@@ -15,6 +15,7 @@ from typing import Any
 import numpy as np
 
 from benchmarks.deterministic_encoder import DeterministicHashEncoder
+from benchmarks.manifest_schema import sha256_file
 from synaptoroute import AdaptiveRouter, MutationReceipt, Route, SQLiteStorage
 
 
@@ -172,10 +173,10 @@ def run_benchmark(
         for future in futures:
             future.result(timeout=10.0)
 
+    measurement_wall_seconds = time.perf_counter() - workload_started
     barrier_started = time.perf_counter()
     router.durable_barrier(timeout=30.0)
     barrier_ms = (time.perf_counter() - barrier_started) * 1000.0
-    workload_wall_seconds = time.perf_counter() - workload_started
     durable_latencies_ms = [
         receipt.durable_latency_ms
         for receipt in mutation_receipts
@@ -198,9 +199,25 @@ def run_benchmark(
     restart_state_equal = _snapshot(restarted_storage) == runtime_snapshot
     restarted.close()
     restarted_storage.close()
+    database_sha256 = sha256_file(database_path)
+    database_bytes = database_path.stat().st_size
 
     completed_queries = len(query_latencies_ms)
+    query_error_count = len(query_errors)
+    query_attempts = completed_queries + query_error_count
+    query_incorrect = completed_queries - query_correct
+    mutation_error_count = len(mutation_errors)
+    mutation_successes = mutation_count - mutation_error_count
+    correctness_violations = (
+        query_incorrect
+        + visibility_failures
+        + deletion_visibility_failures
+        + int(not pre_restart_state_equal)
+        + int(not restart_state_equal)
+    )
+    operation_failures = query_error_count + mutation_error_count
     return {
+        "schema_version": 2,
         "benchmark": "concurrent_dynamic_routing_workload",
         "status": "unverified",
         "paper_evidence_eligible": False,
@@ -219,19 +236,39 @@ def run_benchmark(
             "processor": platform.processor() or "unknown",
         },
         "metrics": {
+            "measurement_wall_seconds": measurement_wall_seconds,
+            "query_attempts": query_attempts,
             "completed_queries": completed_queries,
-            "query_errors": len(query_errors),
+            "query_correct": query_correct,
+            "query_incorrect": query_incorrect,
+            "query_errors": query_error_count,
             "query_accuracy": query_correct / completed_queries if completed_queries else None,
-            "query_throughput_per_second": completed_queries / workload_wall_seconds,
+            "query_success_rate": completed_queries / query_attempts if query_attempts else None,
+            "query_attempt_throughput_per_second": query_attempts / measurement_wall_seconds,
+            "query_success_throughput_per_second": completed_queries / measurement_wall_seconds,
+            "query_throughput_per_second": completed_queries / measurement_wall_seconds,
             "query_latency": _percentiles(query_latencies_ms),
             "mutation_attempts": mutation_count,
-            "mutation_errors": len(mutation_errors),
+            "mutation_successes": mutation_successes,
+            "mutation_errors": mutation_error_count,
+            "mutation_success_rate": (
+                mutation_successes / mutation_count if mutation_count else None
+            ),
+            "mutation_error_rate": (
+                mutation_error_count / mutation_count if mutation_count else None
+            ),
             "mutation_shedding_count": sum(
                 error == "RouterOverloadedError" for error in mutation_errors
             ),
-            "mutation_throughput_per_second": mutation_count / workload_wall_seconds,
+            "mutation_attempt_throughput_per_second": mutation_count
+            / measurement_wall_seconds,
+            "mutation_success_throughput_per_second": mutation_successes
+            / measurement_wall_seconds,
+            "mutation_throughput_per_second": mutation_count / measurement_wall_seconds,
             "mutation_memory_ack": _percentiles(mutation_memory_ack_ms),
             "mutation_durable_commit": _percentiles([float(value) for value in durable_latencies_ms]),
+            "mutation_receipt_count": len(mutation_receipts),
+            "durable_latency_count": len(durable_latencies_ms),
             "durable_receipt_count": sum(
                 receipt.state == "durable" for receipt in mutation_receipts
             ),
@@ -242,13 +279,9 @@ def run_benchmark(
             },
             "visibility_failures": visibility_failures,
             "deletion_visibility_failures": deletion_visibility_failures,
-            "correctness_violations": (
-                len(query_errors)
-                + visibility_failures
-                + deletion_visibility_failures
-                + int(not pre_restart_state_equal)
-                + int(not restart_state_equal)
-            ),
+            "correctness_violations": correctness_violations,
+            "operation_failures": operation_failures,
+            "total_adverse_outcomes": correctness_violations + operation_failures,
             "pre_restart_state_equal": pre_restart_state_equal,
             "restart_state_equal": restart_state_equal,
             "restart_recovery_ms": restart_recovery_ms,
@@ -264,9 +297,16 @@ def run_benchmark(
             "query": sorted(query_errors),
             "mutation": sorted(mutation_errors),
         },
+        "evidence": {
+            "database_path": database_path.resolve().as_posix(),
+            "database_sha256": database_sha256,
+            "database_bytes": database_bytes,
+        },
         "notes": [
             "The deterministic hash encoder isolates structural concurrency behavior.",
             "This mixed workload uses synchronous query calls from multiple threads.",
+            "Throughput denominators use the measured workload window and exclude the durable barrier.",
+            "Correctness violations and explicit operational failures are reported separately.",
             "Results remain unverified until run from a clean commit and repeated on controlled hardware.",
         ],
     }

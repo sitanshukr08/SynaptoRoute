@@ -5,9 +5,14 @@ def test_crash_recovery_distinguishes_memory_and_durable_acknowledgement(tmp_pat
     result = run_benchmark(output_dir=tmp_path, trials=1, delay_ms=100.0)
 
     assert result["metrics"]["memory"]["acknowledged_count"] == 1
+    assert result["metrics"]["memory"]["acknowledgement_rate"] == 1.0
+    assert result["metrics"]["memory"]["survived_count"] == 0
     assert result["metrics"]["memory"]["restart_survival_rate"] == 0.0
+    assert result["metrics"]["memory"]["contract_violation_count"] == 0
     assert result["metrics"]["durable"]["acknowledged_count"] == 1
+    assert result["metrics"]["durable"]["survived_count"] == 1
     assert result["metrics"]["durable"]["restart_survival_rate"] == 1.0
+    assert result["metrics"]["durable"]["contract_success_rate"] == 1.0
     assert result["metrics"]["durable"]["all_children_exited_cleanly"] is True
 
 

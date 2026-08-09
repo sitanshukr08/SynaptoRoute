@@ -177,6 +177,12 @@ A run can be promoted to `verified` only when:
 Paper tables must be generated from verified machine-readable result files.
 Values must not be transcribed manually from terminal output.
 
+Artifact verification establishes provenance and internal consistency, not a
+successful hypothesis. The matrix verifier recomputes systems denominators,
+rates, and throughputs and checks referenced SQLite hashes. Correctness misses,
+durability-contract violations, request errors, and explicit shedding remain
+in `outcome_observations` and are analyzed as results.
+
 The exact final systems matrix is stored in
 `paper/experiment_matrix.json`. Development smokes may use smaller parameters
 but must never be promoted as substitutes for that matrix.

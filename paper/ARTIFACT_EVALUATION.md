@@ -5,7 +5,10 @@
 Build `Dockerfile.paper` on a CPU-only Linux host. Record the image digest and
 retain `paper/resolved-environment.txt` from the image used for final runs.
 The image installs `paper/requirements-linux-py311.lock`, including CPU FAISS,
-and fails the build if `pip check` detects an inconsistent dependency closure.
+the pinned Hatchling build backend, and its backend dependencies. The editable
+package install uses `--no-build-isolation` so it cannot resolve an undeclared
+second build environment. The image fails if `pip check` detects an
+inconsistent dependency closure.
 
 ## Smoke
 
@@ -35,7 +38,7 @@ analysis output without manual edits.
 
 After extracting a matrix artifact, independently verify its candidate
 identity, ledger consistency, hashes, output/log binding, and family-specific
-correctness invariants:
+count, denominator, timing, and artifact-integrity constraints:
 
 ```bash
 python paper/verify_matrix_run.py EXTRACTED_ROOT/matrix \
@@ -47,6 +50,13 @@ python paper/verify_matrix_run.py EXTRACTED_ROOT/matrix \
 The verifier only accepts an `unverified`, paper-ineligible run. A successful
 report does not promote a claim; independent reproduction, immutable archival,
 and reviewer attestation remain separate gates.
+
+Verification is deliberately outcome-neutral. Incorrect routes, durability
+contract violations, request errors, and load shedding are returned under
+`outcome_observations`; they do not make internally consistent evidence
+invalid. A count mismatch, changed SQLite file, broken hash, or incomplete
+trial ledger does fail verification. See
+`docs/SYSTEMS_EVIDENCE_SCHEMA.md` for field definitions.
 
 Long runs checkpoint `run_state.json` after every command. Resume an interrupted
 run only from the same clean commit, matrix, command plan, output directory,
@@ -98,9 +108,10 @@ python benchmarks/promote_evidence.py \
   --output VERIFIED_CLAIM.json
 ```
 
-Performance values may differ across hardware. Correctness invariants must
-agree, and quality results must be interpreted using the frozen paired
-statistical analysis rather than an ad hoc equality tolerance.
+Performance values may differ across hardware. Reproductions must preserve the
+frozen configuration and report disagreements rather than discarding them.
+Quality results must be interpreted using the frozen paired statistical
+analysis rather than an ad hoc equality tolerance.
 
 ## Archive Construction
 

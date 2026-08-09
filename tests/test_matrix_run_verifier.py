@@ -71,9 +71,14 @@ def _make_crash_run(tmp_path: Path, *, durable_survived: bool = True) -> tuple[P
                 "survived_restart": survived,
                 "wall_ms": 1.0,
                 "database_path": f"/original/matrix/crash_recovery/{name}/{prefix}.sqlite3",
+                "database_sha256": sha256_file(cell_dir / f"{prefix}.sqlite3"),
+                "database_bytes": (cell_dir / f"{prefix}.sqlite3").stat().st_size,
+                "marker_path": f"/original/matrix/crash_recovery/{name}/{prefix}.ack",
+                "marker_sha256": sha256_file(cell_dir / f"{prefix}.ack"),
             }
         )
     summary = {
+        "schema_version": 2,
         "benchmark": "abrupt_process_restart_durability",
         "status": "unverified",
         "paper_evidence_eligible": False,
@@ -88,14 +93,28 @@ def _make_crash_run(tmp_path: Path, *, durable_survived: bool = True) -> tuple[P
             "memory": {
                 "trial_count": 1,
                 "acknowledged_count": 1,
+                "acknowledgement_rate": 1.0,
+                "survived_count": 0,
                 "restart_survival_rate": 0.0,
+                "clean_exit_count": 1,
+                "clean_exit_rate": 1.0,
                 "all_children_exited_cleanly": True,
+                "expected_restart_survival": False,
+                "contract_violation_count": 0,
+                "contract_success_rate": 1.0,
             },
             "durable": {
                 "trial_count": 1,
                 "acknowledged_count": 1,
+                "acknowledgement_rate": 1.0,
+                "survived_count": 1 if durable_survived else 0,
                 "restart_survival_rate": 1.0 if durable_survived else 0.0,
+                "clean_exit_count": 1,
+                "clean_exit_rate": 1.0,
                 "all_children_exited_cleanly": True,
+                "expected_restart_survival": True,
+                "contract_violation_count": 0 if durable_survived else 1,
+                "contract_success_rate": 1.0 if durable_survived else 0.0,
             },
         },
         "trials": trials,
@@ -227,6 +246,7 @@ def test_verifier_accepts_complete_unverified_crash_run(tmp_path):
     assert report["paper_evidence_eligible"] is False
     assert report["command_count"] == 1
     assert report["invariants"]["crash_trial_record_count"] == 2
+    assert report["outcome_observation_count"] == 0
 
 
 def test_verifier_rejects_a_changed_hashed_log(tmp_path):
@@ -238,11 +258,22 @@ def test_verifier_rejects_a_changed_hashed_log(tmp_path):
         verify_matrix_run(run_dir, source_root=source)
 
 
-def test_verifier_rejects_an_internally_consistent_durability_violation(tmp_path):
+def test_verifier_rejects_changed_crash_database_evidence(tmp_path):
+    run_dir, source = _make_crash_run(tmp_path)
+    database = next((run_dir / "crash_recovery").rglob("*.sqlite3"))
+    database.write_bytes(b"tamper")
+
+    with pytest.raises(MatrixRunVerificationError, match="database hash differs"):
+        verify_matrix_run(run_dir, source_root=source)
+
+
+def test_verifier_retains_an_internally_consistent_durability_violation(tmp_path):
     run_dir, source = _make_crash_run(tmp_path, durable_survived=False)
 
-    with pytest.raises(MatrixRunVerificationError, match="restart survival violated"):
-        verify_matrix_run(run_dir, source_root=source)
+    report = verify_matrix_run(run_dir, source_root=source)
+
+    assert report["outcome_observation_count"] == 1
+    assert report["outcome_observations"][0]["code"] == "durable_restart_contract_violations"
 
 
 def test_verifier_requires_requested_environment_evidence(tmp_path):
@@ -253,78 +284,332 @@ def test_verifier_requires_requested_environment_evidence(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("family", "name", "matrix", "summary", "expected_error"),
+    ("family", "name", "matrix", "summary", "expected_code"),
     [
         (
             "dynamic",
             "r100-w1-m0-rep0",
             {"dynamic": {}},
             {
+                "schema_version": 2,
+                "benchmark": "concurrent_dynamic_routing_workload",
                 "status": "unverified",
                 "paper_evidence_eligible": False,
+                "workload": {
+                    "route_count": 100,
+                    "query_workers": 1,
+                    "target_mutations_per_second": 0,
+                    "warmup_seconds": 10,
+                    "duration_seconds": 60,
+                },
                 "metrics": {
+                    "measurement_wall_seconds": 1.0,
+                    "query_attempts": 2,
+                    "completed_queries": 2,
+                    "query_correct": 1,
+                    "query_incorrect": 1,
+                    "query_errors": 0,
+                    "query_accuracy": 0.5,
+                    "query_success_rate": 1.0,
+                    "query_attempt_throughput_per_second": 2.0,
+                    "query_success_throughput_per_second": 2.0,
+                    "query_throughput_per_second": 2.0,
+                    "query_latency": {
+                        "p50_ms": 1.0,
+                        "p95_ms": 1.0,
+                        "p99_ms": 1.0,
+                        "max_ms": 1.0,
+                    },
+                    "mutation_attempts": 0,
+                    "mutation_successes": 0,
+                    "mutation_errors": 0,
+                    "mutation_success_rate": None,
+                    "mutation_error_rate": None,
+                    "mutation_shedding_count": 0,
+                    "mutation_attempt_throughput_per_second": 0.0,
+                    "mutation_success_throughput_per_second": 0.0,
+                    "mutation_throughput_per_second": 0.0,
+                    "mutation_memory_ack": None,
+                    "mutation_durable_commit": None,
+                    "mutation_receipt_count": 0,
+                    "durable_latency_count": 0,
+                    "durable_receipt_count": 0,
+                    "storage_queue_depth": {"max": 0, "samples": 0},
+                    "visibility_failures": 0,
+                    "deletion_visibility_failures": 0,
                     "correctness_violations": 1,
+                    "operation_failures": 0,
+                    "total_adverse_outcomes": 1,
                     "pre_restart_state_equal": True,
                     "restart_state_equal": True,
                 },
+                "errors": {"query": [], "mutation": []},
             },
-            "dynamic:r100-w1-m0-rep0: correctness violations",
+            "incorrect_query_results",
         ),
         (
             "scale",
             "numpy-r1000-rep0",
             {"scale": {}},
             {
+                "schema_version": 2,
+                "benchmark": "precomputed_vector_scale",
                 "status": "unverified",
                 "paper_evidence_eligible": False,
-                "metrics": {"top1_identity_accuracy": 0.99},
+                "configuration": {
+                    "engine": "numpy",
+                    "route_count": 1000,
+                    "query_count": 100,
+                    "seed": 42,
+                },
+                "metrics": {
+                    "query_count": 100,
+                    "correct_count": 99,
+                    "incorrect_count": 1,
+                    "top1_identity_accuracy": 0.99,
+                    "build_seconds": 1.0,
+                    "query_seconds": 1.0,
+                    "throughput_qps": 100.0,
+                    "latency": {
+                        "p50_ms": 1.0,
+                        "p95_ms": 1.0,
+                        "p99_ms": 1.0,
+                        "max_ms": 1.0,
+                    },
+                },
             },
-            "scale:numpy-r1000-rep0: identity retrieval failed",
+            "identity_retrieval_misses",
         ),
         (
             "backpressure",
             "balanced-rep0",
             {"backpressure": {"offered_load_fraction": [1.0]}},
             {
+                "schema_version": 2,
+                "benchmark": "sustained_async_backpressure",
                 "status": "unverified",
                 "paper_evidence_eligible": False,
+                "configuration": {
+                    "duration_seconds": 60,
+                    "saturation_calibration_target_seconds": 10,
+                    "queue_size": 32,
+                    "batch_size": 8,
+                    "saturation_calibration_attempts": 10,
+                    "saturation_calibration_successes": 10,
+                    "saturation_calibration_overloaded": 0,
+                    "saturation_calibration_error_count": 0,
+                    "saturation_calibration_error_types": [],
+                    "saturation_calibration_seconds": 0.1,
+                    "measured_saturation_qps": 100.0,
+                },
                 "scenarios": [
                     {
                         "load_fraction": 1.0,
                         "offered_count": 3,
                         "successful_count": 1,
+                        "successful_correct_count": 1,
+                        "successful_incorrect_count": 0,
                         "overloaded_count": 1,
-                        "error_count": 0,
+                        "error_count": 1,
+                        "success_rate": 1 / 3,
+                        "shedding_rate": 1 / 3,
+                        "error_rate": 1 / 3,
                         "successful_accuracy": 1.0,
+                        "target_qps": 100.0,
+                        "offering_wall_seconds": 1.0,
+                        "drain_seconds": 0.0,
+                        "scenario_wall_seconds": 1.0,
+                        "offered_qps": 3.0,
+                        "successful_qps": 1.0,
+                        "completed_qps": 1.0,
+                        "resolved_qps": 3.0,
+                        "successful_latency": {
+                            "p50_ms": 1.0,
+                            "p95_ms": 1.0,
+                            "p99_ms": 1.0,
+                            "max_ms": 1.0,
+                        },
+                        "overload_latency": {
+                            "p50_ms": 1.0,
+                            "p95_ms": 1.0,
+                            "p99_ms": 1.0,
+                            "max_ms": 1.0,
+                        },
+                        "error_types": ["error:RuntimeError"],
                     }
                 ],
             },
-            "backpressure:balanced-rep0: offered-load denominator mismatch",
+            "request_errors",
         ),
     ],
 )
-def test_family_handlers_reject_structural_invariant_failures(
+def test_family_handlers_retain_unfavorable_outcomes(
     tmp_path,
     family,
     name,
     matrix,
     summary,
-    expected_error,
+    expected_code,
 ):
     run_dir = tmp_path / "matrix"
-    result = {"index": 0, "family": family, "name": name}
+    commands = {
+        "dynamic": [
+            "python",
+            "benchmark.py",
+            "--routes",
+            "100",
+            "--query-workers",
+            "1",
+            "--mutation-rate",
+            "0",
+            "--warmup",
+            "10",
+            "--duration",
+            "60",
+        ],
+        "scale": [
+            "python",
+            "benchmark.py",
+            "--engine",
+            "numpy",
+            "--routes",
+            "1000",
+            "--queries",
+            "100",
+            "--seed",
+            "42",
+        ],
+        "backpressure": [
+            "python",
+            "benchmark.py",
+            "--duration",
+            "60",
+            "--calibration-duration",
+            "10",
+            "--queue-size",
+            "32",
+            "--batch-size",
+            "8",
+        ],
+    }
+    result = {"index": 0, "family": family, "name": name, "command": commands[family]}
     if family == "dynamic":
         summary_path = run_dir / family / name / "dynamic_workload_summary.json"
     else:
         summary_path = run_dir / family / f"{name}.json"
     log_path = run_dir / "logs" / f"0000-{family}-{name}.log"
+    if family == "dynamic":
+        database = run_dir / family / name / "state.sqlite3"
+        database.parent.mkdir(parents=True, exist_ok=True)
+        database.write_bytes(b"sqlite")
+        summary["evidence"] = {
+            "database_path": f"/original/matrix/{family}/{name}/{database.name}",
+            "database_sha256": sha256_file(database),
+            "database_bytes": database.stat().st_size,
+        }
     _write_json(summary_path, summary)
     _write_json(log_path, summary)
     errors = []
 
-    _verify_family_invariants(run_dir, [result], matrix, {0: log_path}, errors)
+    report = _verify_family_invariants(run_dir, [result], matrix, {0: log_path}, errors)
 
-    assert expected_error in errors
+    assert errors == []
+    assert expected_code in {
+        observation["code"] for observation in report["outcome_observations"]
+    }
+
+
+def test_backpressure_handler_rejects_a_falsified_denominator(tmp_path):
+    run_dir = tmp_path / "matrix"
+    name = "balanced-rep0"
+    summary = {
+        "schema_version": 2,
+        "benchmark": "sustained_async_backpressure",
+        "status": "unverified",
+        "paper_evidence_eligible": False,
+        "configuration": {
+            "duration_seconds": 60,
+            "saturation_calibration_target_seconds": 10,
+            "queue_size": 32,
+            "batch_size": 8,
+            "saturation_calibration_attempts": 1,
+            "saturation_calibration_successes": 1,
+            "saturation_calibration_overloaded": 0,
+            "saturation_calibration_error_count": 0,
+            "saturation_calibration_error_types": [],
+            "saturation_calibration_seconds": 1.0,
+            "measured_saturation_qps": 1.0,
+        },
+        "scenarios": [
+            {
+                "load_fraction": 1.0,
+                "target_qps": 1.0,
+                "offered_count": 4,
+                "successful_count": 1,
+                "successful_correct_count": 1,
+                "successful_incorrect_count": 0,
+                "overloaded_count": 1,
+                "error_count": 1,
+                "success_rate": 0.25,
+                "shedding_rate": 0.25,
+                "error_rate": 0.25,
+                "offering_wall_seconds": 1.0,
+                "drain_seconds": 0.0,
+                "scenario_wall_seconds": 1.0,
+                "offered_qps": 4.0,
+                "successful_qps": 1.0,
+                "completed_qps": 1.0,
+                "resolved_qps": 4.0,
+                "successful_accuracy": 1.0,
+                "successful_latency": {
+                    "p50_ms": 1.0,
+                    "p95_ms": 1.0,
+                    "p99_ms": 1.0,
+                    "max_ms": 1.0,
+                },
+                "overload_latency": {
+                    "p50_ms": 1.0,
+                    "p95_ms": 1.0,
+                    "p99_ms": 1.0,
+                    "max_ms": 1.0,
+                },
+                "error_types": ["error:RuntimeError"],
+            }
+        ],
+    }
+    summary_path = run_dir / "backpressure" / f"{name}.json"
+    log_path = run_dir / "logs" / f"0000-backpressure-{name}.log"
+    _write_json(summary_path, summary)
+    _write_json(log_path, summary)
+    errors = []
+
+    _verify_family_invariants(
+        run_dir,
+        [
+            {
+                "index": 0,
+                "family": "backpressure",
+                "name": name,
+                "command": [
+                    "python",
+                    "benchmark.py",
+                    "--duration",
+                    "60",
+                    "--calibration-duration",
+                    "10",
+                    "--queue-size",
+                    "32",
+                    "--batch-size",
+                    "8",
+                ],
+            }
+        ],
+        {"backpressure": {"offered_load_fraction": [1.0]}},
+        {0: log_path},
+        errors,
+    )
+
+    assert "backpressure:balanced-rep0:load=1.0: offered-load denominator mismatch" in errors
 
 
 def test_quality_handler_checks_seed_artifact_hashes(tmp_path):

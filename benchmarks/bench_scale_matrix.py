@@ -65,6 +65,7 @@ def run_benchmark(
     query_seconds = time.perf_counter() - query_started
 
     return {
+        "schema_version": 2,
         "benchmark": "precomputed_vector_scale",
         "status": "unverified",
         "paper_evidence_eligible": False,
@@ -82,6 +83,9 @@ def run_benchmark(
             "numpy": np.__version__,
         },
         "metrics": {
+            "query_count": query_count,
+            "correct_count": correct,
+            "incorrect_count": query_count - correct,
             "top1_identity_accuracy": correct / query_count,
             "build_seconds": build_seconds,
             "query_seconds": query_seconds,
@@ -89,6 +93,11 @@ def run_benchmark(
             "latency": _percentiles(latencies_ms),
             "rss_before_mb": rss_before,
             "rss_after_mb": rss_after,
+            "rss_delta_mb": (
+                rss_after - rss_before
+                if rss_before is not None and rss_after is not None
+                else None
+            ),
         },
         "notes": [
             "Precomputed synthetic vectors isolate index structure from encoder cost.",
