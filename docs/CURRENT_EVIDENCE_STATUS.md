@@ -51,10 +51,22 @@ SynaptoRoute has a coherent engineering direction, but its historical benchmark 
   diagnostic evidence only because the host was uncontrolled and the run has
   no environment bundle, independent reproduction, archive, or attestation.
   Details are in `SYSTEMS_PILOT_RESULTS.md`.
+* A clean local scale run at
+  `039971adbbea48ab00b3f18e603f9a1f55fee243` completed all 40 frozen cells
+  and 400,000 structural identity queries. NumPy exact returned all 200,000
+  identities. FAISS HNSW returned 199,495 of 200,000, with misses confined to
+  the 50,000- and 100,000-vector cells. The paired analysis found a query
+  performance crossover at larger sizes alongside lower identity accuracy,
+  much higher one-at-a-time build cost, and higher observed RSS. This is an
+  unverified diagnostic result, not a release or paper claim. The uncontrolled
+  run also omitted first-class FAISS/HNSW configuration fields needed for
+  confirmation. Details are in `SYSTEMS_PILOT_RESULTS.md`.
 
 ## Research Claims
 
-* Banking77, CLINC150, OOD, latency, throughput, GPU, and scale numbers are historical audit records only.
+* Historical Banking77, CLINC150, OOD, latency, throughput, GPU, and 1M-scale
+  numbers remain audit records only. The clean local 100k scale pilot is a new
+  unverified diagnostic and does not supersede that publication restriction.
 * The old `0.003ms` 1M-vector latency claim is retracted. The historical value appears to be about 3.1ms after unit correction, but it still needs a clean rerun.
 * OOD metrics must be rerun before publication because existing docs previously contradicted whether OOD validation existed.
 * The CLINC development pilot indicates that OOD rejection is currently the

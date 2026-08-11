@@ -31,6 +31,35 @@ def _rss_mb() -> float | None:
         return None
 
 
+def _index_parameters(index, engine: str, route_count: int) -> dict:
+    common = {
+        "construction_add_calls": route_count,
+        "vectors_per_add_call": 1,
+        "metric": "normalized_inner_product",
+    }
+    if engine == "numpy":
+        return {
+            **common,
+            "implementation": "numpy_exact",
+            "max_capacity": index.max_capacity,
+        }
+
+    import faiss
+
+    base_index = faiss.downcast_index(index.index.index)
+    hnsw = getattr(base_index, "hnsw")
+    return {
+        **common,
+        "implementation": "faiss_hnsw",
+        "faiss_version": faiss.__version__,
+        "omp_threads": faiss.omp_get_max_threads(),
+        "hnsw_m": hnsw.nb_neighbors(1),
+        "hnsw_ef_construction": hnsw.efConstruction,
+        "hnsw_ef_search": hnsw.efSearch,
+        "search_candidate_floor": index.SEARCH_CANDIDATE_FLOOR,
+    }
+
+
 def run_benchmark(
     *,
     engine: str,
@@ -45,6 +74,7 @@ def run_benchmark(
     vectors = rng.normal(size=(route_count, dim)).astype(np.float32)
     vectors /= np.linalg.norm(vectors, axis=1, keepdims=True)
     index = get_index(dim=dim, max_capacity=route_count, engine=engine)
+    index_parameters = _index_parameters(index, engine, route_count)
 
     rss_before = _rss_mb()
     build_started = time.perf_counter()
@@ -75,12 +105,14 @@ def run_benchmark(
             "query_count": query_count,
             "dimension": dim,
             "seed": seed,
+            "index_parameters": index_parameters,
         },
         "environment": {
             "python": platform.python_version(),
             "platform": platform.platform(),
             "processor": platform.processor() or "unknown",
             "numpy": np.__version__,
+            "faiss": index_parameters.get("faiss_version"),
         },
         "metrics": {
             "query_count": query_count,

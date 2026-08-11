@@ -150,3 +150,83 @@ captured environment evidence, an immutable archive, independent execution,
 and reviewer attestation. Its synthetic delayed encoder isolates queue
 behavior and does not establish end-to-end performance with a production
 embedding provider.
+
+## Scale Pilot
+
+### Candidate And Run
+
+| Field | Value |
+|---|---|
+| Source commit | `039971adbbea48ab00b3f18e603f9a1f55fee243` |
+| Run ID | `85dc2982-b9f7-42c3-82a9-dd655fd55f42` |
+| Date completed | 2026-08-11 |
+| Host | Uncontrolled Windows 10 development workstation |
+| Python | 3.10.11 |
+| Family | Frozen `scale` matrix |
+| Cells | 40 of 40 completed |
+| Queries | 400,000: 2 engines x 4 sizes x 5 repetitions x 10,000 |
+| Recorded completed-cell time | 2,622.89 seconds |
+| Resume count | 0 |
+
+The structural workload used normalized 64-dimensional synthetic vectors and
+queried vectors already present in each index. It crossed NumPy exact and
+FAISS HNSW indexes at 1,000, 10,000, 50,000, and 100,000 vectors with matched
+seeds 42 through 46. Identity accuracy is an index-retrieval invariant, not
+semantic-routing accuracy.
+
+### Aggregate Outcomes
+
+| Outcome | Count |
+|---|---:|
+| Scale cells | 40 / 40 |
+| Query attempts | 400,000 |
+| Correct identity lookups | 399,495 |
+| Incorrect identity lookups | 505 |
+| NumPy exact misses | 0 / 200,000 |
+| FAISS HNSW misses | 505 / 200,000 |
+| Command failures | 0 |
+
+The repetition-level analysis used a deterministic 10,000-resample percentile
+bootstrap over five cells per engine and route count.
+
+| Engine | Routes | Accuracy | Misses | Build, mean [95% CI] | QPS, mean [95% CI] | P95, mean [95% CI] | RSS delta |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| NumPy | 1,000 | 100.000% | 0 | 0.01 [0.01, 0.01] s | 9,612.55 [8,680.66, 10,112.90] | 0.133 [0.122, 0.156] ms | 0.22 MB |
+| NumPy | 10,000 | 100.000% | 0 | 0.13 [0.13, 0.13] s | 7,079.37 [7,048.35, 7,112.08] | 0.172 [0.171, 0.174] ms | 4.88 MB |
+| NumPy | 50,000 | 100.000% | 0 | 0.68 [0.68, 0.69] s | 1,676.47 [1,636.59, 1,707.22] | 0.745 [0.716, 0.783] ms | 26.62 MB |
+| NumPy | 100,000 | 100.000% | 0 | 1.37 [1.35, 1.38] s | 529.34 [511.63, 540.85] | 2.206 [2.060, 2.457] ms | 52.32 MB |
+| FAISS | 1,000 | 100.000% | 0 | 0.08 [0.08, 0.08] s | 6,642.44 [6,172.06, 6,893.17] | 0.180 [0.167, 0.205] ms | 1.25 MB |
+| FAISS | 10,000 | 100.000% | 0 | 3.99 [3.97, 4.01] s | 3,975.90 [3,907.98, 4,015.56] | 0.288 [0.283, 0.297] ms | 10.02 MB |
+| FAISS | 50,000 | 99.806% | 97 | 96.44 [94.80, 97.78] s | 3,269.45 [3,246.76, 3,284.76] | 0.367 [0.363, 0.370] ms | 45.59 MB |
+| FAISS | 100,000 | 99.184% | 408 | 372.21 [355.54, 384.28] s | 3,101.83 [2,892.59, 3,226.51] | 0.403 [0.375, 0.454] ms | 88.70 MB |
+
+Matched-seed comparisons show a crossover rather than one universally better
+index. At 1,000 and 10,000 vectors, FAISS throughput was 0.70x and 0.56x
+NumPy throughput and its P95 latency was 1.38x and 1.67x NumPy P95. At 50,000
+and 100,000 vectors, FAISS throughput rose to 1.95x and 5.87x NumPy throughput,
+while its P95 fell to 0.49x and 0.19x NumPy P95. Those large-size gains came
+with mean identity-accuracy changes of -0.194 and -0.816 percentage points,
+build-time ratios of 140.97x and 272.26x, and larger observed RSS deltas.
+
+### Verification And Analysis
+
+The standalone verifier returned `valid_unverified_matrix_run`, checked all 40
+command logs and count/timing invariants, and retained ten
+`identity_retrieval_misses` observations: one for every 50,000- and
+100,000-vector FAISS repetition. These misses are experimental outcomes, not
+evidence-integrity failures.
+
+`paper/analyze_scale.py` binds the analysis to the run ID, candidate SHA,
+manifest hash, run-state hash, and all 40 source-summary hashes. Pooled
+accuracy retains every query. Performance intervals resample repetition-level
+metrics, and exact-versus-HNSW effects pair the same route count and generated
+vector seed.
+
+This pilot does not promote claim C9. It lacks controlled Linux hardware,
+captured environment evidence, independent execution, immutable archival, and
+reviewer attestation. The synthetic identity workload does not measure
+semantic quality. The sealed summaries also do not capture FAISS version,
+HNSW construction/search parameters, thread count, or the benchmark's
+one-vector-at-a-time construction policy as first-class fields. Those fields,
+a bulk-construction comparison, and an HNSW parameter sweep are required before
+the controlled scale experiment.

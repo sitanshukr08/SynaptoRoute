@@ -185,12 +185,15 @@ class FaissIndex:
     A FAISS-based vector index utilizing HNSW for sub-linear search latency.
     Employs a Tombstone architecture for O(1) instantaneous deletions.
     """
+    HNSW_M = 32
+    SEARCH_CANDIDATE_FLOOR = 2048
+
     def __init__(self, dim: int):
         self.dim = dim
         self.lock = threading.Lock()
         
         # Inner Product (Cosine Similarity for normalized embeddings)
-        base_index = faiss.IndexHNSWFlat(self.dim, 32, faiss.METRIC_INNER_PRODUCT)
+        base_index = faiss.IndexHNSWFlat(self.dim, self.HNSW_M, faiss.METRIC_INNER_PRODUCT)
         self.index = faiss.IndexIDMap(base_index)
         
         self.tombstones: set[int] = set()
@@ -232,7 +235,10 @@ class FaissIndex:
     def search(self, query_embeddings: np.ndarray, top_k: int = 1) -> List[List[Tuple[float, str]]]:
         if True:
             # Overfetch to account for tombstones 
-            search_k = min(self.index.ntotal, max(top_k + len(self.tombstones) * 2, 2048))
+            search_k = min(
+                self.index.ntotal,
+                max(top_k + len(self.tombstones) * 2, self.SEARCH_CANDIDATE_FLOOR),
+            )
             
             if search_k == 0:
                 return [[] for _ in range(query_embeddings.shape[0])]
@@ -265,7 +271,11 @@ class FaissIndex:
         """Garbage Collection: Completely reconstructs the HNSW index to flush dead vectors."""
         if True:
             # Create a brand new index
-            base_index = faiss.IndexHNSWFlat(self.dim, 32, faiss.METRIC_INNER_PRODUCT)
+            base_index = faiss.IndexHNSWFlat(
+                self.dim,
+                self.HNSW_M,
+                faiss.METRIC_INNER_PRODUCT,
+            )
             new_index = faiss.IndexIDMap(base_index)
             
             new_route_to_ids = {}

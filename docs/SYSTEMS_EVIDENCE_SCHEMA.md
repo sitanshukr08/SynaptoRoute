@@ -54,6 +54,18 @@ The structural identity workload records `query_count`, `correct_count`, and
 `query_seconds`. Identity accuracy is an index-structure check; it is not
 semantic-routing quality evidence.
 
+`paper/analyze_scale.py` aggregates counts and repetition-level performance by
+engine and route count, then pairs NumPy and FAISS cells by generated-vector
+seed. Accuracy effects are FAISS minus NumPy; build-time, throughput, and P95
+effects are FAISS divided by NumPy. RSS is reported separately because process
+allocator behavior can make deltas noisy. Approximate-retrieval misses remain
+in both the pooled denominator and verifier outcome observations.
+
+New scale cells also record construction-call policy, metric, implementation,
+FAISS version, OpenMP thread count, HNSW `M`, `efConstruction`, `efSearch`, and
+the search-candidate floor. The verifier validates these fields when present;
+older unverified pilots remain readable but must not be promoted without them.
+
 ## Crash Recovery
 
 Each trial records acknowledgement, child exit, restart survival, and the path,

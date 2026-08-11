@@ -64,6 +64,17 @@ request outcomes, and bootstraps repetition-level metrics. It emits JSON, CSV,
 and Markdown under `analysis/backpressure/` while preserving `status=unverified`
 and `paper_evidence_eligible=false`.
 
+Use the paired scale analyzer for a complete scale family:
+
+```bash
+python paper/analyze_scale.py EXTRACTED_ROOT/matrix \
+  --expected-commit FULL_CANDIDATE_SHA
+```
+
+It retains exact and approximate identity misses, summarizes each engine/size
+cell, and pairs engine effects by route count and generated-vector seed under
+`analysis/scale/`. Do not interpret identity accuracy as semantic quality.
+
 Verification is deliberately outcome-neutral. Incorrect routes, durability
 contract violations, request errors, and load shedding are returned under
 `outcome_observations`; they do not make internally consistent evidence

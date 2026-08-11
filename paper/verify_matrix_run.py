@@ -712,6 +712,41 @@ def _verify_scale_summary(
     if not isinstance(configuration, dict) or not isinstance(metrics, dict):
         errors.append(f"scale:{name}: configuration and metrics must be objects")
         return
+    index_parameters = configuration.get("index_parameters")
+    if index_parameters is not None:
+        if not isinstance(index_parameters, dict):
+            errors.append(f"scale:{name}: index_parameters must be an object")
+        else:
+            route_count = configuration.get("route_count")
+            if index_parameters.get("construction_add_calls") != route_count:
+                errors.append(f"scale:{name}: construction calls differ from route count")
+            if index_parameters.get("vectors_per_add_call") != 1:
+                errors.append(f"scale:{name}: vectors_per_add_call must equal one")
+            if index_parameters.get("metric") != "normalized_inner_product":
+                errors.append(f"scale:{name}: index metric is not normalized inner product")
+            engine = configuration.get("engine")
+            expected_implementation = {
+                "numpy": "numpy_exact",
+                "faiss": "faiss_hnsw",
+            }.get(engine) if isinstance(engine, str) else None
+            if index_parameters.get("implementation") != expected_implementation:
+                errors.append(f"scale:{name}: index implementation differs from engine")
+            if engine == "faiss":
+                version = index_parameters.get("faiss_version")
+                if not isinstance(version, str) or not version:
+                    errors.append(f"scale:{name}: FAISS version is missing")
+                for field in (
+                    "omp_threads",
+                    "hnsw_m",
+                    "hnsw_ef_construction",
+                    "hnsw_ef_search",
+                    "search_candidate_floor",
+                ):
+                    value = index_parameters.get(field)
+                    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                        errors.append(f"scale:{name}: {field} must be a positive integer")
+            elif engine == "numpy" and index_parameters.get("max_capacity") != route_count:
+                errors.append(f"scale:{name}: NumPy capacity differs from route count")
     query_count = _count(metrics.get("query_count"), f"scale:{name}: query_count", errors)
     correct = _count(metrics.get("correct_count"), f"scale:{name}: correct_count", errors)
     incorrect = _count(metrics.get("incorrect_count"), f"scale:{name}: incorrect_count", errors)

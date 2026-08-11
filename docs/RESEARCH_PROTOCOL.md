@@ -141,6 +141,8 @@ or nanoseconds with the conversion performed exactly once in analysis code.
 * Apply the same offered concurrency and harness queueing policy to every
   compared system.
 * Separate encoder, retrieval, decision, persistence, and end-to-end timings.
+* For approximate indexes, record library version, construction/search
+  parameters, thread count, candidate budget, and insertion/bulk-build policy.
 * Record failures and timeouts in the denominator; do not silently retry them.
 * Freeze thresholds and hyperparameters using training/validation data before
   evaluating the final test split.

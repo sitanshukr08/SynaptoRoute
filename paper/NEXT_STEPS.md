@@ -24,6 +24,10 @@ Implemented:
   windows, SQLite hashes, and outcome-neutral matrix verification;
 * repetition-level backpressure analysis with pooled outcome denominators,
   deterministic bootstrap intervals, and JSON/CSV/Markdown outputs;
+* paired repetition-level scale analysis for exact/HNSW accuracy, build time,
+  query throughput, latency, and RSS tradeoffs;
+* future scale cells record FAISS/HNSW versions, parameters, thread count,
+  search-candidate floor, and construction-call policy;
 * a streaming, content-inventoried archive builder that rejects dirty source,
   mismatched manifests, failed runs, changed hashes, and symlinks;
 * an independent streaming archive verifier, unattended runbook, paper methods
@@ -43,8 +47,10 @@ Not yet complete:
   3,200 crash-recovery trials, including a successful checkpoint resume;
 * a clean local backpressure pilot completed all 15 cells, retained 3,961,344
   offered-request outcomes, and exposed a low-latency variance concern;
-* quality, dynamic, and scale hosted pilots remain pending, as does a
-  controlled-host backpressure reproduction;
+* a clean local scale pilot completed all 40 cells and exposed a large-size
+  HNSW speed/identity-recall/build-cost tradeoff;
+* quality and dynamic hosted pilots remain pending, as do controlled-host
+  backpressure and scale reproductions;
 * controlled matrix runs, second-machine reproduction, archival DOI, and paper
   results remain pending.
 
@@ -80,7 +86,10 @@ Not yet complete:
 4. Repeat the complete backpressure matrix in the paper container and confirm
    whether the low-latency 1.0x P95 variance persists on controlled Linux
    hardware.
-5. Freeze a new candidate if any correctness code changes.
+5. Add frozen bulk-construction and HNSW parameter-sweep cells, then confirm
+   the new version/parameter/thread/construction metadata before controlled
+   scale execution.
+6. Freeze a new candidate if any correctness code changes.
 
 ### 4. Run Confirmatory Experiments
 

@@ -21,6 +21,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from benchmarks.manifest_schema import sha256_file  # noqa: E402
+from paper.analysis_utils import concise_matrix_verification, summarize_values  # noqa: E402
 from paper.verify_matrix_run import verify_matrix_run  # noqa: E402
 
 
@@ -49,43 +50,6 @@ def _count(value: Any, label: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < 0:
         raise ValueError(f"{label} must be a non-negative integer")
     return value
-
-
-def summarize_values(
-    values: Sequence[float],
-    *,
-    bootstrap_repetitions: int,
-    rng: np.random.Generator,
-) -> dict[str, Any]:
-    """Summarize repetition-level values with a percentile bootstrap interval."""
-
-    if not values:
-        raise ValueError("cannot summarize an empty sequence")
-    if bootstrap_repetitions < 100:
-        raise ValueError("bootstrap repetitions must be at least 100")
-    array = np.asarray(values, dtype=np.float64)
-    if not np.all(np.isfinite(array)):
-        raise ValueError("summary values must be finite")
-
-    mean = float(np.mean(array))
-    if len(array) == 1 or np.all(array == array[0]):
-        lower = upper = mean
-    else:
-        sampled_indexes = rng.integers(
-            0,
-            len(array),
-            size=(bootstrap_repetitions, len(array)),
-        )
-        bootstrap_means = np.mean(array[sampled_indexes], axis=1)
-        lower, upper = (float(value) for value in np.percentile(bootstrap_means, [2.5, 97.5]))
-    return {
-        "n": len(array),
-        "mean": mean,
-        "sample_std": float(np.std(array, ddof=1)) if len(array) > 1 else None,
-        "min": float(np.min(array)),
-        "max": float(np.max(array)),
-        "confidence_interval_95": [lower, upper],
-    }
 
 
 def _optional_summary(
@@ -339,18 +303,6 @@ def analyze_records(
     }
 
 
-def _concise_verification(report: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        "verification_status": report["verification_status"],
-        "command_count": report["command_count"],
-        "log_hashes_verified": report["log_hashes_verified"],
-        "raw_and_state_hashes_verified": report["raw_and_state_hashes_verified"],
-        "invariants_passed": report["invariants"]["passed"],
-        "outcome_observation_count": report["outcome_observation_count"],
-        "environment_evidence_verified": report["environment_evidence_verified"],
-    }
-
-
 def analyze_run(
     run_dir: Path,
     *,
@@ -399,7 +351,7 @@ def analyze_run(
             "manifest_sha256": sha256_file(run_dir / "manifest.json"),
             "run_state_sha256": sha256_file(state_path),
         },
-        "verification": _concise_verification(verification),
+        "verification": concise_matrix_verification(verification),
         "configuration": {
             "bootstrap_repetitions": bootstrap_repetitions,
             "random_seed": random_seed,

@@ -8,11 +8,52 @@ from benchmarks.manifest_schema import sha256_file
 from paper.verify_matrix_run import (
     MatrixRunVerificationError,
     _verify_family_invariants,
+    _verify_scale_summary,
     verify_matrix_run,
 )
 
 
 COMMIT = "a" * 40
+
+
+def test_scale_handler_validates_recorded_hnsw_configuration():
+    summary = {
+        "configuration": {
+            "engine": "faiss",
+            "route_count": 100,
+            "query_count": 10,
+            "index_parameters": {
+                "construction_add_calls": 100,
+                "vectors_per_add_call": 1,
+                "metric": "normalized_inner_product",
+                "implementation": "faiss_hnsw",
+                "faiss_version": "1.14.3",
+                "omp_threads": 4,
+                "hnsw_m": 32,
+                "hnsw_ef_construction": 40,
+                "hnsw_ef_search": 0,
+                "search_candidate_floor": 2048,
+            },
+        },
+        "metrics": {
+            "query_count": 10,
+            "correct_count": 10,
+            "incorrect_count": 0,
+            "top1_identity_accuracy": 1.0,
+            "build_seconds": 1.0,
+            "query_seconds": 1.0,
+            "throughput_qps": 10.0,
+            "latency": {"p50_ms": 1.0, "p95_ms": 1.0, "p99_ms": 1.0, "max_ms": 1.0},
+            "rss_before_mb": None,
+            "rss_after_mb": None,
+            "rss_delta_mb": None,
+        },
+    }
+    errors = []
+
+    _verify_scale_summary("faiss-r100-rep0", summary, errors, [])
+
+    assert errors == ["scale:faiss-r100-rep0: hnsw_ef_search must be a positive integer"]
 
 
 def _json_sha256(value):

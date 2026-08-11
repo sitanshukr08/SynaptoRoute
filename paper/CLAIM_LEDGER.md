@@ -13,7 +13,7 @@ publication evidence from being conflated.
 | C6 | Durability mode trades commit latency for a stronger process-crash guarantee. | Planned systems claim | FULL/NORMAL crash cells, confidence intervals, archive |
 | C7 | Per-route policy calibration changes selective risk at matched coverage. | Planned quality claim | Five-seed datasets, paired analysis, archive |
 | C8 | The correctness-probability layer has measurable calibration behavior. | Planned quality claim | Held-out ECE/Brier/reliability outputs and reproduction |
-| C9 | Exact and HNSW indexes have different scale/latency/memory regimes. | Planned systems claim | Frozen scale matrix and hardware metadata |
+| C9 | Exact and HNSW indexes have different scale/latency/memory regimes. | Unverified pilot | Controlled matrix, frozen HNSW configuration, second machine, archive, reviewer |
 
 No numerical statement enters the abstract, README, release notes, or results
 section until its claim-specific manifest is verified. Negative or null results
@@ -53,3 +53,13 @@ repetition-level analysis exposed material P95 variance in the low-latency
 profile at 1.0x calibrated load. This supports continued investigation of C5
 but does not promote it: the run lacks controlled hardware, independent
 reproduction, immutable archival, and reviewer attestation.
+
+A clean local scale pilot on 2026-08-11 completed all 40 frozen cells at
+`039971adbbea48ab00b3f18e603f9a1f55fee243`. NumPy exact produced zero
+identity misses across 200,000 queries. FAISS HNSW produced 97 misses at 50,000
+vectors and 408 at 100,000 vectors across five matched seeds per size. Its
+query throughput crossed above NumPy at those larger sizes, while build time
+and observed RSS increased substantially. This is an outcome-rich pilot for
+C9, not promoted evidence: the host was uncontrolled, no independent
+reproduction or archive exists, and the summaries did not capture all
+FAISS/HNSW configuration fields required for a confirmatory comparison.
