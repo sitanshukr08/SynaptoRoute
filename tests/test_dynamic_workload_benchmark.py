@@ -32,6 +32,11 @@ def test_dynamic_workload_preserves_visibility_and_restart_state(tmp_path):
     assert metrics["restart_state_equal"] is True
     assert metrics["restart_recovery_ms"] >= 0.0
     assert metrics["storage_queue_depth"]["samples"] > 0
+    parameters = result["workload"]["index_parameters"]
+    assert result["workload"]["index_engine_requested"] == "auto"
+    assert parameters["resolved_engine"] in {"numpy", "faiss"}
+    assert parameters["metric"] == "normalized_inner_product"
+    assert result["environment"]["faiss"] == parameters.get("faiss_version")
 
 
 def test_dynamic_workload_supports_read_only_baseline(tmp_path):

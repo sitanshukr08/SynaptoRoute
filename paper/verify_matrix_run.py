@@ -505,6 +505,37 @@ def _verify_dynamic_summary(
     errors: list[str],
     observations: list[dict[str, Any]],
 ) -> None:
+    workload = summary.get("workload", {})
+    if not isinstance(workload, dict):
+        errors.append(f"dynamic:{name}: workload must be an object")
+        return
+    index_parameters = workload.get("index_parameters")
+    if index_parameters is not None:
+        if not isinstance(index_parameters, dict):
+            errors.append(f"dynamic:{name}: index_parameters must be an object")
+        else:
+            if workload.get("index_engine_requested") != "auto":
+                errors.append(f"dynamic:{name}: requested index engine must be recorded as auto")
+            resolved_engine = index_parameters.get("resolved_engine")
+            expected_implementation = {
+                "numpy": "numpy_exact",
+                "faiss": "faiss_hnsw",
+            }.get(resolved_engine) if isinstance(resolved_engine, str) else None
+            if index_parameters.get("implementation") != expected_implementation:
+                errors.append(f"dynamic:{name}: index implementation differs from resolved engine")
+            if index_parameters.get("metric") != "normalized_inner_product":
+                errors.append(f"dynamic:{name}: index metric is not normalized inner product")
+            if resolved_engine == "faiss":
+                for field in (
+                    "omp_threads",
+                    "hnsw_m",
+                    "hnsw_ef_construction",
+                    "hnsw_ef_search",
+                    "search_candidate_floor",
+                ):
+                    value = index_parameters.get(field)
+                    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                        errors.append(f"dynamic:{name}: {field} must be a positive integer")
     metrics = summary.get("metrics", {})
     if not isinstance(metrics, dict):
         errors.append(f"dynamic:{name}: metrics must be an object")

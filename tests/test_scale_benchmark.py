@@ -21,6 +21,7 @@ def test_numpy_scale_benchmark_is_structural_and_complete():
         "construction_add_calls": 20,
         "vectors_per_add_call": 1,
         "metric": "normalized_inner_product",
+        "resolved_engine": "numpy",
         "implementation": "numpy_exact",
         "max_capacity": 20,
     }

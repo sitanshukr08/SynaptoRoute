@@ -15,6 +15,7 @@ from typing import Any
 import numpy as np
 
 from benchmarks.deterministic_encoder import DeterministicHashEncoder
+from benchmarks.index_metadata import describe_index
 from benchmarks.manifest_schema import sha256_file
 from synaptoroute import AdaptiveRouter, MutationReceipt, Route, SQLiteStorage
 
@@ -75,6 +76,7 @@ def run_benchmark(
         max_capacity=route_count * 10,
         max_storage_queue_size=max(1000, route_count + 100),
     )
+    index_parameters = describe_index(router.index)
     rss_before_mb = _rss_mb()
     base_queries = []
     for index in range(route_count):
@@ -229,11 +231,14 @@ def run_benchmark(
             "target_mutations_per_second": mutation_rate,
             "encoder": encoder.model_name,
             "dimension": dim,
+            "index_engine_requested": "auto",
+            "index_parameters": index_parameters,
         },
         "environment": {
             "python": platform.python_version(),
             "platform": platform.platform(),
             "processor": platform.processor() or "unknown",
+            "faiss": index_parameters.get("faiss_version"),
         },
         "metrics": {
             "measurement_wall_seconds": measurement_wall_seconds,
@@ -305,6 +310,7 @@ def run_benchmark(
         "notes": [
             "The deterministic hash encoder isolates structural concurrency behavior.",
             "This mixed workload uses synchronous query calls from multiple threads.",
+            "The requested and resolved index configuration is recorded in the workload.",
             "Throughput denominators use the measured workload window and exclude the durable barrier.",
             "Correctness violations and explicit operational failures are reported separately.",
             "Results remain unverified until run from a clean commit and repeated on controlled hardware.",

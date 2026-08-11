@@ -28,6 +28,8 @@ Implemented:
   query throughput, latency, and RSS tradeoffs;
 * future scale cells record FAISS/HNSW versions, parameters, thread count,
   search-candidate floor, and construction-call policy;
+* dynamic cells record the requested and resolved index engine so optional
+  FAISS installation cannot remain a hidden workload variable;
 * a streaming, content-inventoried archive builder that rejects dirty source,
   mismatched manifests, failed runs, changed hashes, and symlinks;
 * an independent streaming archive verifier, unattended runbook, paper methods

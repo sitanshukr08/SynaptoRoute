@@ -221,6 +221,7 @@ def run_preflight(
             "paper/CLAIM_LEDGER.md",
             "paper/experiment_matrix.json",
             "benchmarks/run_protocol_smoke.py",
+            "benchmarks/index_metadata.py",
             "paper/build_archive.py",
             "paper/verify_archive.py",
             "paper/verify_matrix_run.py",

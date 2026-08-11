@@ -47,6 +47,11 @@ failures are reported separately to avoid conflating availability with a wrong
 answer. Throughput uses `measurement_wall_seconds`, which excludes the durable
 barrier. The final SQLite database path, size, and SHA-256 are recorded.
 
+New dynamic cells record both the requested `auto` index policy and its
+resolved implementation. FAISS cells include the version, thread count, HNSW
+parameters, and search-candidate floor so optional-package availability cannot
+silently change the interpreted workload.
+
 ## Scale Matrix
 
 The structural identity workload records `query_count`, `correct_count`, and

@@ -10,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
+from benchmarks.index_metadata import describe_index
 from synaptoroute.index import get_index
 
 
@@ -32,32 +33,14 @@ def _rss_mb() -> float | None:
 
 
 def _index_parameters(index, engine: str, route_count: int) -> dict:
-    common = {
+    parameters = {
+        **describe_index(index),
         "construction_add_calls": route_count,
         "vectors_per_add_call": 1,
-        "metric": "normalized_inner_product",
     }
-    if engine == "numpy":
-        return {
-            **common,
-            "implementation": "numpy_exact",
-            "max_capacity": index.max_capacity,
-        }
-
-    import faiss
-
-    base_index = faiss.downcast_index(index.index.index)
-    hnsw = getattr(base_index, "hnsw")
-    return {
-        **common,
-        "implementation": "faiss_hnsw",
-        "faiss_version": faiss.__version__,
-        "omp_threads": faiss.omp_get_max_threads(),
-        "hnsw_m": hnsw.nb_neighbors(1),
-        "hnsw_ef_construction": hnsw.efConstruction,
-        "hnsw_ef_search": hnsw.efSearch,
-        "search_candidate_floor": index.SEARCH_CANDIDATE_FLOOR,
-    }
+    if parameters["resolved_engine"] != engine:
+        raise RuntimeError("resolved scale index differs from the requested engine")
+    return parameters
 
 
 def run_benchmark(
