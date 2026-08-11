@@ -22,6 +22,8 @@ Implemented:
   validation, failed-cell retry, and optional fail-fast/timeout controls;
 * version 2 systems summaries with explicit counts, denominators, timing
   windows, SQLite hashes, and outcome-neutral matrix verification;
+* repetition-level backpressure analysis with pooled outcome denominators,
+  deterministic bootstrap intervals, and JSON/CSV/Markdown outputs;
 * a streaming, content-inventoried archive builder that rejects dirty source,
   mismatched manifests, failed runs, changed hashes, and symlinks;
 * an independent streaming archive verifier, unattended runbook, paper methods
@@ -39,7 +41,10 @@ Not yet complete:
   hashes, and durability invariants passed independent matrix-run inspection;
 * a clean local repeat at `78e96ec3` passed the revised verifier across another
   3,200 crash-recovery trials, including a successful checkpoint resume;
-* quality, dynamic, scale, and backpressure hosted pilots remain pending;
+* a clean local backpressure pilot completed all 15 cells, retained 3,961,344
+  offered-request outcomes, and exposed a low-latency variance concern;
+* quality, dynamic, and scale hosted pilots remain pending, as does a
+  controlled-host backpressure reproduction;
 * controlled matrix runs, second-machine reproduction, archival DOI, and paper
   results remain pending.
 
@@ -72,7 +77,10 @@ Not yet complete:
    hashes, and schema-valid unverified manifests. Retain correctness failures
    and other unfavorable outcomes for analysis. Native smoke currently passes
    this gate.
-4. Freeze a new candidate if any correctness code changes.
+4. Repeat the complete backpressure matrix in the paper container and confirm
+   whether the low-latency 1.0x P95 variance persists on controlled Linux
+   hardware.
+5. Freeze a new candidate if any correctness code changes.
 
 ### 4. Run Confirmatory Experiments
 

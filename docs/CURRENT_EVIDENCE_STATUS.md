@@ -41,6 +41,16 @@ SynaptoRoute has a coherent engineering direction, but its historical benchmark 
   run is corroborating development evidence only; it has no controlled-host
   environment bundle, immutable archive, independent reviewer, or attestation.
   Details are in `SYSTEMS_PILOT_RESULTS.md`.
+* A second clean local Windows run at
+  `52968b6fc72350f4e6b2e4adba030d045931b39a` completed the 15-cell frozen
+  sustained-backpressure matrix: 60 scenarios and 3,961,344 offered requests.
+  All outcomes were accounted for, all 2,714,164 successful routes were
+  correct, 1,247,180 requests were explicitly shed, and no request errors were
+  recorded. Repetition-level bootstrap analysis also exposed substantial P95
+  variance in the low-latency profile at calibrated saturation. This is
+  diagnostic evidence only because the host was uncontrolled and the run has
+  no environment bundle, independent reproduction, archive, or attestation.
+  Details are in `SYSTEMS_PILOT_RESULTS.md`.
 
 ## Research Claims
 

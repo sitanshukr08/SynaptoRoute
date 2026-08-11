@@ -43,3 +43,13 @@ zero outcome observations. This is corroborating development evidence, not the
 independent reproduction required to promote C2 or C6; the host was
 uncontrolled and no environment bundle, immutable archive, or reviewer
 attestation was produced.
+
+A clean local backpressure pilot on 2026-08-11 completed all 15 frozen cells
+at `52968b6fc72350f4e6b2e4adba030d045931b39a`. Across 60 offered-load
+scenarios, every one of 3,961,344 requests was accounted for as successful or
+explicitly shed, all 2,714,164 successful routes were correct, and no request
+errors occurred. The verifier retained 43 shedding observations and the
+repetition-level analysis exposed material P95 variance in the low-latency
+profile at 1.0x calibrated load. This supports continued investigation of C5
+but does not promote it: the run lacks controlled hardware, independent
+reproduction, immutable archival, and reviewer attestation.

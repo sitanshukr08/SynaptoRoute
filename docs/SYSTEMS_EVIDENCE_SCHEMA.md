@@ -81,6 +81,14 @@ denominator. `offering_wall_seconds` covers request creation,
 `scenario_wall_seconds` covers both. Offered, successful, and resolved
 throughputs state which count and timing window they use.
 
+`paper/analyze_backpressure.py` accepts only a complete verifier-accepted
+backpressure family. It treats each separately calibrated repetition as the
+experimental unit for bootstrap intervals, while separately pooling raw counts
+for success, shedding, error, and correctness rates. Reported latency intervals
+summarize per-repetition percentiles; they are not percentiles over unavailable
+pooled request-level samples. The analysis remains unverified until its source
+runs pass the independent reproduction and evidence-promotion gates.
+
 ## Compatibility
 
 Version 1 systems summaries are development artifacts and are not accepted by

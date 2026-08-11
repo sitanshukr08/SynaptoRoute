@@ -51,6 +51,19 @@ The verifier only accepts an `unverified`, paper-ineligible run. A successful
 report does not promote a claim; independent reproduction, immutable archival,
 and reviewer attestation remain separate gates.
 
+After a backpressure run passes integrity verification, aggregate the frozen
+repetitions with the committed analysis path:
+
+```bash
+python paper/analyze_backpressure.py EXTRACTED_ROOT/matrix \
+  --expected-commit FULL_CANDIDATE_SHA
+```
+
+The analyzer reruns verification, hashes every source summary, pools explicit
+request outcomes, and bootstraps repetition-level metrics. It emits JSON, CSV,
+and Markdown under `analysis/backpressure/` while preserving `status=unverified`
+and `paper_evidence_eligible=false`.
+
 Verification is deliberately outcome-neutral. Incorrect routes, durability
 contract violations, request errors, and load shedding are returned under
 `outcome_observations`; they do not make internally consistent evidence

@@ -9,7 +9,7 @@ import math
 import re
 import sys
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, cast
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -115,16 +115,19 @@ def _verify_percentiles(
         return
     fields = ("p50_ms", "p95_ms", "p99_ms", "max_ms")
     values = [value.get(field) for field in fields]
-    if any(
-        not isinstance(item, (int, float))
-        or isinstance(item, bool)
-        or not math.isfinite(float(item))
-        or item < 0
+    valid_values = all(
+        isinstance(item, (int, float))
+        and not isinstance(item, bool)
+        and math.isfinite(float(item))
+        and item >= 0
         for item in values
-    ):
+    )
+    if not valid_values:
         errors.append(f"{label} contains invalid percentile values")
-    elif values != sorted(values):
-        errors.append(f"{label} percentiles are not monotonically ordered")
+    else:
+        numeric_values = [float(cast(int | float, item)) for item in values]
+        if numeric_values != sorted(numeric_values):
+            errors.append(f"{label} percentiles are not monotonically ordered")
 
 
 def _observe(
@@ -797,7 +800,12 @@ def _verify_backpressure_summary(
         f"backpressure:{name}: calibration errors",
         errors,
     )
-    if None not in (attempts, successes, overloaded, calibration_errors):
+    if (
+        attempts is not None
+        and successes is not None
+        and overloaded is not None
+        and calibration_errors is not None
+    ):
         if attempts != successes + overloaded + calibration_errors:
             errors.append(f"backpressure:{name}: calibration denominator mismatch")
         _verify_throughput(
