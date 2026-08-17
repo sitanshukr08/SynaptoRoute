@@ -98,6 +98,12 @@ SHA-256. Failed commands are retried. A changed commit, matrix, command plan,
 timeout, command identity, or successful log aborts resume instead of mixing
 evidence. `--stop-on-failure` is available for supervised pilot runs.
 
+`status=running` is a checkpoint value, not a liveness signal. A hard process
+or host termination can leave it behind. Check `updated_at_utc` and the host's
+process table before resuming. Each new runner invocation has its own ID,
+start/finish timestamps, and terminal status; a stale running invocation is
+marked `interrupted_before_resume` when a valid resume starts.
+
 ## Independent Reproduction
 
 The reproducer must use the same source commit and configuration on a different

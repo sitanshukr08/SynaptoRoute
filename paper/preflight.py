@@ -110,6 +110,9 @@ def validate_lock_file(path: Path) -> tuple[bool, str]:
 def validate_matrix(repo_root: Path) -> tuple[bool, str]:
     matrix_path = repo_root / "paper" / "experiment_matrix.json"
     matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+    dynamic_engine = matrix.get("dynamic", {}).get("index_engine")
+    if dynamic_engine not in {"numpy", "faiss"}:
+        return False, "dynamic matrix must freeze an explicit numpy or faiss index engine"
     families = set(EXPECTED_COMMAND_COUNTS)
     commands = build_commands(
         matrix,

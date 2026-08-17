@@ -20,6 +20,9 @@ from benchmarks.run_paper_matrix import build_commands  # noqa: E402
 
 
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
+UUID4 = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+)
 FAMILIES = {"quality", "dynamic", "scale", "crash_recovery", "backpressure"}
 
 
@@ -272,6 +275,7 @@ def _verify_system_configuration(
     string_fields: tuple[tuple[str, str], ...] = ()
     numeric_fields: tuple[tuple[str, str], ...] = ()
     if family == "dynamic":
+        string_fields = (("index_engine_requested", "--engine"),)
         numeric_fields = (
             ("route_count", "--routes"),
             ("query_workers", "--query-workers"),
@@ -509,13 +513,14 @@ def _verify_dynamic_summary(
     if not isinstance(workload, dict):
         errors.append(f"dynamic:{name}: workload must be an object")
         return
+    requested_engine = workload.get("index_engine_requested")
+    if requested_engine not in {"numpy", "faiss", "auto"}:
+        errors.append(f"dynamic:{name}: requested index engine is invalid")
     index_parameters = workload.get("index_parameters")
     if index_parameters is not None:
         if not isinstance(index_parameters, dict):
             errors.append(f"dynamic:{name}: index_parameters must be an object")
         else:
-            if workload.get("index_engine_requested") != "auto":
-                errors.append(f"dynamic:{name}: requested index engine must be recorded as auto")
             resolved_engine = index_parameters.get("resolved_engine")
             expected_implementation = {
                 "numpy": "numpy_exact",
@@ -525,7 +530,12 @@ def _verify_dynamic_summary(
                 errors.append(f"dynamic:{name}: index implementation differs from resolved engine")
             if index_parameters.get("metric") != "normalized_inner_product":
                 errors.append(f"dynamic:{name}: index metric is not normalized inner product")
+            if requested_engine != "auto" and resolved_engine != requested_engine:
+                errors.append(f"dynamic:{name}: resolved index differs from requested engine")
             if resolved_engine == "faiss":
+                version = index_parameters.get("faiss_version")
+                if not isinstance(version, str) or not version:
+                    errors.append(f"dynamic:{name}: FAISS version is missing")
                 for field in (
                     "omp_threads",
                     "hnsw_m",
@@ -1159,6 +1169,56 @@ def _verify_environment(
     return True
 
 
+def _verify_runner_invocations(
+    state: dict[str, Any],
+    manifest: dict[str, Any],
+    errors: list[str],
+) -> None:
+    invocations = state.get("invocations")
+    if not isinstance(invocations, list) or not invocations:
+        errors.append("run state must contain runner invocations")
+        return
+    if manifest.get("configuration", {}).get("runner_invocations") != invocations:
+        errors.append("manifest runner invocations differ from run state")
+    terminal_statuses = {
+        "completed",
+        "completed_with_failures",
+        "stopped_on_failure",
+        "interrupted",
+        "interrupted_before_resume",
+        "runner_error",
+    }
+    invocation_ids: list[str] = []
+    for index, invocation in enumerate(invocations):
+        label = f"runner invocation {index}"
+        if not isinstance(invocation, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        invocation_id = invocation.get("invocation_id")
+        if not isinstance(invocation_id, str) or not UUID4.fullmatch(invocation_id):
+            errors.append(f"{label} ID is not a UUID4")
+        else:
+            invocation_ids.append(invocation_id)
+        started = invocation.get("started_at_utc")
+        finished = invocation.get("finished_at_utc")
+        if not isinstance(started, str) or not started:
+            errors.append(f"{label} start time is missing")
+        if not isinstance(finished, str) or not finished:
+            errors.append(f"{label} finish time is missing")
+        elif isinstance(started, str) and started > finished:
+            errors.append(f"{label} finishes before it starts")
+        if invocation.get("status") not in terminal_statuses:
+            errors.append(f"{label} has no terminal status")
+        if not isinstance(invocation.get("command"), list) or not invocation["command"]:
+            errors.append(f"{label} command is missing")
+        if not isinstance(invocation.get("resume"), bool):
+            errors.append(f"{label} resume flag must be boolean")
+    if len(invocation_ids) != len(set(invocation_ids)):
+        errors.append("runner invocation IDs are not unique")
+    if isinstance(invocations[-1], dict) and invocations[-1].get("status") != "completed":
+        errors.append("final runner invocation is not completed")
+
+
 def verify_matrix_run(
     run_dir: Path,
     *,
@@ -1200,6 +1260,7 @@ def verify_matrix_run(
         errors.append("run state ID differs from manifest")
     if state.get("status") != "completed":
         errors.append("run state is not completed")
+    _verify_runner_invocations(state, manifest, errors)
 
     results = state.get("results")
     if not isinstance(results, list):

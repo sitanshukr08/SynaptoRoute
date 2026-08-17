@@ -55,6 +55,7 @@ def run_benchmark(
     route_count: int,
     query_workers: int,
     mutation_rate: float,
+    index_engine: str = "auto",
     dim: int = 32,
     warmup_seconds: float = 0.0,
 ) -> dict[str, Any]:
@@ -64,6 +65,8 @@ def run_benchmark(
         raise ValueError("route_count and query_workers must be positive; mutation_rate cannot be negative")
     if warmup_seconds < 0:
         raise ValueError("warmup_seconds cannot be negative")
+    if index_engine not in {"numpy", "faiss", "auto"}:
+        raise ValueError("index_engine must be numpy, faiss, or auto")
     if database_path.exists():
         raise FileExistsError(f"benchmark database already exists: {database_path}")
     database_path.parent.mkdir(parents=True, exist_ok=True)
@@ -75,8 +78,11 @@ def run_benchmark(
         storage,
         max_capacity=route_count * 10,
         max_storage_queue_size=max(1000, route_count + 100),
+        index_engine=index_engine,
     )
     index_parameters = describe_index(router.index)
+    if index_engine != "auto" and index_parameters["resolved_engine"] != index_engine:
+        raise RuntimeError("resolved dynamic index differs from the requested engine")
     rss_before_mb = _rss_mb()
     base_queries = []
     for index in range(route_count):
@@ -231,7 +237,7 @@ def run_benchmark(
             "target_mutations_per_second": mutation_rate,
             "encoder": encoder.model_name,
             "dimension": dim,
-            "index_engine_requested": "auto",
+            "index_engine_requested": index_engine,
             "index_parameters": index_parameters,
         },
         "environment": {
@@ -325,6 +331,7 @@ def main() -> int:
     parser.add_argument("--routes", type=int, default=100)
     parser.add_argument("--query-workers", type=int, default=4)
     parser.add_argument("--mutation-rate", type=float, default=20.0)
+    parser.add_argument("--engine", choices=("numpy", "faiss", "auto"), default="auto")
     parser.add_argument("--dim", type=int, default=32)
     default_dir = Path(os.environ.get("SYNAPTOROUTE_RUN_DIR", "benchmark_results/dynamic"))
     parser.add_argument("--output-dir", type=Path, default=default_dir)
@@ -338,6 +345,7 @@ def main() -> int:
         route_count=args.routes,
         query_workers=args.query_workers,
         mutation_rate=args.mutation_rate,
+        index_engine=args.engine,
         dim=args.dim,
         warmup_seconds=args.warmup,
     )

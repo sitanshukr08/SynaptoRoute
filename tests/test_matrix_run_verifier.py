@@ -8,6 +8,7 @@ from benchmarks.manifest_schema import sha256_file
 from paper.verify_matrix_run import (
     MatrixRunVerificationError,
     _verify_family_invariants,
+    _verify_runner_invocations,
     _verify_scale_summary,
     verify_matrix_run,
 )
@@ -54,6 +55,27 @@ def test_scale_handler_validates_recorded_hnsw_configuration():
     _verify_scale_summary("faiss-r100-rep0", summary, errors, [])
 
     assert errors == ["scale:faiss-r100-rep0: hnsw_ef_search must be a positive integer"]
+
+
+def test_runner_invocation_verifier_rejects_a_stale_terminal_record():
+    invocation = {
+        "invocation_id": "11111111-1111-4111-8111-111111111111",
+        "started_at_utc": "2026-08-08T00:00:00Z",
+        "command": ["python", "benchmarks/run_paper_matrix.py", "--execute"],
+        "resume": False,
+        "status": "running",
+    }
+    state = {"invocations": [invocation]}
+    manifest = {"configuration": {"runner_invocations": [invocation]}}
+    errors = []
+
+    _verify_runner_invocations(state, manifest, errors)
+
+    assert errors == [
+        "runner invocation 0 finish time is missing",
+        "runner invocation 0 has no terminal status",
+        "final runner invocation is not completed",
+    ]
 
 
 def _json_sha256(value):
@@ -207,11 +229,14 @@ def _make_crash_run(tmp_path: Path, *, durable_survived: bool = True) -> tuple[P
         "resume_count": 0,
         "invocations": [
             {
-                "timestamp_utc": "2026-08-08T00:00:00Z",
+                "invocation_id": "11111111-1111-4111-8111-111111111111",
+                "started_at_utc": "2026-08-08T00:00:00Z",
+                "finished_at_utc": "2026-08-08T00:00:01Z",
                 "command": invocation,
                 "resume": False,
                 "stop_on_failure": False,
                 "command_timeout_seconds": 1800.0,
+                "status": "completed",
             }
         ],
         "results": [result],
@@ -342,6 +367,7 @@ def test_verifier_requires_requested_environment_evidence(tmp_path):
                     "target_mutations_per_second": 0,
                     "warmup_seconds": 10,
                     "duration_seconds": 60,
+                    "index_engine_requested": "faiss",
                 },
                 "metrics": {
                     "measurement_wall_seconds": 1.0,
@@ -503,6 +529,8 @@ def test_family_handlers_retain_unfavorable_outcomes(
             "1",
             "--mutation-rate",
             "0",
+            "--engine",
+            "faiss",
             "--warmup",
             "10",
             "--duration",

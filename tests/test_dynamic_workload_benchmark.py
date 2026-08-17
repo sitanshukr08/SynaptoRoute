@@ -8,6 +8,7 @@ def test_dynamic_workload_preserves_visibility_and_restart_state(tmp_path):
         route_count=8,
         query_workers=2,
         mutation_rate=12.0,
+        index_engine="numpy",
         dim=8,
     )
 
@@ -33,8 +34,8 @@ def test_dynamic_workload_preserves_visibility_and_restart_state(tmp_path):
     assert metrics["restart_recovery_ms"] >= 0.0
     assert metrics["storage_queue_depth"]["samples"] > 0
     parameters = result["workload"]["index_parameters"]
-    assert result["workload"]["index_engine_requested"] == "auto"
-    assert parameters["resolved_engine"] in {"numpy", "faiss"}
+    assert result["workload"]["index_engine_requested"] == "numpy"
+    assert parameters["resolved_engine"] == "numpy"
     assert parameters["metric"] == "normalized_inner_product"
     assert result["environment"]["faiss"] == parameters.get("faiss_version")
 
@@ -46,6 +47,7 @@ def test_dynamic_workload_supports_read_only_baseline(tmp_path):
         route_count=4,
         query_workers=1,
         mutation_rate=0.0,
+        index_engine="numpy",
         dim=8,
         warmup_seconds=0.01,
     )

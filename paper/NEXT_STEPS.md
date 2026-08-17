@@ -1,8 +1,9 @@
 # SynaptoRoute Next Steps
 
-Status: artifact candidate `paper-artifact-v0.5.0-rc1` is frozen at
-`0de734be8427aa3786e29062339a83b2ffb79bdd`; controlled confirmatory runs are
-pending.
+Status: `paper-artifact-v0.5.0-rc1` remains the historical candidate frozen at
+`0de734be8427aa3786e29062339a83b2ffb79bdd`. Post-candidate verifier, summary,
+and matrix corrections on this branch require a new candidate commit before
+controlled confirmatory execution.
 
 ## Current Position
 
@@ -28,8 +29,9 @@ Implemented:
   query throughput, latency, and RSS tradeoffs;
 * future scale cells record FAISS/HNSW versions, parameters, thread count,
   search-candidate floor, and construction-call policy;
-* dynamic cells record the requested and resolved index engine so optional
-  FAISS installation cannot remain a hidden workload variable;
+* the confirmatory dynamic matrix freezes FAISS explicitly and records the
+  requested and resolved engine so optional-package availability cannot change
+  the workload;
 * a streaming, content-inventoried archive builder that rejects dirty source,
   mismatched manifests, failed runs, changed hashes, and symlinks;
 * an independent streaming archive verifier, unattended runbook, paper methods
@@ -51,8 +53,11 @@ Not yet complete:
   offered-request outcomes, and exposed a low-latency variance concern;
 * a clean local scale pilot completed all 40 cells and exposed a large-size
   HNSW speed/identity-recall/build-cost tradeoff;
-* quality and dynamic hosted pilots remain pending, as do controlled-host
-  backpressure and scale reproductions;
+* a dynamic pilot stopped after 37 of 135 cells before the explicit-engine
+  correction; it is incomplete diagnostic output and must not be resumed as a
+  substitute for the corrected matrix;
+* quality and corrected dynamic hosted pilots remain pending, as do
+  controlled-host backpressure and scale reproductions;
 * controlled matrix runs, second-machine reproduction, archival DOI, and paper
   results remain pending.
 

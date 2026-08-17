@@ -23,16 +23,17 @@ correctness, mutation visibility, and p95/p99 query latency?
 **RQ3 - Durability:** What latency and recovery cost is required to provide
 explicit in-memory, flushed, and restart-durable mutation guarantees?
 
-**RQ4 - Scale:** How do route count, utterances per route, index choice, and
-batching affect quality, latency, throughput, and memory?
+**RQ4 - Scale:** How do route count and index choice affect structural
+retrieval accuracy, latency, throughput, build cost, and memory?
 
 ## Hypotheses
 
 * **H1:** Validation-calibrated per-route thresholds and score margins reduce
   selective risk and OOD false acceptance relative to one global threshold at
   matched coverage.
-* **H2:** Bounded microbatching improves throughput under burst load without
-  increasing p99 latency beyond the declared service objective.
+* **H2:** Above calibrated capacity, bounded query queues retain every request
+  in the outcome denominator, preserve correctness for completed requests, and
+  expose excess demand as shedding rather than unbounded backlog.
 * **H3:** Explicit storage barriers recover every mutation acknowledged as
   durable after process restart, with measurable but bounded overhead.
 * **H4:** HNSW lowers retrieval cost at large route counts, but exact retrieval

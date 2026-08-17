@@ -63,6 +63,20 @@ def test_matrix_preflight_matches_frozen_protocol():
     assert "208 commands" in detail
 
 
+def test_matrix_preflight_rejects_auto_index_resolution(tmp_path):
+    paper_dir = tmp_path / "paper"
+    paper_dir.mkdir()
+    (paper_dir / "experiment_matrix.json").write_text(
+        json.dumps({"dynamic": {"index_engine": "auto"}}),
+        encoding="utf-8",
+    )
+
+    passed, detail = preflight.validate_matrix(tmp_path)
+
+    assert passed is False
+    assert detail == "dynamic matrix must freeze an explicit numpy or faiss index engine"
+
+
 def test_preflight_json_is_machine_readable():
     report = preflight.run_preflight(REPO_ROOT, strict=False)
 

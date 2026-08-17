@@ -61,6 +61,12 @@ SynaptoRoute has a coherent engineering direction, but its historical benchmark 
   unverified diagnostic result, not a release or paper claim. The uncontrolled
   run also omitted first-class FAISS/HNSW configuration fields needed for
   confirmation. Details are in `SYSTEMS_PILOT_RESULTS.md`.
+* A later local dynamic run stopped after 37 of 135 cells. Its checkpoint still
+  says `running` because the parent process ended outside the runner's handled
+  interrupt path; that value is not a liveness signal. The run is incomplete,
+  has no final manifest, and used the former `auto` engine policy. It is not an
+  evidence record and will not be resumed after the matrix was corrected to
+  freeze FAISS explicitly.
 
 ## Research Claims
 

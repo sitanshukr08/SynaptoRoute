@@ -59,7 +59,7 @@ experimental and excluded from the primary artifact.
 
 ## 4. Methodology
 
-The frozen protocol is defined in `docs/RESEARCH_PROTOCOL.md`,
+The candidate protocol is defined in `docs/RESEARCH_PROTOCOL.md`,
 `paper/QUALITY_PROTOCOL.md`, and `paper/experiment_matrix.json`. Every run
 records a full commit SHA, dirty-tree state, command plan, dependency-lock hash,
 environment, hardware, seed, units, raw-output hashes, and exit status.
@@ -73,7 +73,9 @@ Paired bootstrap analysis operates on aligned per-example predictions.
 Systems experiments vary routes, query workers, mutation rates, index engine,
 durability mode, SQLite synchronous mode, injected commit delay, queue profile,
 and offered load. Warmup, measurement duration, repetitions, and all matrix
-cells are fixed before confirmatory execution.
+cells are fixed before confirmatory execution. Dynamic-workload cells request
+FAISS explicitly; development-only `auto` resolution is excluded because
+optional dependency availability would otherwise alter the experiment.
 
 ## 5. Results
 

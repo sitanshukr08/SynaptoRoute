@@ -191,6 +191,7 @@ def run_protocol_smoke(output_root: Path) -> dict[str, Any]:
         route_count=10,
         query_workers=2,
         mutation_rate=5.0,
+        index_engine="numpy",
         dim=32,
         warmup_seconds=0.05,
     )

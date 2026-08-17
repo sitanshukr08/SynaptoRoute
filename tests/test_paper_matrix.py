@@ -17,7 +17,12 @@ def test_frozen_matrix_expands_every_declared_family(tmp_path):
 
     assert {item["family"] for item in commands} == families
     assert len([item for item in commands if item["family"] == "quality"]) == 2
-    assert len([item for item in commands if item["family"] == "dynamic"]) == 135
+    dynamic_commands = [item for item in commands if item["family"] == "dynamic"]
+    assert len(dynamic_commands) == 135
+    assert all(
+        item["command"][item["command"].index("--engine") + 1] == "faiss"
+        for item in dynamic_commands
+    )
     assert len([item for item in commands if item["family"] == "scale"]) == 40
     crash_commands = [item for item in commands if item["family"] == "crash_recovery"]
     assert len(crash_commands) == 16
@@ -80,6 +85,11 @@ def test_matrix_resume_skips_successful_hashed_logs(tmp_path, monkeypatch):
     assert second_state["run_id"] == first_state["run_id"]
     assert second_state["resume_count"] == 1
     assert len(second_state["invocations"]) == 2
+    assert [item["status"] for item in second_state["invocations"]] == [
+        "completed",
+        "completed",
+    ]
+    assert all(item.get("finished_at_utc") for item in second_state["invocations"])
     assert manifest["metrics"]["skipped_successful_command_count"] == 1
 
 
@@ -108,6 +118,37 @@ def test_matrix_resume_retries_failed_command(tmp_path, monkeypatch):
     recovered_state = json.loads((output_dir / "run_state.json").read_text(encoding="utf-8"))
     assert recovered_state["status"] == "completed"
     assert recovered_state["results"][0]["return_code"] == 0
+    assert [item["status"] for item in recovered_state["invocations"]] == [
+        "completed_with_failures",
+        "completed",
+    ]
+
+
+def test_matrix_resume_marks_a_stale_running_invocation_interrupted(tmp_path, monkeypatch):
+    root, matrix_path, matrix, _ = _runner_workspace(tmp_path, monkeypatch)
+    commands = [
+        {
+            "family": "fixture",
+            "name": "success",
+            "command": [sys.executable, "-c", "print('ok')"],
+        }
+    ]
+    output_dir = root / "results"
+    assert execute(commands, matrix, matrix_path, output_dir) == 0
+
+    state_path = output_dir / "run_state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["status"] = "running"
+    state["invocations"][-1]["status"] = "running"
+    state["invocations"][-1].pop("finished_at_utc")
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+    assert execute(commands, matrix, matrix_path, output_dir, resume=True) == 0
+    recovered = json.loads(state_path.read_text(encoding="utf-8"))
+    assert [item["status"] for item in recovered["invocations"]] == [
+        "interrupted_before_resume",
+        "completed",
+    ]
 
 
 def test_matrix_resume_rejects_a_different_commit(tmp_path, monkeypatch):
