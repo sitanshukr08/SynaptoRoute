@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -13,6 +14,14 @@ from pathlib import Path
 from typing import Any
 
 from synaptoroute import SQLiteStorage
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _run_trial(
@@ -87,7 +96,11 @@ def _run_trial(
         "acknowledged": marker is not None,
         "survived_restart": survived,
         "wall_ms": wall_ms,
-        "database_path": database_path.as_posix(),
+        "database_path": database_path.resolve().as_posix(),
+        "database_sha256": _sha256_file(database_path),
+        "database_bytes": database_path.stat().st_size,
+        "marker_path": marker_path.resolve().as_posix(),
+        "marker_sha256": _sha256_file(marker_path) if marker_path.is_file() else None,
     }
 
 
@@ -129,16 +142,29 @@ def run_benchmark(
     }
     metrics = {}
     for mode, results in by_mode.items():
+        acknowledged_count = sum(bool(result["acknowledged"]) for result in results)
+        survived_count = sum(bool(result["survived_restart"]) for result in results)
+        clean_exit_count = sum(result["return_code"] == 0 for result in results)
+        expected_survival = mode == "durable"
+        contract_violation_count = sum(
+            result["survived_restart"] is not expected_survival for result in results
+        )
         metrics[mode] = {
             "trial_count": len(results),
-            "acknowledged_count": sum(result["acknowledged"] for result in results),
-            "restart_survival_rate": (
-                sum(result["survived_restart"] for result in results) / len(results)
-            ),
-            "all_children_exited_cleanly": all(result["return_code"] == 0 for result in results),
+            "acknowledged_count": acknowledged_count,
+            "acknowledgement_rate": acknowledged_count / len(results),
+            "survived_count": survived_count,
+            "restart_survival_rate": survived_count / len(results),
+            "clean_exit_count": clean_exit_count,
+            "clean_exit_rate": clean_exit_count / len(results),
+            "all_children_exited_cleanly": clean_exit_count == len(results),
+            "expected_restart_survival": expected_survival,
+            "contract_violation_count": contract_violation_count,
+            "contract_success_rate": 1.0 - (contract_violation_count / len(results)),
         }
 
     return {
+        "schema_version": 2,
         "benchmark": "abrupt_process_restart_durability",
         "status": "unverified",
         "paper_evidence_eligible": False,

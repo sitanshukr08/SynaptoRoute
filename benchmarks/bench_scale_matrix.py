@@ -10,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
+from benchmarks.index_metadata import describe_index
 from synaptoroute.index import get_index
 
 
@@ -31,6 +32,17 @@ def _rss_mb() -> float | None:
         return None
 
 
+def _index_parameters(index, engine: str, route_count: int) -> dict:
+    parameters = {
+        **describe_index(index),
+        "construction_add_calls": route_count,
+        "vectors_per_add_call": 1,
+    }
+    if parameters["resolved_engine"] != engine:
+        raise RuntimeError("resolved scale index differs from the requested engine")
+    return parameters
+
+
 def run_benchmark(
     *,
     engine: str,
@@ -45,6 +57,7 @@ def run_benchmark(
     vectors = rng.normal(size=(route_count, dim)).astype(np.float32)
     vectors /= np.linalg.norm(vectors, axis=1, keepdims=True)
     index = get_index(dim=dim, max_capacity=route_count, engine=engine)
+    index_parameters = _index_parameters(index, engine, route_count)
 
     rss_before = _rss_mb()
     build_started = time.perf_counter()
@@ -65,6 +78,7 @@ def run_benchmark(
     query_seconds = time.perf_counter() - query_started
 
     return {
+        "schema_version": 2,
         "benchmark": "precomputed_vector_scale",
         "status": "unverified",
         "paper_evidence_eligible": False,
@@ -74,14 +88,19 @@ def run_benchmark(
             "query_count": query_count,
             "dimension": dim,
             "seed": seed,
+            "index_parameters": index_parameters,
         },
         "environment": {
             "python": platform.python_version(),
             "platform": platform.platform(),
             "processor": platform.processor() or "unknown",
             "numpy": np.__version__,
+            "faiss": index_parameters.get("faiss_version"),
         },
         "metrics": {
+            "query_count": query_count,
+            "correct_count": correct,
+            "incorrect_count": query_count - correct,
             "top1_identity_accuracy": correct / query_count,
             "build_seconds": build_seconds,
             "query_seconds": query_seconds,
@@ -89,6 +108,11 @@ def run_benchmark(
             "latency": _percentiles(latencies_ms),
             "rss_before_mb": rss_before,
             "rss_after_mb": rss_after,
+            "rss_delta_mb": (
+                rss_after - rss_before
+                if rss_before is not None and rss_after is not None
+                else None
+            ),
         },
         "notes": [
             "Precomputed synthetic vectors isolate index structure from encoder cost.",

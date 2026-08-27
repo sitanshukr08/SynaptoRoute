@@ -1,8 +1,9 @@
 # SynaptoRoute Next Steps
 
-Status: artifact candidate `paper-artifact-v0.5.0-rc1` is frozen at
-`0de734be8427aa3786e29062339a83b2ffb79bdd`; controlled confirmatory runs are
-pending.
+Status: `paper-artifact-v0.5.0-rc1` remains the historical candidate frozen at
+`0de734be8427aa3786e29062339a83b2ffb79bdd`. Post-candidate verifier, summary,
+and matrix corrections on this branch require a new candidate commit before
+controlled confirmatory execution.
 
 ## Current Position
 
@@ -20,6 +21,17 @@ Implemented:
   invariants and a schema-v2 unverified manifest;
 * an atomic per-command matrix ledger with candidate-bound resume, hashed-log
   validation, failed-cell retry, and optional fail-fast/timeout controls;
+* version 2 systems summaries with explicit counts, denominators, timing
+  windows, SQLite hashes, and outcome-neutral matrix verification;
+* repetition-level backpressure analysis with pooled outcome denominators,
+  deterministic bootstrap intervals, and JSON/CSV/Markdown outputs;
+* paired repetition-level scale analysis for exact/HNSW accuracy, build time,
+  query throughput, latency, and RSS tradeoffs;
+* future scale cells record FAISS/HNSW versions, parameters, thread count,
+  search-candidate floor, and construction-call policy;
+* the confirmatory dynamic matrix freezes FAISS explicitly and records the
+  requested and resolved engine so optional-package availability cannot change
+  the workload;
 * a streaming, content-inventoried archive builder that rejects dirty source,
   mismatched manifests, failed runs, changed hashes, and symlinks;
 * an independent streaming archive verifier, unattended runbook, paper methods
@@ -35,7 +47,17 @@ Not yet complete:
   confirmatory performance claims;
 * the crash-recovery pilot completed all 16 cells and its 3,200 trial records,
   hashes, and durability invariants passed independent matrix-run inspection;
-* quality, dynamic, scale, and backpressure hosted pilots remain pending;
+* a clean local repeat at `78e96ec3` passed the revised verifier across another
+  3,200 crash-recovery trials, including a successful checkpoint resume;
+* a clean local backpressure pilot completed all 15 cells, retained 3,961,344
+  offered-request outcomes, and exposed a low-latency variance concern;
+* a clean local scale pilot completed all 40 cells and exposed a large-size
+  HNSW speed/identity-recall/build-cost tradeoff;
+* a dynamic pilot stopped after 37 of 135 cells before the explicit-engine
+  correction; it is incomplete diagnostic output and must not be resumed as a
+  substitute for the corrected matrix;
+* quality and corrected dynamic hosted pilots remain pending, as do
+  controlled-host backpressure and scale reproductions;
 * controlled matrix runs, second-machine reproduction, archival DOI, and paper
   results remain pending.
 
@@ -64,9 +86,17 @@ Not yet complete:
 1. Build `Dockerfile.paper` and record its image digest and resolved package inventory.
 2. Execute one short smoke cell from each experiment family. The native runner
    is implemented and passes; repeat it inside the paper container.
-3. Confirm zero correctness violations, complete raw logs, stable units, and
-   schema-valid unverified manifests. Native smoke currently passes this gate.
-4. Freeze a new candidate if any correctness code changes.
+3. Confirm complete raw logs, stable units, reproducible denominators, evidence
+   hashes, and schema-valid unverified manifests. Retain correctness failures
+   and other unfavorable outcomes for analysis. Native smoke currently passes
+   this gate.
+4. Repeat the complete backpressure matrix in the paper container and confirm
+   whether the low-latency 1.0x P95 variance persists on controlled Linux
+   hardware.
+5. Add frozen bulk-construction and HNSW parameter-sweep cells, then confirm
+   the new version/parameter/thread/construction metadata before controlled
+   scale execution.
+6. Freeze a new candidate if any correctness code changes.
 
 ### 4. Run Confirmatory Experiments
 

@@ -23,16 +23,17 @@ correctness, mutation visibility, and p95/p99 query latency?
 **RQ3 - Durability:** What latency and recovery cost is required to provide
 explicit in-memory, flushed, and restart-durable mutation guarantees?
 
-**RQ4 - Scale:** How do route count, utterances per route, index choice, and
-batching affect quality, latency, throughput, and memory?
+**RQ4 - Scale:** How do route count and index choice affect structural
+retrieval accuracy, latency, throughput, build cost, and memory?
 
 ## Hypotheses
 
 * **H1:** Validation-calibrated per-route thresholds and score margins reduce
   selective risk and OOD false acceptance relative to one global threshold at
   matched coverage.
-* **H2:** Bounded microbatching improves throughput under burst load without
-  increasing p99 latency beyond the declared service objective.
+* **H2:** Above calibrated capacity, bounded query queues retain every request
+  in the outcome denominator, preserve correctness for completed requests, and
+  expose excess demand as shedding rather than unbounded backlog.
 * **H3:** Explicit storage barriers recover every mutation acknowledged as
   durable after process restart, with measurable but bounded overhead.
 * **H4:** HNSW lowers retrieval cost at large route counts, but exact retrieval
@@ -141,6 +142,8 @@ or nanoseconds with the conversion performed exactly once in analysis code.
 * Apply the same offered concurrency and harness queueing policy to every
   compared system.
 * Separate encoder, retrieval, decision, persistence, and end-to-end timings.
+* For approximate indexes, record library version, construction/search
+  parameters, thread count, candidate budget, and insertion/bulk-build policy.
 * Record failures and timeouts in the denominator; do not silently retry them.
 * Freeze thresholds and hyperparameters using training/validation data before
   evaluating the final test split.
@@ -176,6 +179,12 @@ A run can be promoted to `verified` only when:
 
 Paper tables must be generated from verified machine-readable result files.
 Values must not be transcribed manually from terminal output.
+
+Artifact verification establishes provenance and internal consistency, not a
+successful hypothesis. The matrix verifier recomputes systems denominators,
+rates, and throughputs and checks referenced SQLite hashes. Correctness misses,
+durability-contract violations, request errors, and explicit shedding remain
+in `outcome_observations` and are analyzed as results.
 
 The exact final systems matrix is stored in
 `paper/experiment_matrix.json`. Development smokes may use smaller parameters

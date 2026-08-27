@@ -72,6 +72,8 @@ def build_commands(matrix: dict, output_dir: Path, families: set[str]) -> list[d
                                     str(workers),
                                     "--mutation-rate",
                                     str(rate),
+                                    "--engine",
+                                    str(dynamic["index_engine"]),
                                     "--warmup",
                                     str(dynamic["warmup_seconds"]),
                                     "--duration",
@@ -188,6 +190,34 @@ def _timestamp() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
+def _close_previous_invocation_for_resume(state: dict[str, Any]) -> None:
+    invocations = state.get("invocations")
+    if not isinstance(invocations, list) or not invocations:
+        return
+    previous = invocations[-1]
+    if not isinstance(previous, dict) or previous.get("status") not in {None, "running"}:
+        return
+    run_status = state.get("status")
+    previous["status"] = (
+        "interrupted_before_resume"
+        if run_status in {"running", "interrupted"}
+        else str(run_status or "unknown")
+    )
+    previous.setdefault("finished_at_utc", state.get("updated_at_utc") or _timestamp())
+
+
+def _finish_invocation(
+    invocation_record: dict[str, Any],
+    status: str,
+    *,
+    error_type: str | None = None,
+) -> None:
+    invocation_record["status"] = status
+    invocation_record["finished_at_utc"] = _timestamp()
+    if error_type is not None:
+        invocation_record["error_type"] = error_type
+
+
 def _atomic_write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -299,6 +329,7 @@ def execute(
             commands=commands,
             command_timeout_seconds=command_timeout_seconds,
         )
+        _close_previous_invocation_for_resume(state)
         state["resume_count"] = int(state.get("resume_count", 0)) + 1
     else:
         state = {
@@ -319,16 +350,17 @@ def execute(
         results_by_index = {}
         _atomic_write_json(state_path, state)
 
-    state.setdefault("invocations", []).append(
-        {
-            "timestamp_utc": _timestamp(),
-            "command": invocation
-            or [sys.executable, "benchmarks/run_paper_matrix.py", "--execute"],
-            "resume": resume,
-            "stop_on_failure": stop_on_failure,
-            "command_timeout_seconds": command_timeout_seconds,
-        }
-    )
+    invocation_record = {
+        "invocation_id": str(uuid.uuid4()),
+        "started_at_utc": _timestamp(),
+        "command": invocation
+        or [sys.executable, "benchmarks/run_paper_matrix.py", "--execute"],
+        "resume": resume,
+        "stop_on_failure": stop_on_failure,
+        "command_timeout_seconds": command_timeout_seconds,
+        "status": "running",
+    }
+    state.setdefault("invocations", []).append(invocation_record)
     state["updated_at_utc"] = _timestamp()
     _atomic_write_json(state_path, state)
 
@@ -391,6 +423,14 @@ def execute(
                 break
     except KeyboardInterrupt:
         state["status"] = "interrupted"
+        _finish_invocation(invocation_record, "interrupted")
+        state["updated_at_utc"] = _timestamp()
+        state["results"] = [results_by_index[key] for key in sorted(results_by_index)]
+        _atomic_write_json(state_path, state)
+        raise
+    except Exception as error:
+        state["status"] = "runner_error"
+        _finish_invocation(invocation_record, "runner_error", error_type=type(error).__name__)
         state["updated_at_utc"] = _timestamp()
         state["results"] = [results_by_index[key] for key in sorted(results_by_index)]
         _atomic_write_json(state_path, state)
@@ -401,13 +441,15 @@ def execute(
     failed_count = sum(item["return_code"] != 0 for item in results)
     all_commands_completed = completed_count == len(commands)
     exit_status = 0 if all_commands_completed and failed_count == 0 else 1
-    state["status"] = (
+    final_status = (
         "completed"
         if exit_status == 0
         else "completed_with_failures"
         if all_commands_completed
         else "stopped_on_failure"
     )
+    state["status"] = final_status
+    _finish_invocation(invocation_record, final_status)
     state["updated_at_utc"] = _timestamp()
     state["results"] = results
     _atomic_write_json(state_path, state)

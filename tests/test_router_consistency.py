@@ -144,7 +144,12 @@ async def test_sync_and_async_paths_apply_the_same_margin_policy(fake_encoder):
 async def test_rebuild_failure_retries_then_clears_pending_state(fake_encoder):
     from unittest.mock import patch
     storage = SQLiteStorage(":memory:")
-    router = AdaptiveRouter(fake_encoder, storage, max_rebuild_retries=2)
+    router = AdaptiveRouter(
+        fake_encoder,
+        storage,
+        max_rebuild_retries=2,
+        index_engine="numpy",
+    )
     router.add_route(Route(name="r1", utterances=["utterance1"], threshold=0.5))
     router.durable_barrier()
 

@@ -110,6 +110,9 @@ def validate_lock_file(path: Path) -> tuple[bool, str]:
 def validate_matrix(repo_root: Path) -> tuple[bool, str]:
     matrix_path = repo_root / "paper" / "experiment_matrix.json"
     matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+    dynamic_engine = matrix.get("dynamic", {}).get("index_engine")
+    if dynamic_engine not in {"numpy", "faiss"}:
+        return False, "dynamic matrix must freeze an explicit numpy or faiss index engine"
     families = set(EXPECTED_COMMAND_COUNTS)
     commands = build_commands(
         matrix,
@@ -191,6 +194,7 @@ def run_preflight(
         required = (
             "FROM python:3.11",
             "paper/requirements-linux-py311.lock",
+            "--no-build-isolation --no-deps -e .",
             "python -m pip check",
         )
         missing = [fragment for fragment in required if fragment not in content]
@@ -220,10 +224,15 @@ def run_preflight(
             "paper/CLAIM_LEDGER.md",
             "paper/experiment_matrix.json",
             "benchmarks/run_protocol_smoke.py",
+            "benchmarks/index_metadata.py",
             "paper/build_archive.py",
             "paper/verify_archive.py",
             "paper/verify_matrix_run.py",
+            "paper/analysis_utils.py",
+            "paper/analyze_backpressure.py",
+            "paper/analyze_scale.py",
             "docs/RESEARCH_PROTOCOL.md",
+            "docs/SYSTEMS_EVIDENCE_SCHEMA.md",
             "docs/CURRENT_EVIDENCE_STATUS.md",
         )
         missing = [relative for relative in required if not (repo_root / relative).is_file()]
@@ -252,11 +261,13 @@ def run_preflight(
             "valid_unverified_matrix_run",
             "raw results reference or SHA-256 is invalid",
             "summary differs from hashed command log",
-            "restart survival violated",
+            "outcome_observations",
+            "database hash differs",
+            "offered-load denominator mismatch",
             "Independent reproduction, immutable archival, and reviewer attestation",
         )
         missing = [fragment for fragment in required if fragment not in content]
-        detail = "matrix outputs, hashes, and family invariants independently checked"
+        detail = "matrix integrity and outcome observations independently checked"
         return not missing, detail if not missing else f"missing: {missing}"
 
     def check_evidence_promotion() -> tuple[bool, str]:

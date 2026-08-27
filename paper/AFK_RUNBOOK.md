@@ -63,12 +63,20 @@ Do not edit logs, state, predictions, summaries, or manifests. The runner skips
 only successful cells with matching log hashes and retries failed cells. It
 refuses to resume a different candidate or command plan.
 
+The top-level `status=running` value is only the last durable checkpoint. It
+can remain after a hard process or host termination and does not prove a runner
+is alive. Check `updated_at_utc` and the host process table. A valid resume
+retains the old invocation, marks a stale one `interrupted_before_resume`, and
+adds a separately identified invocation record.
+
 ## 4. Original-Run Review
 
-Require all 208 commands to complete, no correctness-invariant failures, a
-schema-valid unverified manifest, complete raw logs, and generated analysis
-artifacts. Statistical and paper outputs must be regenerated from archived
-machine-readable inputs. A failed or incomplete run is diagnostic only.
+Require all 208 commands to complete, a schema-valid unverified manifest,
+complete raw logs, and generated analysis artifacts. Statistical and paper
+outputs must be regenerated from archived machine-readable inputs. Integrity
+failures make a run diagnostic only. Unfavorable experimental outcomes remain
+in the candidate evidence and must not be rerun or excluded merely because they
+weaken a claim.
 
 Run the independent matrix verifier against the extracted or native matrix
 directory before reviewing any metric:
@@ -80,8 +88,10 @@ python paper/verify_matrix_run.py benchmark_results/paper-matrix-CANDIDATE-MACHI
 
 For hosted pilot artifacts, also pass `--family FAMILY --require-environment`.
 The verifier checks the frozen command plan, manifest/state/raw/log hashes,
-summary-to-log binding, and family correctness invariants. Its success still
-leaves the run unverified and paper-ineligible.
+summary-to-log binding, SQLite evidence hashes, and family arithmetic. Its
+success still leaves the run unverified and paper-ineligible. Review
+`outcome_observations` separately; these are retained results, not verifier
+failures.
 
 ## 5. Independent Reproduction
 

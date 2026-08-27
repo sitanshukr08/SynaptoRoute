@@ -18,6 +18,11 @@ def test_sustained_backpressure_retains_all_offered_requests():
 
     assert result["status"] == "unverified"
     assert result["configuration"]["measured_saturation_qps"] > 0
+    assert result["configuration"]["saturation_calibration_attempts"] == (
+        result["configuration"]["saturation_calibration_successes"]
+        + result["configuration"]["saturation_calibration_overloaded"]
+        + result["configuration"]["saturation_calibration_error_count"]
+    )
     for scenario in result["scenarios"]:
         accounted = (
             scenario["successful_count"]
@@ -25,3 +30,9 @@ def test_sustained_backpressure_retains_all_offered_requests():
             + scenario["error_count"]
         )
         assert accounted == scenario["offered_count"]
+        assert scenario["successful_count"] == (
+            scenario["successful_correct_count"] + scenario["successful_incorrect_count"]
+        )
+        outcome_rate = scenario["success_rate"] + scenario["shedding_rate"] + scenario["error_rate"]
+        assert abs(outcome_rate - 1.0) < 1e-12
+        assert scenario["scenario_wall_seconds"] >= scenario["offering_wall_seconds"]

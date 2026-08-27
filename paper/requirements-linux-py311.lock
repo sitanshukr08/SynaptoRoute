@@ -27,6 +27,7 @@ flatbuffers==25.12.19
 frozenlist==1.8.0
 fsspec==2026.2.0
 h11==0.16.0
+hatchling==1.25.0
 hf-xet==1.5.2
 httpcore==1.0.9
 httpx==0.28.1
@@ -91,6 +92,7 @@ tiktoken==0.13.0
 tokenizers==0.22.2
 tornado==6.5.7
 tqdm==4.67.3
+trove-classifiers==2026.6.1.19
 typing_extensions==4.15.0
 typing-inspection==0.4.2
 tzdata==2026.3

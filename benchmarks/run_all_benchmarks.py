@@ -36,6 +36,8 @@ BENCHMARKS = {
         "2",
         "--mutation-rate",
         "10",
+        "--engine",
+        "numpy",
     ],
     "backpressure_smoke": [
         "benchmarks/bench_async_backpressure.py",
